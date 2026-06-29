@@ -87,18 +87,30 @@ export default function ProyeccionPage() {
         </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="card">
-          <p className="text-sm text-secondary-600">Simpatizantes</p>
+          <p className="text-sm text-secondary-600">Padrón total</p>
           <p className="text-2xl font-bold text-secondary-900">{(resumen?.votantes_registrados || 0).toLocaleString()}</p>
+          {resumen?.meta_lista_nominal ? (
+            <p className="text-xs text-secondary-500">Lista nominal configurada</p>
+          ) : null}
         </div>
         <div className="card">
-          <p className="text-sm text-secondary-600">Meta total</p>
+          <p className="text-sm text-secondary-600">Capturados en sistema</p>
+          <p className="text-2xl font-bold text-secondary-900">{(resumen?.votantes_capturados || 0).toLocaleString()}</p>
+          {resumen?.avance_padron != null ? (
+            <p className="text-xs text-secondary-500">{resumen.avance_padron}% del padrón</p>
+          ) : null}
+        </div>
+        <div className="card">
+          <p className="text-sm text-secondary-600">Meta total votos</p>
           <p className="text-2xl font-bold text-secondary-900">{(resumen?.meta_votos_total || 0).toLocaleString()}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-secondary-600">Apoyos</p>
-          <p className="text-2xl font-bold text-secondary-900">{(resumen?.apoyos_registrados || 0).toLocaleString()}</p>
+          <p className="text-sm text-secondary-600">Participación esperada</p>
+          <p className="text-2xl font-bold text-secondary-900">
+            {resumen?.meta_participacion ? `${resumen.meta_participacion}%` : '-'}
+          </p>
         </div>
         <div className="card">
           <p className="text-sm text-secondary-600">Brecha vs meta</p>

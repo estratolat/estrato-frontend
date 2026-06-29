@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { votantesApi } from '@/lib/api';
+import { votantesApi, proyeccionApi } from '@/lib/api';
 import { Votante } from '@/types';
-import { Upload } from 'lucide-react';
+import { Upload, Users, Target } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const ImportModal = dynamic(() => import('./ImportModal'), { ssr: false });
@@ -17,6 +17,7 @@ export default function VotantesPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const [padron, setPadron] = useState<{ total?: number; capturados?: number; avance?: number } | null>(null);
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -26,6 +27,7 @@ export default function VotantesPage() {
     }
 
     loadVotantes();
+    loadPadron();
   }, [router]);
 
   const loadVotantes = async () => {
@@ -37,6 +39,21 @@ export default function VotantesPage() {
       setError(err.response?.data?.message || 'Error al cargar votantes');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPadron = async () => {
+    try {
+      const { data } = await proyeccionApi.getResumen();
+      if (data?.meta_lista_nominal && data?.votantes_capturados != null) {
+        setPadron({
+          total: data.meta_lista_nominal,
+          capturados: data.votantes_capturados,
+          avance: data.avance_padron ?? Math.round((data.votantes_capturados / data.meta_lista_nominal) * 1000) / 10,
+        });
+      }
+    } catch (err) {
+      // No bloquear la página si falla la proyección
     }
   };
 
@@ -84,6 +101,37 @@ export default function VotantesPage() {
           {error}
         </div>
       )}
+
+      {padron && padron.total ? (
+        <div className="card mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
+                <Users size={20} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Avance de captura del padrón</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {padron.capturados?.toLocaleString()} de {padron.total.toLocaleString()}{' '}
+                  <span className="text-sm font-medium text-gray-500">({padron.avance}%)</span>
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Faltan por capturar</p>
+              <p className="text-xl font-bold text-red-600">
+                {Math.max(0, (padron.total || 0) - (padron.capturados || 0)).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-full rounded-full bg-primary-600 transition-all"
+              style={{ width: `${Math.min(100, padron.avance || 0)}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="card mb-6">
         <input

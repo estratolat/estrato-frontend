@@ -41,7 +41,7 @@ export default function CasillasPage() {
   const loadCasillas = async () => {
     try {
       setLoading(true);
-      const { data } = await casillasApi.getAll({ limit: 500 });
+      const { data } = await casillasApi.getAll({ limit: 10000 });
       setCasillas(data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al cargar casillas');

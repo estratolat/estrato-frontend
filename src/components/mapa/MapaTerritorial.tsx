@@ -129,6 +129,11 @@ export default function MapaTerritorial() {
     color: string;
     props: Record<string, any>;
   } | null>(null);
+  const [featureSindicalSeleccionado, setFeatureSindicalSeleccionado] = useState<{
+    capaId: string;
+    featureId: string;
+    props: Record<string, any>;
+  } | null>(null);
   const [guardandoFeature, setGuardandoFeature] = useState(false);
   const [modalIneSecciones, setModalIneSecciones] = useState(false);
   const [modalExcel, setModalExcel] = useState(false);
@@ -244,6 +249,12 @@ export default function MapaTerritorial() {
   }, []);
 
   const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
+    const esCapaSindical = /STASE|Sindicales/i.test(
+      capasPersonalizadas.find(c => c.id === capaId)?.nombre || ''
+    );
+    if (esCapaSindical) {
+      setFeatureSindicalSeleccionado({ capaId, featureId, props });
+    }
     setFeatureEditando({
       capaId,
       featureId,
@@ -255,6 +266,10 @@ export default function MapaTerritorial() {
 
   const cerrarFeatureEditando = useCallback(() => {
     setFeatureEditando(null);
+  }, []);
+
+  const cerrarFeatureSindical = useCallback(() => {
+    setFeatureSindicalSeleccionado(null);
   }, []);
 
   const asegurarCapaCargada = useCallback(async (capaId: string, featureId: string, geometry?: any) => {
@@ -1304,6 +1319,13 @@ export default function MapaTerritorial() {
       <section className="relative min-h-[400px] flex-1 overflow-hidden rounded-xl bg-white shadow-sm">
         {detalle && <FichaTerritorial detalle={detalle} onCerrar={cerrarFicha} />}
 
+        {featureSindicalSeleccionado && (
+          <PanelSindicalFeature
+            feature={featureSindicalSeleccionado}
+            onCerrar={cerrarFeatureSindical}
+          />
+        )}
+
         {featureEditando && (
           <div className="absolute left-4 right-4 top-4 z-[600] mx-auto max-w-sm rounded-xl border border-secondary-200 bg-white p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
@@ -1652,4 +1674,119 @@ function generarDemoData(): MapaData {
     eventos: { type: 'FeatureCollection', features: eventos },
     lideres: { type: 'FeatureCollection', features: lideres },
   };
+}
+
+function PanelSindicalFeature({
+  feature,
+  onCerrar,
+}: {
+  feature: { capaId: string; featureId: string; props: Record<string, any> };
+  onCerrar: () => void;
+}) {
+  const props = feature.props || {};
+  const nombre = String(props._feature_nombre || props.NOMBRE || props.nombre || props.name || 'Sin nombre');
+  const zona = props.zona_sindical ? String(props.zona_sindical) : null;
+  const colorZona = props.color_zona ? String(props.color_zona) : null;
+  const tipoEntidad = props.tipo_entidad ? String(props.tipo_entidad) : null;
+  const dependenciasEje = Array.isArray(props.dependencias_eje) ? props.dependencias_eje : [];
+  const dependenciasEspecificas = Array.isArray(props.dependencias_especificas) ? props.dependencias_especificas : [];
+  const sede = props.sede_votacion ? String(props.sede_votacion) : null;
+  const resultados = props.resultados_historicos || null;
+  const esNodo = props.es_nodo === true;
+
+  return (
+    <div className="absolute right-4 top-4 z-[650] w-[340px] max-w-[92vw] rounded-xl border border-secondary-200 bg-white p-4 shadow-xl">
+      <div className="mb-3 flex items-start justify-between border-b border-secondary-200 pb-2">
+        <div>
+          <h3 className="text-base font-bold text-secondary-900">{nombre}</h3>
+          <p className="text-[10px] uppercase tracking-wide text-secondary-500">
+            Sinaloa - Municipios y Nodos Sindicales STASE 2027
+            {esNodo && ' • Nodo sindical'}
+          </p>
+        </div>
+        <button onClick={onCerrar} className="text-secondary-400 hover:text-secondary-600">✕</button>
+      </div>
+
+      <div className="space-y-2 text-xs">
+        {zona && (
+          <div className="flex items-center gap-2">
+            {colorZona && (
+              <span
+                className="inline-block h-3 w-3 rounded-full border border-white shadow"
+                style={{ backgroundColor: colorZona }}
+              />
+            )}
+            <span className="font-semibold text-secondary-800">Zona sindical:</span>
+            <span>{zona}</span>
+          </div>
+        )}
+        {tipoEntidad && (
+          <div>
+            <span className="font-semibold text-secondary-800">Tipo:</span> {tipoEntidad}
+          </div>
+        )}
+        {sede && (
+          <div>
+            <span className="font-semibold text-secondary-800">Sede de votación:</span> {sede}
+          </div>
+        )}
+
+        <div>
+          <span className="font-semibold text-secondary-800">Dependencias eje:</span>
+          {dependenciasEje.length > 0 ? (
+            <ul className="list-disc pl-4 text-secondary-700">
+              {dependenciasEje.map((d: string, i: number) => (
+                <li key={i}>{d}</li>
+              ))}
+            </ul>
+          ) : (
+            <em className="text-secondary-500">Sin datos</em>
+          )}
+        </div>
+
+        <div>
+          <span className="font-semibold text-secondary-800">Dependencias específicas:</span>
+          {dependenciasEspecificas.length > 0 ? (
+            <ul className="list-disc pl-4 text-secondary-700">
+              {dependenciasEspecificas.map((d: string, i: number) => (
+                <li key={i}>{d}</li>
+              ))}
+            </ul>
+          ) : (
+            <em className="text-secondary-500">Sin datos</em>
+          )}
+        </div>
+
+        {resultados && (
+          <div className="rounded border border-secondary-200 bg-secondary-50/60 p-1.5">
+            <p className="mb-1 font-semibold text-secondary-800">Resultados históricos STASE</p>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-secondary-100">
+                  <th className="px-2 py-1 text-left">Año</th>
+                  <th className="px-2 py-1 text-left">Planilla</th>
+                  <th className="px-2 py-1 text-right">Votos gan.</th>
+                  <th className="px-2 py-1 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(resultados).map(([anio, r]: [string, any]) => (
+                  <tr key={anio} className="border-b border-secondary-200">
+                    <td className="px-2 py-1">{anio}</td>
+                    <td className="px-2 py-1 font-semibold">{r?.planilla_ganadora || '-'}</td>
+                    <td className="px-2 py-1 text-right">
+                      {r?.votos_ganador != null ? Number(r.votos_ganador).toLocaleString() : '-'}
+                    </td>
+                    <td className="px-2 py-1 text-right">
+                      {r?.total != null ? Number(r.total).toLocaleString() : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

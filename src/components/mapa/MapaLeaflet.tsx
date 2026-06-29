@@ -596,18 +596,20 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
 
     const esCapaSindical = /STASE|Sindicales/i.test(capa.nombre);
 
+    const baseStyle = (feature: any) => {
+      const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
+      return {
+        color,
+        fillColor: color,
+        weight: esCapaSindical ? 2.5 : 2,
+        opacity: esCapaSindical ? 0.85 : 0.7,
+        fillOpacity: esCapaSindical ? 0.35 : 0.2,
+      };
+    };
+
     const layer = L.geoJSON(data, {
       ...(esCapaSindical ? { pane: 'sindical' } : {}),
-      style: (feature: any) => {
-        const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
-        return {
-          color,
-          fillColor: color,
-          weight: esCapaSindical ? 2.5 : 2,
-          opacity: esCapaSindical ? 0.85 : 0.7,
-          fillOpacity: esCapaSindical ? 0.35 : 0.2,
-        };
-      },
+      style: baseStyle,
       onEachFeature: (feature: any, l: any) => {
         const props = feature?.properties || {};
         const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
@@ -619,7 +621,13 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
 
         l.on('click', (e: any) => {
           L.DomEvent.stopPropagation(e);
+          l.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.5 });
           l.openPopup();
+          if (onFeatureClick) onFeatureClick(capa.id, featureId, props);
+        });
+
+        l.on('popupclose', () => {
+          l.setStyle(baseStyle(l.feature));
         });
 
         l.on('popupopen', () => {

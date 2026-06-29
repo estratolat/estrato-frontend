@@ -32,7 +32,7 @@ function mergeRecords(
   const merged = { ...defaults };
   if (saved && typeof saved === 'object') {
     Object.entries(saved).forEach(([k, v]) => {
-      if (k in merged) merged[k] = v;
+      merged[k] = v;
     });
   }
   return merged;

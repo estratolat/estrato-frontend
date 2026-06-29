@@ -497,6 +497,83 @@ interface CapaPersonalizadaProps {
   onRender?: () => void;
 }
 
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function listaHtml(items: string[] | undefined): string {
+  if (!items || items.length === 0) return '&lt;em&gt;Sin datos&lt;/em&gt;';
+  return `&lt;ul class="list-disc pl-4 text-xs text-secondary-700"&gt;${items
+    .map((i) => `&lt;li&gt;${escaparHtml(String(i))}&lt;/li&gt;`)
+    .join('')}&lt;/ul&gt;`;
+}
+
+function resultadosHtml(resultados: any): string {
+  if (!resultados || typeof resultados !== 'object') return '&lt;em&gt;Sin datos históricos&lt;/em&gt;';
+  const rows = Object.entries(resultados)
+    .map(([anio, r]: [string, any]) => {
+      const planilla = r?.planilla_ganadora ? escaparHtml(String(r.planilla_ganadora)) : '-';
+      const votos = r?.votos_ganador != null ? Number(r.votos_ganador).toLocaleString() : '-';
+      const total = r?.total != null ? Number(r.total).toLocaleString() : '-';
+      return `&lt;tr&gt;&lt;td class="px-2 py-1 border-b border-secondary-200"&gt;${anio}&lt;/td&gt;&lt;td class="px-2 py-1 border-b border-secondary-200 font-semibold"&gt;${planilla}&lt;/td&gt;&lt;td class="px-2 py-1 border-b border-secondary-200 text-right"&gt;${votos}&lt;/td&gt;&lt;td class="px-2 py-1 border-b border-secondary-200 text-right"&gt;${total}&lt;/td&gt;&lt;/tr&gt;`;
+    })
+    .join('');
+  return `&lt;table class="w-full text-xs"&gt;&lt;thead&gt;&lt;tr class="bg-secondary-100"&gt;&lt;th class="px-2 py-1 text-left"&gt;Año&lt;/th&gt;&lt;th class="px-2 py-1 text-left"&gt;Planilla&lt;/th&gt;&lt;th class="px-2 py-1 text-right"&gt;Votos gan.&lt;/th&gt;&lt;th class="px-2 py-1 text-right"&gt;Total&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;${rows}&lt;/tbody&gt;&lt;/table&gt;`;
+}
+
+function crearPopupHtml(props: Record<string, any>, capaId: string, capaNombre: string): string {
+  const nombre = escaparHtml(String(props._feature_nombre || props.NOMBRE || props.nombre || props.name || 'Sin nombre'));
+  const zona = props.zona_sindical ? escaparHtml(String(props.zona_sindical)) : null;
+  const colorZona = props.color_zona ? String(props.color_zona) : null;
+  const tipoEntidad = props.tipo_entidad ? escaparHtml(String(props.tipo_entidad)) : null;
+  const dependenciasEje = Array.isArray(props.dependencias_eje) ? props.dependencias_eje : [];
+  const dependenciasEspecificas = Array.isArray(props.dependencias_especificas)
+    ? props.dependencias_especificas
+    : [];
+  const sede = props.sede_votacion ? escaparHtml(String(props.sede_votacion)) : null;
+  const resultados = props.resultados_historicos || null;
+  const esNodo = props.es_nodo === true;
+  const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
+
+  const colorDot = colorZona
+    ? `&lt;span class="inline-block h-3 w-3 rounded-full border border-white shadow" style="background-color:${escaparHtml(colorZona)}"&gt;&lt;/span&gt;`
+    : '';
+
+  return `
+    &lt;div class="min-w-[260px] max-w-[320px] font-sans"&gt;
+      &lt;div class="mb-2 border-b border-secondary-200 pb-2"&gt;
+        &lt;h3 class="text-sm font-bold text-secondary-900"&gt;${nombre}&lt;/h3&gt;
+        &lt;p class="text-[10px] uppercase tracking-wide text-secondary-500"&gt;${escaparHtml(capaNombre)}${esNodo ? ' • Nodo sindical' : ''}&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div class="space-y-2 text-xs"&gt;
+        ${zona ? `&lt;div class="flex items-center gap-2"&gt;${colorDot}&lt;span class="font-semibold text-secondary-800"&gt;Zona sindical:&lt;/span&gt;&lt;span&gt;${zona}&lt;/span&gt;&lt;/div&gt;` : ''}
+        ${tipoEntidad ? `&lt;div&gt;&lt;span class="font-semibold text-secondary-800"&gt;Tipo:&lt;/span&gt; ${tipoEntidad}&lt;/div&gt;` : ''}
+        ${sede ? `&lt;div&gt;&lt;span class="font-semibold text-secondary-800"&gt;Sede de votación:&lt;/span&gt; ${sede}&lt;/div&gt;` : ''}
+        &lt;div&gt;
+          &lt;span class="font-semibold text-secondary-800"&gt;Dependencias eje:&lt;/span&gt;
+          ${listaHtml(dependenciasEje)}
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;span class="font-semibold text-secondary-800"&gt;Dependencias específicas:&lt;/span&gt;
+          ${listaHtml(dependenciasEspecificas)}
+        &lt;/div&gt;
+        &lt;div class="rounded border border-secondary-200 bg-secondary-50/60 p-1.5"&gt;
+          &lt;p class="mb-1 font-semibold text-secondary-800"&gt;Resultados históricos STASE&lt;/p&gt;
+          ${resultadosHtml(resultados)}
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class="mt-3 flex gap-2"&gt;
+        &lt;button id="btn-editar-feature-${featureId}" class="flex-1 rounded-md bg-primary-600 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-primary-700"&gt;Editar polígono&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  `;
+}
+
 function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRender }: CapaPersonalizadaProps) {
   const map = useMap();
   const capaRef = useRef<L.GeoJSON | null>(null);
@@ -521,11 +598,31 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
         };
       },
       onEachFeature: (feature: any, l: any) => {
+        const props = feature?.properties || {};
+        const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
+
+        l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre), {
+          maxWidth: 320,
+          className: 'capa-popup-sindical',
+        });
+
         l.on('click', (e: any) => {
           L.DomEvent.stopPropagation(e);
-          const props = feature?.properties || {};
-          const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
-          if (onFeatureClick) onFeatureClick(capa.id, featureId, props);
+          l.openPopup();
+        });
+
+        l.on('popupopen', () => {
+          const btn = document.getElementById(`btn-editar-feature-${featureId}`);
+          if (btn && onFeatureClick) {
+            const handler = () => onFeatureClick(capa.id, featureId, props);
+            btn.addEventListener('click', handler);
+            // Limpiar listener al cerrar popup para evitar duplicados
+            const cleanup = () => {
+              btn.removeEventListener('click', handler);
+              l.off('popupclose', cleanup);
+            };
+            l.on('popupclose', cleanup);
+          }
         });
       },
       pointToLayer: (feature: any, latlng: any) => {

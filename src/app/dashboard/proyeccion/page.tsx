@@ -154,7 +154,7 @@ export default function ProyeccionPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-secondary-200 bg-secondary-50">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-secondary-600">Sección</th>
+                <th className="px-4 py-3 text-left font-medium text-secondary-600">Sección / Zona</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Simp.</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Líderes</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Meta votos</th>
@@ -173,7 +173,7 @@ export default function ProyeccionPage() {
                   const Icon = tendenciaIcons[s.tendencia] || Minus;
                   return (
                     <tr key={s.seccion}>
-                      <td className="px-4 py-3 font-medium text-secondary-900">Sección {s.seccion}</td>
+                      <td className="px-4 py-3 font-medium text-secondary-900">{s.seccion}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.votantes}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.lideres}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.meta_votos?.toLocaleString() || '-'}</td>

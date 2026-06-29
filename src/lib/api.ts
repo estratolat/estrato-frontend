@@ -309,7 +309,7 @@ export const inteligenciaElectoralApi = {
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/analizar-seccion/${seccion}`),
 
   // Consultor IA
-  consultarIA: (data: { pregunta: string; contextoCampana?: Record<string, any>; eleccionId?: string }) =>
+  consultarIA: (data: { pregunta: string; contextoCampana?: Record<string, any>; eleccionId?: string; fuentes?: Record<string, boolean>; filtroTerritorial?: { tipo: string; valor: string } }) =>
     api.post('/inteligencia-electoral/consultar-ia', data),
 };
 

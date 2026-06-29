@@ -36,6 +36,11 @@ const PARTIDO_COLORS: Record<string, string> = {
   PVEM: '#65a30d',
   PT: '#dc2626',
   PANAL: '#06b6d4',
+  ROJA: '#b91c1c',
+  'AZUL MARINO': '#1e3a8a',
+  BLANCA: '#374151',
+  AZUL: '#2563eb',
+  VERDE: '#16a34a',
   OTRO: '#6b7280',
 };
 
@@ -88,7 +93,7 @@ export default function HistoricoElectoralPage() {
   const filtrados = useMemo(() => {
     return resultados.filter((r) => {
       if (filtros.anio && String(r.anio) !== filtros.anio) return false;
-      if (filtros.seccion && !r.seccion.includes(filtros.seccion.padStart(4, '0'))) return false;
+      if (filtros.seccion && !r.seccion.toLowerCase().includes(filtros.seccion.toLowerCase())) return false;
       if (filtros.partido && !r.partido_ganador.toLowerCase().includes(filtros.partido.toLowerCase())) return false;
       return true;
     });
@@ -158,7 +163,7 @@ export default function HistoricoElectoralPage() {
             Histórico Electoral
           </h1>
           <p className="text-sm text-secondary-500">
-            Resultados de votaciones pasadas por sección electoral
+            Resultados de votaciones sindicales pasadas por nodo / municipio
           </p>
         </div>
 
@@ -206,7 +211,7 @@ export default function HistoricoElectoralPage() {
                 <p className="mt-1 text-2xl font-bold text-secondary-900">
                   {resumen?.seccionesPorAnio[anio] || 0}
                 </p>
-                <p className="text-xs text-secondary-400">secciones cargadas</p>
+                <p className="text-xs text-secondary-400">nodos cargados</p>
               </div>
             ))}
           </div>
@@ -228,25 +233,25 @@ export default function HistoricoElectoralPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Sección</label>
+                <label className="label">Nodo / Municipio</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
                   <input
                     type="text"
                     value={filtros.seccion}
                     onChange={(e) => setFiltros({ ...filtros, seccion: e.target.value })}
-                    placeholder="Ej. 0123"
+                    placeholder="Ej. Culiacán"
                     className="input pl-9"
                   />
                 </div>
               </div>
               <div>
-                <label className="label">Partido ganador</label>
+                <label className="label">Planilla ganadora</label>
                 <input
                   type="text"
                   value={filtros.partido}
                   onChange={(e) => setFiltros({ ...filtros, partido: e.target.value })}
-                  placeholder="Ej. MORENA"
+                  placeholder="Ej. Roja"
                   className="input"
                 />
               </div>
@@ -260,8 +265,8 @@ export default function HistoricoElectoralPage() {
                 <thead className="border-b border-gray-200 bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Año</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Sección</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Ganador</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Nodo / Municipio</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Planilla</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Votos ganador</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Votos totales</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Participación</th>
@@ -303,7 +308,7 @@ export default function HistoricoElectoralPage() {
           <div className="card p-4">
             <div className="mb-4 flex items-center gap-2">
               <BarChart3 size={20} className="text-primary-600" />
-              <h3 className="text-lg font-bold text-secondary-900">Comparativa por sección</h3>
+              <h3 className="text-lg font-bold text-secondary-900">Comparativa por nodo</h3>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <select
@@ -333,9 +338,9 @@ export default function HistoricoElectoralPage() {
                 <table className="w-full">
                   <thead className="border-b border-gray-200 bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Sección</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{anio1} Ganador</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{anio2} Ganador</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Nodo / Municipio</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{anio1} Planilla</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{anio2} Planilla</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Dif. votos</th>
                     </tr>
                   </thead>

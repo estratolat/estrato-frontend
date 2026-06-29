@@ -186,6 +186,14 @@ interface MapaBridgeProps {
 const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBridgeInner({ capasGeoJSONRef }, ref) {
   const map = useMap();
 
+  useEffect(() => {
+    // Pane especial para que la capa sindical STASE quede por encima de colonias/distritos
+    if (!map.getPane('sindical')) {
+      map.createPane('sindical');
+      map.getPane('sindical')!.style.zIndex = '640';
+    }
+  }, [map]);
+
   const resaltarFeature = useCallback((capaId: string, featureId: string, geometryFallback?: any) => {
     try {
       const geoLayer = capasGeoJSONRef?.current?.get(capaId);
@@ -586,15 +594,18 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
     }
     if (!data?.features?.length) return;
 
+    const esCapaSindical = /STASE|Sindicales/i.test(capa.nombre);
+
     const layer = L.geoJSON(data, {
+      ...(esCapaSindical ? { pane: 'sindical' } : {}),
       style: (feature: any) => {
         const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
         return {
           color,
           fillColor: color,
-          weight: 2,
-          opacity: 0.7,
-          fillOpacity: 0.2,
+          weight: esCapaSindical ? 2.5 : 2,
+          opacity: esCapaSindical ? 0.85 : 0.7,
+          fillOpacity: esCapaSindical ? 0.35 : 0.2,
         };
       },
       onEachFeature: (feature: any, l: any) => {

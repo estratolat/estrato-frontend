@@ -621,6 +621,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
 
         l.on('click', (e: any) => {
           L.DomEvent.stopPropagation(e);
+          l.bringToFront();
           l.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.5 });
           l.openPopup();
           if (onFeatureClick) onFeatureClick(capa.id, featureId, props);

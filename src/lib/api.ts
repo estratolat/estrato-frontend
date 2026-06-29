@@ -294,14 +294,17 @@ export const inteligenciaElectoralApi = {
   updateActor: (id: string, data: any) => api.patch(`/inteligencia-electoral/actores/${id}`, data),
   deleteActor: (id: string) => api.delete(`/inteligencia-electoral/actores/${id}`),
 
-  // Plantilla y carga
+  // Plantilla, sábana y carga
   descargarPlantilla: (eleccionId: string) =>
     api.get(`/inteligencia-electoral/elecciones/${eleccionId}/plantilla`, { responseType: 'blob' }),
+  descargarSabana: (eleccionId: string) =>
+    api.get(`/inteligencia-electoral/elecciones/${eleccionId}/sabana`, { responseType: 'blob' }),
   cargarExcel: (eleccionId: string, formData: FormData) =>
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/cargar-excel`, formData),
 
   // Análisis
   getSecciones: (eleccionId: string) => api.get(`/inteligencia-electoral/elecciones/${eleccionId}/secciones`),
+  getMapaSecciones: (eleccionId: string) => api.get(`/inteligencia-electoral/elecciones/${eleccionId}/mapa-secciones`),
   analizarSeccion: (eleccionId: string, seccion: string) =>
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/analizar-seccion/${seccion}`),
 };
@@ -322,6 +325,7 @@ export const mapaApi = {
     api.get('/mapas/estadisticas', { params: { nivel } }),
   createCapa: (data: any) => api.post('/mapas/capas', data),
   updateCapa: (id: string, data: any) => api.patch(`/mapas/capas/${id}`, data),
+  updateEstilosCapa: (id: string, estilos: Record<string, { color?: string; nombre?: string }>) => api.patch(`/mapas/capas/${id}/estilos`, { estilos }),
   deleteCapa: (id: string) => api.delete(`/mapas/capas/${id}`),
   subirCapa: (formData: FormData) => api.post('/mapas/subir', formData),
   getSeccionesINE: (estado_id?: string | number, municipio_id?: string | number) => api.get('/mapas/secciones-ine', { params: { estado_id, municipio_id } }),

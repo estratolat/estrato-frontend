@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -28,7 +28,7 @@ import 'leaflet.heat';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
-import { MapaData } from '@/types/mapa';
+import { MapaData, ResultadoGlobal } from '@/types/mapa';
 import { Lider } from '@/types';
 import { Icon } from '@/components/ui/Icon';
 import { errorToString } from '@/lib/error-utils';
@@ -37,11 +37,40 @@ import { es } from 'date-fns/locale';
 
 const CENTRO_LEON: [number, number] = [21.125, -101.6858];
 const ZOOM_INICIAL = 13;
+const CENTRO_STORAGE_KEY = 'mapa-centro';
+const RESALTAR_REINTENTOS = 40;
+const RESALTAR_INTERVALO = 300;
+
+function getCentroInicial(): { center: [number, number]; zoom: number } {
+  if (typeof window === 'undefined') {
+    return { center: CENTRO_LEON, zoom: ZOOM_INICIAL };
+  }
+  try {
+    const raw = localStorage.getItem(CENTRO_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        Array.isArray(parsed.center) &&
+        parsed.center.length === 2 &&
+        typeof parsed.center[0] === 'number' &&
+        typeof parsed.center[1] === 'number' &&
+        typeof parsed.zoom === 'number'
+      ) {
+        return { center: parsed.center, zoom: parsed.zoom };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { center: CENTRO_LEON, zoom: ZOOM_INICIAL };
+}
 
 export interface MapaLeafletRef {
   flyTo: (lat: number, lng: number, zoom?: number) => void;
   fitBounds: (geometryOrBbox: any) => void;
   openPopup: (lat: number, lng: number, contenido?: HTMLElement) => void;
+  resaltarFeature: (capaId: string, featureId: string) => void;
+  _resaltarFeatureConGeometria?: (capaId: string, featureId: string, geometry?: any) => void;
 }
 
 interface Props {
@@ -57,16 +86,33 @@ interface Props {
   onCerrarPunto?: () => void;
   filtrosApoyos?: Record<string, boolean>;
   seleccion?: { geometry: any; properties?: any; tipo?: string; nombre?: string } | null;
+  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
+  resultadoDestacado?: ResultadoGlobal | null;
 }
 
+// Refs compartidos entre MapaBridge y CapaPersonalizada para resaltar features
+const highlightRef: { layer: L.GeoJSON | null; timer: any } = { layer: null, timer: null };
+let pendingHighlight: { capaId: string; featureId: string; intentos: number } | null = null;
+
 export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
-  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, filtrosApoyos, seleccion },
+  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado },
   ref
 ) {
+  const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
+  const centroInicial = useRef(getCentroInicial()).current;
+
+  const handleCapaRender = useCallback((capaId: string) => {
+    if (pendingHighlight && pendingHighlight.capaId === capaId) {
+      setTimeout(() => {
+        (ref as any)?.current?.resaltarFeature?.(pendingHighlight!.capaId, pendingHighlight!.featureId);
+      }, 80);
+    }
+  }, []);
+
   return (
     <MapContainer
-      center={CENTRO_LEON}
-      zoom={ZOOM_INICIAL}
+      center={centroInicial.center}
+      zoom={centroInicial.zoom}
       scrollWheelZoom={true}
       className="h-full w-full"
     >
@@ -75,9 +121,12 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       />
 
-      <MapaBridge ref={ref} />
+      <MapaBridge ref={ref} capasGeoJSONRef={capasGeoJSONRef} />
       <ControlRecargar onRecargar={onRecargar} />
+      <GuardarCentro />
       {onSeleccionarCoordenada && <DetectorClicMapa onSeleccionar={onSeleccionarCoordenada} />}
+
+      <ManejadorResultadoDestacado resultado={resultadoDestacado} capasGeoJSONRef={capasGeoJSONRef} />
 
       {activas.votantes && data.votantes && (
         <CapaVotantes data={data.votantes} />
@@ -105,7 +154,14 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
 
       {personalizadas.map(capa => (
         activas[capa.id] && data[capa.id] && (
-          <CapaPersonalizada key={capa.id} data={data[capa.id]!} color={capa.color} nombre={capa.nombre} />
+          <CapaPersonalizada
+            key={capa.id}
+            data={data[capa.id]!}
+            capa={capa}
+            capasGeoJSONRef={capasGeoJSONRef}
+            onFeatureClick={onFeatureClick}
+            onRender={() => handleCapaRender(capa.id)}
+          />
         )
       ))}
 
@@ -123,34 +179,274 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
   );
 });
 
-const MapaBridge = forwardRef<MapaLeafletRef, {}>(function MapaBridgeInner(_props, ref) {
+interface MapaBridgeProps {
+  capasGeoJSONRef?: React.RefObject<Map<string, L.GeoJSON>>;
+}
+
+const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBridgeInner({ capasGeoJSONRef }, ref) {
   const map = useMap();
+
+  const resaltarFeature = useCallback((capaId: string, featureId: string, geometryFallback?: any) => {
+    try {
+      const geoLayer = capasGeoJSONRef?.current?.get(capaId);
+      if (!geoLayer) {
+        console.warn('[MapaBridge] resaltarFeature: capa no encontrada', capaId, '— se reintentará');
+        pendingHighlight = { capaId, featureId, intentos: 1 };
+        return;
+      }
+
+      const layers = geoLayer.getLayers() as L.Layer[];
+      const target = layers.find((l: any) => {
+        const p = l.feature?.properties || {};
+        return String(p._feature_id) === String(featureId);
+      }) as L.Layer | undefined;
+
+      if (!target) {
+        console.warn('[MapaBridge] resaltarFeature: feature no encontrado', featureId, 'en capa', capaId, 'capa tiene', layers.length, 'layers');
+        pendingHighlight = { capaId, featureId, intentos: 1 };
+        return;
+      }
+
+      pendingHighlight = null;
+
+      const bounds = (target as any).getBounds ? (target as any).getBounds() : null;
+      if (bounds?.isValid?.()) {
+        // Ajustar el mapa para que el polígono ocupe toda la vista
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
+      } else if (geometryFallback) {
+        const fallback = L.geoJSON(geometryFallback);
+        const fb = fallback.getBounds();
+        fallback.remove();
+        if (fb?.isValid?.()) {
+          map.fitBounds(fb, { padding: [60, 60], maxZoom: 16, animate: true });
+        }
+      } else if ((target as any).getLatLng) {
+        const ll = (target as any).getLatLng();
+        map.flyTo(ll, 16, { duration: 1.2 });
+      }
+
+      // highlight temporal
+      if (highlightRef.layer) {
+        try { map.removeLayer(highlightRef.layer); } catch {}
+      }
+      if (highlightRef.timer) clearTimeout(highlightRef.timer);
+
+      const featureGeo = (target as any).feature || geometryFallback;
+      if (!featureGeo) {
+        console.warn('[MapaBridge] resaltarFeature: no hay geometría para resaltar', featureId);
+        return;
+      }
+      const highlight = L.geoJSON(featureGeo, {
+        style: {
+          fillColor: '#D73216',
+          color: '#D73216',
+          weight: 4,
+          opacity: 1,
+          fillOpacity: 0.25,
+          dashArray: '6 6',
+        },
+        pointToLayer: (_f, latlng) => L.circleMarker(latlng, {
+          radius: 12,
+          fillColor: '#D73216',
+          color: '#fff',
+          weight: 3,
+          opacity: 1,
+          fillOpacity: 0.8,
+        }),
+      });
+      highlight.addTo(map);
+      highlightRef.layer = highlight;
+      highlightRef.timer = setTimeout(() => {
+        try { map.removeLayer(highlight); } catch {}
+        highlightRef.layer = null;
+      }, 5000);
+    } catch (e) {
+      console.warn('[MapaBridge] resaltarFeature error:', e);
+    }
+  }, [map, capasGeoJSONRef]);
+
+  // Reintento automático mientras haya un highlight pendiente
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!pendingHighlight) return;
+      if (pendingHighlight.intentos >= RESALTAR_REINTENTOS) {
+        console.warn('[MapaBridge] highlight pendiente abandonado tras', RESALTAR_REINTENTOS, 'intentos:', pendingHighlight);
+        pendingHighlight = null;
+        return;
+      }
+      pendingHighlight.intentos += 1;
+      resaltarFeature(pendingHighlight.capaId, pendingHighlight.featureId);
+    }, RESALTAR_INTERVALO);
+    return () => clearInterval(interval);
+  }, [resaltarFeature]);
+
   useImperativeHandle(ref, () => ({
     flyTo: (lat, lng, zoom = 16) => map.flyTo([lat, lng], zoom, { duration: 1.2 }),
     fitBounds: (geometryOrBbox) => {
       try {
+        console.log('[MapaBridge] fitBounds input:', geometryOrBbox);
         let bounds: L.LatLngBounds | null = null;
         if (Array.isArray(geometryOrBbox) && geometryOrBbox.length === 4) {
           const [minLng, minLat, maxLng, maxLat] = geometryOrBbox;
+          bounds = L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
+        } else if (geometryOrBbox?.bbox) {
+          const [minLng, minLat, maxLng, maxLat] = geometryOrBbox.bbox;
           bounds = L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
         } else if (geometryOrBbox) {
           const geo = L.geoJSON(geometryOrBbox);
           bounds = geo.getBounds();
           geo.remove();
         }
+        console.log('[MapaBridge] fitBounds computed:', bounds?.isValid?.() ? bounds.toBBoxString() : 'invalid');
         if (bounds && bounds.isValid()) {
-          map.flyToBounds(bounds, { padding: [40, 40], duration: 1.2, maxZoom: 18 });
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18, animate: true });
+        } else {
+          console.warn('[MapaBridge] fitBounds: bounds inválido', geometryOrBbox);
         }
       } catch (e) {
-        console.warn('fitBounds error:', e);
+        console.warn('[MapaBridge] fitBounds error:', e);
       }
     },
     openPopup: (lat, lng) => {
       map.flyTo([lat, lng], 16, { duration: 1.2 });
     },
-  }));
+    resaltarFeature: (capaId, featureId) => resaltarFeature(capaId, featureId, undefined),
+    // Exponer versión interna con fallback de geometría para que MapaTerritorial pueda pasarla
+    _resaltarFeatureConGeometria: resaltarFeature,
+  }), [map, resaltarFeature]);
   return null;
 });
+
+function ManejadorResultadoDestacado({
+  resultado,
+  capasGeoJSONRef,
+}: {
+  resultado?: ResultadoGlobal | null;
+  capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!resultado) return;
+    console.log('[ManejadorResultadoDestacado] resultado:', resultado.id, resultado.tipo, 'bbox:', resultado.bbox, 'capaId:', resultado.capaId, 'featureId:', resultado.featureId);
+
+    // Zoom inmediato al bbox o geometría
+    try {
+      let bounds: L.LatLngBounds | null = null;
+      if (Array.isArray(resultado.bbox) && resultado.bbox.length === 4) {
+        const [minLng, minLat, maxLng, maxLat] = resultado.bbox;
+        bounds = L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
+      } else if (resultado.geometry) {
+        const geo = L.geoJSON(resultado.geometry);
+        bounds = geo.getBounds();
+        geo.remove();
+      }
+      if (bounds && bounds.isValid()) {
+        console.log('[ManejadorResultadoDestacado] haciendo fitBounds');
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
+      } else {
+        console.warn('[ManejadorResultadoDestacado] bounds inválido');
+      }
+    } catch (e) {
+      console.warn('[ManejadorResultadoDestacado] fitBounds error:', e);
+    }
+
+    // Intentar resaltar feature dentro de la capa padre
+    if (resultado.tipo === 'capa_feature' && resultado.capaId && resultado.featureId) {
+      const intentarResaltar = () => {
+        try {
+          const geoLayer = capasGeoJSONRef.current?.get(resultado.capaId!);
+          if (!geoLayer) {
+            console.log('[ManejadorResultadoDestacado] capa aún no renderizada, reintentando...');
+            return false;
+          }
+          const layers = geoLayer.getLayers() as L.Layer[];
+          const target = layers.find((l: any) => {
+            const p = l.feature?.properties || {};
+            return String(p._feature_id) === String(resultado.featureId);
+          }) as L.Layer | undefined;
+
+          if (!target) {
+            console.log('[ManejadorResultadoDestacado] feature no encontrado, reintentando...');
+            return false;
+          }
+
+          // Highlight temporal
+          if (highlightRef.layer) {
+            try { map.removeLayer(highlightRef.layer); } catch {}
+          }
+          if (highlightRef.timer) clearTimeout(highlightRef.timer);
+
+          const featureGeo = (target as any).feature || resultado.geometry;
+          const highlight = L.geoJSON(featureGeo, {
+            style: {
+              fillColor: '#D73216',
+              color: '#D73216',
+              weight: 4,
+              opacity: 1,
+              fillOpacity: 0.25,
+              dashArray: '6 6',
+            },
+            pointToLayer: (_f, latlng) => L.circleMarker(latlng, {
+              radius: 12,
+              fillColor: '#D73216',
+              color: '#fff',
+              weight: 3,
+              opacity: 1,
+              fillOpacity: 0.8,
+            }),
+          });
+          highlight.addTo(map);
+          highlightRef.layer = highlight;
+          highlightRef.timer = setTimeout(() => {
+            try { map.removeLayer(highlight); } catch {}
+            highlightRef.layer = null;
+          }, 5000);
+          return true;
+        } catch (e) {
+          console.warn('[ManejadorResultadoDestacado] resaltar error:', e);
+          return false;
+        }
+      };
+
+      // Reintentos progresivos
+      if (!intentarResaltar()) {
+        let intentos = 0;
+        const interval = setInterval(() => {
+          intentos += 1;
+          if (intentarResaltar() || intentos >= 20) {
+            clearInterval(interval);
+            if (intentos >= 20) {
+              console.warn('[ManejadorResultadoDestacado] abandonado tras 20 intentos');
+            }
+          }
+        }, 250);
+      }
+    }
+  }, [resultado, map, capasGeoJSONRef]);
+
+  return null;
+}
+
+function GuardarCentro() {
+  const map = useMap();
+  useMapEvents({
+    moveend: () => {
+      if (typeof window === 'undefined') return;
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      try {
+        localStorage.setItem(
+          CENTRO_STORAGE_KEY,
+          JSON.stringify({ center: [center.lat, center.lng], zoom })
+        );
+      } catch {
+        // ignore
+      }
+    },
+  });
+  return null;
+}
 
 function DetectorClicMapa({ onSeleccionar }: { onSeleccionar: (lat: number, lng: number) => void }) {
   useMapEvents({
@@ -161,17 +457,106 @@ function DetectorClicMapa({ onSeleccionar }: { onSeleccionar: (lat: number, lng:
   return null;
 }
 
-const iconoPuntoSeleccionado = L.divIcon({
-  className: 'custom-marker-punto',
-  html: `
-    <div style="position:relative;width:28px;height:28px;transform:translate(-50%,-50%);">
-      <div style="position:absolute;inset:0;border:3px solid #D73216;border-radius:50%;background:rgba(215,50,22,0.15);"></div>
-      <div style="position:absolute;inset:0;margin:auto;width:8px;height:8px;background:#D73216;border-radius:50%;"></div>
-    </div>
-  `,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-});
+function ControlRecargar({ onRecargar }: { onRecargar: () => void }) {
+  return null;
+}
+
+function CapaVotantes({ data }: { data: any }) {
+  return null;
+}
+
+function CapaRecorridos({ data }: { data: any }) {
+  return null;
+}
+
+function CapaApoyos({ data, filtros }: { data: any; filtros?: Record<string, boolean> }) {
+  return null;
+}
+
+function CapaPeticiones({ data }: { data: any }) {
+  return null;
+}
+
+function CapaEventos({ data }: { data: any }) {
+  return null;
+}
+
+function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
+  return null;
+}
+
+function CapaDibujo() {
+  return null;
+}
+
+interface CapaPersonalizadaProps {
+  data: any;
+  capa: { id: string; nombre: string; color: string };
+  capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
+  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
+  onRender?: () => void;
+}
+
+function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRender }: CapaPersonalizadaProps) {
+  const map = useMap();
+  const capaRef = useRef<L.GeoJSON | null>(null);
+
+  useEffect(() => {
+    if (capaRef.current) {
+      capaRef.current.removeFrom(map);
+      capasGeoJSONRef.current?.delete(capa.id);
+      capaRef.current = null;
+    }
+    if (!data?.features?.length) return;
+
+    const layer = L.geoJSON(data, {
+      style: (feature: any) => {
+        const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
+        return {
+          color,
+          fillColor: color,
+          weight: 2,
+          opacity: 0.7,
+          fillOpacity: 0.2,
+        };
+      },
+      onEachFeature: (feature: any, l: any) => {
+        l.on('click', (e: any) => {
+          L.DomEvent.stopPropagation(e);
+          const props = feature?.properties || {};
+          const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
+          if (onFeatureClick) onFeatureClick(capa.id, featureId, props);
+        });
+      },
+      pointToLayer: (feature: any, latlng: any) => {
+        const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
+        return L.circleMarker(latlng, {
+          radius: 6,
+          fillColor: color,
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8,
+        });
+      },
+    });
+
+    layer.addTo(map);
+    capaRef.current = layer;
+    capasGeoJSONRef.current?.set(capa.id, layer);
+    console.log('[CapaPersonalizada] renderizada', capa.id, capa.nombre, 'features:', data.features.length);
+    onRender?.();
+
+    return () => {
+      if (capaRef.current) {
+        capaRef.current.removeFrom(map);
+        capasGeoJSONRef.current?.delete(capa.id);
+      }
+    };
+  }, [data, capa.id, capa.color, capa.nombre, map, capasGeoJSONRef, onFeatureClick, onRender]);
+
+  return null;
+}
 
 function MarcadorPuntoSeleccionado({
   lat,
@@ -185,722 +570,65 @@ function MarcadorPuntoSeleccionado({
   onCerrar: () => void;
 }) {
   return (
-    <Marker
-      position={[lat, lng]}
-      icon={iconoPuntoSeleccionado}
-      eventHandlers={{
-        add: (e) => {
-          e.target.openPopup();
-        },
-        click: (e) => {
-          e.originalEvent?.stopPropagation();
-        },
-      }}
-    >
-      <Popup minWidth={220} closeButton={false}>
-        <div
-          className="font-sans"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <p className="mb-2 text-sm font-semibold text-secondary-900">¿Qué quieres agregar aquí?</p>
-          <p className="mb-3 text-xs text-secondary-500">
-            Lat {lat.toFixed(5)}, Lng {lng.toFixed(5)}
-          </p>
-          <div className="space-y-1.5">
+    <Marker position={[lat, lng]}>
+      <Popup>
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">¿Qué quieres registrar aquí?</p>
+          <div className="flex gap-2">
             <button
-              onClick={(e) => { e.stopPropagation(); onAccion('apoyo', lat, lng); }}
-              className="flex w-full items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-left text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+              onClick={() => onAccion('apoyo', lat, lng)}
+              className="rounded bg-primary-600 px-2 py-1 text-xs text-white"
             >
-              <Icon name="apoyos" size={14} /> Registrar apoyo
+              Apoyo
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onAccion('evento', lat, lng); }}
-              className="flex w-full items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 text-left text-xs font-semibold text-primary-700 transition hover:bg-primary-100"
+              onClick={() => onAccion('evento', lat, lng)}
+              className="rounded bg-secondary-600 px-2 py-1 text-xs text-white"
             >
-              <Icon name="eventos" size={14} /> Nuevo evento
+              Evento
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onAccion('lider', lat, lng); }}
-              className="flex w-full items-center gap-2 rounded-lg bg-secondary-100 px-3 py-2 text-left text-xs font-semibold text-secondary-700 transition hover:bg-secondary-200"
+              onClick={() => onAccion('lider', lat, lng)}
+              className="rounded bg-green-600 px-2 py-1 text-xs text-white"
             >
-              <Icon name="lideres" size={14} /> Agregar líder
+              Líder
             </button>
           </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onCerrar(); }}
-            className="mt-2 w-full rounded-md py-1 text-[11px] font-medium text-secondary-500 transition hover:bg-secondary-50"
-          >
-            Cerrar
-          </button>
+          <button onClick={onCerrar} className="text-xs text-secondary-500 underline">Cerrar</button>
         </div>
       </Popup>
     </Marker>
   );
 }
 
-function ControlRecargar({ onRecargar }: { onRecargar: () => void }) {
+function CapaSeleccionada({ seleccion }: { seleccion: any }) {
   const map = useMap();
-  const divRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<L.GeoJSON | null>(null);
 
   useEffect(() => {
-    if (!divRef.current) return;
-    const control = new (L.Control as any)({ position: 'topright' });
-    control.onAdd = () => divRef.current!;
-    control.addTo(map);
-    return () => {
-      control.remove();
-    };
-  }, [map]);
-
-  return (
-    <div ref={divRef} className="leaflet-bar leaflet-control">
-      <button
-        onClick={onRecargar}
-        title="Recargar capas"
-        className="flex h-9 w-9 items-center justify-center bg-white text-secondary-700 shadow-sm hover:bg-secondary-50"
-      >
-        <Icon name="eventos" size={18} />
-      </button>
-    </div>
-  );
-}
-
-const COLOR_NIVEL_APOYO: Record<number, string> = {
-  5: '#22C55E',
-  4: '#84CC16',
-  3: '#F59E0B',
-  2: '#F97316',
-  1: '#EF4444',
-};
-
-const LABEL_NIVEL_APOYO: Record<number, string> = {
-  5: 'Muy probable',
-  4: 'Probable',
-  3: 'Indeciso',
-  2: 'Poco probable',
-  1: 'Opuesto',
-};
-
-function iconoVotante(nivel: number) {
-  const color = COLOR_NIVEL_APOYO[nivel] || '#9CA3AF';
-  return L.divIcon({
-    className: 'custom-marker-votante',
-    html: `
-      <div style="position:relative;width:18px;height:18px;background-color:${color};border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.35);"></div>
-    `,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-  });
-}
-
-function CapaVotantes({ data }: { data: any }) {
-  const features = (data.features || []).filter((f: any) => f.geometry?.type === 'Point');
-
-  return (
-    <>
-      {features.map((f: any) => {
-        const coords = f.geometry.coordinates;
-        const p = f.properties || {};
-        const nivel = Number(p.nivel_apoyo) || 3;
-        const color = COLOR_NIVEL_APOYO[nivel] || '#9CA3AF';
-        return (
-          <Marker key={p.id || Math.random()} position={[coords[1], coords[0]]} icon={iconoVotante(nivel)}>
-            <Popup>
-              <div className="font-sans min-w-[200px]">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                  <p className="font-bold text-secondary-900">{p.nombre || 'Simpatizante'}</p>
-                </div>
-                {p.telefono && <p className="text-sm text-secondary-500">{p.telefono}</p>}
-                {p.seccion_electoral && <p className="text-sm text-secondary-500">Sección: {p.seccion_electoral}</p>}
-                {p.colonia && <p className="text-sm text-secondary-500">Colonia: {p.colonia}</p>}
-                <p className="text-sm text-secondary-700">
-                  Nivel de apoyo: <span className="font-semibold" style={{ color }}>{LABEL_NIVEL_APOYO[nivel] || nivel}</span>
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        );
-      })}
-    </>
-  );
-}
-
-function CapaCalor({ data }: { data: any }) {
-  const map = useMap();
-  const layerRef = useRef<L.Layer | null>(null);
-
-  useEffect(() => {
-    const points = (data.features || [])
-      .filter((f: any) => f.geometry?.type === 'Point')
-      .map((f: any) => {
-        const coords = f.geometry.coordinates;
-        return [coords[1], coords[0], 0.6 + (f.properties?.nivel_apoyo || 3) * 0.1];
-      });
-
-    if (points.length === 0) return;
-
-    const heatLayer = (L as any).heatLayer(points, {
-      radius: 22,
-      blur: 18,
-      maxZoom: 16,
-      max: 1,
-      gradient: {
-        0.3: '#F87171',
-        0.55: '#EF4444',
-        0.8: '#B91C1C',
-        1: '#7F1D1D',
+    if (!seleccion?.geometry) return;
+    if (layerRef.current) {
+      layerRef.current.removeFrom(map);
+      layerRef.current = null;
+    }
+    const layer = L.geoJSON(seleccion.geometry, {
+      style: {
+        color: '#D73216',
+        weight: 3,
+        opacity: 0.9,
+        fillColor: '#D73216',
+        fillOpacity: 0.15,
+        dashArray: '5 5',
       },
     });
-
-    heatLayer.addTo(map);
-    layerRef.current = heatLayer;
-
+    layer.addTo(map);
+    layerRef.current = layer;
     return () => {
       if (layerRef.current) {
-        map.removeLayer(layerRef.current);
+        layerRef.current.removeFrom(map);
       }
     };
-  }, [map, data]);
+  }, [seleccion, map]);
 
   return null;
-}
-
-function CapaRecorridos({ data }: { data: any }) {
-  return (
-    <>
-      {(data.features || [])
-        .filter((f: any) => f.geometry?.type === 'LineString')
-        .map((f: any) => {
-          const positions = f.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
-          return (
-            <Polyline
-              key={f.properties?.id || Math.random()}
-              positions={positions}
-              pathOptions={{ color: '#D73216', weight: 3, opacity: 0.75 }}
-            >
-              <Popup>
-                <div className="font-sans">
-                  <p className="font-bold text-secondary-900">Recorrido de brigada</p>
-                  <p className="text-sm text-secondary-600">{formatFecha(f.properties?.fecha)}</p>
-                  {f.properties?.usuario_nombre && (
-                    <p className="text-sm text-secondary-600">Por: {f.properties.usuario_nombre}</p>
-                  )}
-                </div>
-              </Popup>
-            </Polyline>
-          );
-        })}
-    </>
-  );
-}
-
-const COLOR_APOYO: Record<string, string> = {
-  despensa: '#F59E0B',
-  medicamento: '#3B82F6',
-  lamina: '#6B7280',
-  otro: '#22C55E',
-};
-
-function iconoApoyo(tipo: string) {
-  const color = COLOR_APOYO[tipo] || '#9CA3AF';
-  return L.divIcon({
-    className: 'custom-marker-apoyo',
-    html: `<div style="background-color:${color};width:16px;height:16px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.35);"></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-  });
-}
-
-function CapaApoyos({ data, filtros }: { data: any; filtros?: Record<string, boolean> }) {
-  const features = (data.features || [])
-    .filter((f: any) => f.geometry?.type === 'Point')
-    .filter((f: any) => {
-      const tipo = f.properties?.tipo_apoyo || 'otro';
-      return filtros ? filtros[tipo] !== false : true;
-    });
-
-  return (
-    <>
-      {features.map((f: any) => {
-        const coords = f.geometry.coordinates;
-        const p = f.properties || {};
-        const tipo = p.tipo_apoyo || 'otro';
-        const color = COLOR_APOYO[tipo] || '#9CA3AF';
-        return (
-          <Marker key={p.id || Math.random()} position={[coords[1], coords[0]]} icon={iconoApoyo(tipo)}>
-            <Popup>
-              <div className="font-sans min-w-[220px]">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                  <p className="font-bold text-secondary-900 capitalize">{tipo}</p>
-                </div>
-                {p.votante_nombre && <p className="text-sm text-secondary-700">A: {p.votante_nombre}</p>}
-                <p className="text-sm text-secondary-500">{formatFecha(p.fecha_entrega)}</p>
-                {p.cantidad && <p className="text-sm text-secondary-500">Cantidad: {p.cantidad}</p>}
-                {p.entregado_por && <p className="text-sm text-secondary-500">Entregó: {p.entregado_por}</p>}
-                {p.observaciones && <p className="text-xs text-secondary-500 mt-1">{p.observaciones}</p>}
-                {p.foto_url && (
-                  <img src={p.foto_url} alt="Evidencia" className="mt-2 max-w-full rounded-md object-cover" style={{ maxHeight: '160px' }} />
-                )}
-              </div>
-              </Popup>
-            </Marker>
-          );
-      })}
-    </>
-  );
-}
-
-const COLOR_PETICION: Record<string, string> = {
-  bache: '#F59E0B',
-  alumbrado: '#FACC15',
-  agua: '#3B82F6',
-  seguridad: '#EF4444',
-  limpia: '#22C55E',
-  salud: '#8B5CF6',
-  otro: '#6B7280',
-};
-
-function iconoPeticion(categoria: string, prioridad: string) {
-  const color = COLOR_PETICION[categoria] || '#6B7280';
-  const size = prioridad === 'critica' ? 24 : prioridad === 'alta' ? 20 : 16;
-  return L.divIcon({
-    className: 'custom-marker-peticion',
-    html: `
-      <div style="position:relative;width:${size}px;height:${size}px;background-color:${color};border-radius:50%;border:2.5px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;">
-        <svg width="${size * 0.55}" height="${size * 0.55}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 9v4" /><circle cx="12" cy="12" r="10" /><path d="M12 17h.01" />
-        </svg>
-      </div>
-    `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-}
-
-function CapaPeticiones({ data }: { data: any }) {
-  const features = (data.features || [])
-    .filter((f: any) => f.geometry?.type === 'Point');
-
-  return (
-    <>
-      {features.map((f: any) => {
-        const coords = f.geometry.coordinates;
-        const p = f.properties || {};
-        const categoria = p.categoria || 'otro';
-        const prioridad = p.prioridad || 'media';
-        const color = COLOR_PETICION[categoria] || '#6B7280';
-        return (
-          <Marker key={p.id || Math.random()} position={[coords[1], coords[0]]} icon={iconoPeticion(categoria, prioridad)}>
-            <Popup>
-              <div className="font-sans min-w-[220px]">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                  <p className="font-bold text-secondary-900 capitalize">{ p.titulo || categoria }</p>
-                </div>
-                {p.descripcion && <p className="text-sm text-secondary-700">{p.descripcion}</p>}
-                {p.votante_nombre && <p className="text-sm text-secondary-500">Reportó: {p.votante_nombre}</p>}
-                <p className="text-sm text-secondary-500 capitalize">Categoría: {categoria} • Prioridad: {prioridad}</p>
-                <p className="text-sm font-medium capitalize" style={{ color }} >Estatus: {p.estatus || 'reportada'}</p>
-                {p.foto_url && <img src={p.foto_url} alt="Evidencia" className="mt-2 max-w-full rounded-md object-cover" style={{ maxHeight: '160px' }} />}
-                <p className="mt-1 text-xs text-secondary-400">{formatFecha(p.created_at)}</p>
-              </div>
-            </Popup>
-          </Marker>
-        );
-      })}
-    </>
-  );
-}
-
-function CapaEventos({ data }: { data: any }) {
-  const icon = L.divIcon({
-    className: 'custom-marker-evento',
-    html: `<div style="background-color:#D73216;width:22px;height:22px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-  });
-
-  return (
-    <>
-      {(data.features || [])
-        .filter((f: any) => f.geometry?.type === 'Point')
-        .map((f: any) => {
-          const coords = f.geometry.coordinates;
-          const p = f.properties || {};
-          return (
-            <Marker key={p.id || Math.random()} position={[coords[1], coords[0]]} icon={icon}>
-              <Popup>
-                <div className="font-sans min-w-[200px]">
-                  <p className="font-bold text-secondary-900">{p.nombre}</p>
-                  {p.direccion && <p className="text-sm text-secondary-600">{p.direccion}</p>}
-                  <p className="text-sm text-secondary-500">{formatFecha(p.fecha_inicio)}</p>
-                  <span className="mt-1 inline-block rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-800">
-                    {p.status || 'programado'}
-                  </span>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-    </>
-  );
-}
-
-function iconoLider() {
-  return L.divIcon({
-    className: 'custom-marker-lider',
-    html: `
-      <div style="position:relative;width:28px;height:28px;">
-        <div style="position:absolute;inset:0;background-color:#D73216;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>
-        <svg style="position:absolute;inset:0;margin:auto;width:14px;height:14px;" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-      </div>
-    `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
-}
-
-function popupLiderHTML(l: Lider) {
-  const v = l.votante;
-  return `
-    <div class="font-sans min-w-[220px]">
-      <div class="mb-2 flex items-center gap-2">
-        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-primary-600">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-        </div>
-        <div>
-          <p class="font-bold text-secondary-900">${v?.nombre || 'Líder'}</p>
-          ${v?.telefono ? `<p class="text-xs text-secondary-500">${v.telefono}</p>` : ''}
-        </div>
-      </div>
-      <div class="space-y-1 text-sm text-secondary-700">
-        ${v?.seccion_electoral ? `<p><span class="font-medium">Sección:</span> ${v.seccion_electoral}</p>` : ''}
-        ${v?.colonia ? `<p><span class="font-medium">Colonia:</span> ${v.colonia}</p>` : ''}
-        <p><span class="font-medium">Alcance estimado:</span> ${l.alcance_estimado || 0} personas</p>
-        <p><span class="font-medium">Score:</span> ${l.score ?? 0} pts</p>
-      </div>
-      <a
-        href="/dashboard/lideres/${l.id}"
-        class="mt-3 block rounded-md bg-primary-600 px-3 py-1.5 text-center text-xs font-medium text-white hover:bg-primary-700"
-      >
-        Ver ficha completa
-      </a>
-    </div>
-  `;
-}
-
-function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo: 'pines' | 'circulos' | 'heatmap' | 'solo_puntos' }) {
-  const map = useMap();
-  const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
-  const heatRef = useRef<L.Layer | null>(null);
-  const circlesRef = useRef<L.LayerGroup | null>(null);
-
-  const conCoords = lideres.filter((l) => {
-    const c = l.votante?.coordenadas;
-    return c && typeof c.lat === 'number' && typeof c.lng === 'number';
-  });
-
-  useEffect(() => {
-    function limpiarCapas() {
-      if (clusterRef.current) {
-        try {
-          map.removeLayer(clusterRef.current);
-        } catch {}
-        clusterRef.current = null;
-      }
-      if (heatRef.current) {
-        try {
-          map.removeLayer(heatRef.current);
-        } catch {}
-        heatRef.current = null;
-      }
-      if (circlesRef.current) {
-        try {
-          map.removeLayer(circlesRef.current);
-        } catch {}
-        circlesRef.current = null;
-      }
-    }
-
-    // Siempre limpiar primero para evitar capas fantasmas al cambiar filtros/modo
-    limpiarCapas();
-
-    if (conCoords.length === 0) {
-      return limpiarCapas;
-    }
-
-    if (modo === 'heatmap') {
-      const points = conCoords.map((l) => {
-        const c = l.votante!.coordenadas!;
-        const intensity = Math.min(1, ((l.score ?? 0) / 100) + 0.3);
-        return [c.lat, c.lng, intensity];
-      });
-
-      const heatLayer = (L as any).heatLayer(points, {
-        radius: 25,
-        blur: 20,
-        maxZoom: 16,
-        max: 1,
-        gradient: {
-          0.3: '#FCA5A5',
-          0.55: '#EF4444',
-          0.8: '#B91C1C',
-          1: '#7F1D1D',
-        },
-      });
-
-      map.addLayer(heatLayer);
-      heatRef.current = heatLayer;
-      return limpiarCapas;
-    }
-
-    if (modo === 'circulos') {
-      const group = L.layerGroup();
-      conCoords.forEach((l) => {
-        const c = l.votante!.coordenadas!;
-        const radio = (l.alcance_estimado || 50) * 8;
-        const circle = L.circle([c.lat, c.lng], {
-          radius: radio,
-          color: '#D73216',
-          fillColor: '#D73216',
-          fillOpacity: 0.12,
-          weight: 2,
-          opacity: 0.6,
-          dashArray: '4 6',
-        });
-        circle.bindPopup(popupLiderHTML(l));
-        group.addLayer(circle);
-      });
-      map.addLayer(group);
-      circlesRef.current = group;
-      return limpiarCapas;
-    }
-
-    // Pines o solo puntos: usar clustering
-    const group = (L as any).markerClusterGroup({
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
-      maxClusterRadius: 60,
-      iconCreateFunction: (cluster: any) => {
-        const count = cluster.getChildCount();
-        return L.divIcon({
-          className: 'custom-cluster-lider',
-          html: `<div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;background-color:#D73216;color:white;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);font-size:12px;font-weight:700;font-family:sans-serif;">${count}</div>`,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17],
-        });
-      },
-    });
-
-    conCoords.forEach((l) => {
-      const c = l.votante!.coordenadas!;
-      const marker = L.marker([c.lat, c.lng], { icon: iconoLider() });
-      marker.bindPopup(popupLiderHTML(l));
-      group.addLayer(marker);
-    });
-
-    if (modo === 'pines') {
-      const circles = L.layerGroup();
-      conCoords.forEach((l) => {
-        const c = l.votante!.coordenadas!;
-        const radio = (l.alcance_estimado || 50) * 8;
-        const circle = L.circle([c.lat, c.lng], {
-          radius: radio,
-          color: '#D73216',
-          fillColor: '#D73216',
-          fillOpacity: 0.12,
-          weight: 2,
-          opacity: 0.6,
-          dashArray: '4 6',
-        });
-        circles.addLayer(circle);
-      });
-      map.addLayer(circles);
-      circlesRef.current = circles;
-    }
-
-    map.addLayer(group);
-    clusterRef.current = group as L.MarkerClusterGroup;
-
-    return limpiarCapas;
-  }, [map, conCoords, modo]);
-
-  return null;
-}
-
-function formatearResultadoHistorico(rh: any): string {
-  if (!rh) return '';
-  const partes = [
-    `<span class="font-medium">Último resultado histórico</span>`,
-    `<span class="font-medium">Año:</span> ${rh.anio}`,
-    `<span class="font-medium">Ganador:</span> ${rh.partido_ganador || 'N/D'}`,
-  ];
-  if (rh.votos_totales != null) partes.push(`<span class="font-medium">Votos emitidos:</span> ${Number(rh.votos_totales).toLocaleString()}`);
-  if (rh.participacion_pct != null) partes.push(`<span class="font-medium">Participación:</span> ${rh.participacion_pct}%`);
-  return `<div class="mt-2 rounded-md bg-secondary-50 p-2 text-xs text-secondary-700">${partes.join(' • ')}</div>`;
-}
-
-function formatearResultadoHistoricoAnio(rh: any, anio: number): string {
-  if (!rh || (rh.partido_ganador == null && rh.votos_ganador == null && rh.votos_totales == null)) return '';
-  const partes: string[] = [`<span class="font-bold">${anio}</span>`];
-  if (rh.partido_ganador != null) partes.push(`Ganador: ${rh.partido_ganador}`);
-  if (rh.votos_ganador != null) partes.push(`Votos ganador: ${Number(rh.votos_ganador).toLocaleString()}`);
-  if (rh.votos_totales != null) partes.push(`Votos totales: ${Number(rh.votos_totales).toLocaleString()}`);
-  if (rh.participacion_pct != null) partes.push(`Participación: ${rh.participacion_pct}%`);
-  if (rh.votos_nulos != null) partes.push(`Nulos: ${Number(rh.votos_nulos).toLocaleString()}`);
-  return `<div class="mt-1 rounded-md bg-secondary-50 p-2 text-xs text-secondary-700">${partes.join(' • ')}</div>`;
-}
-
-function formatearValorSimple(value: any): string {
-  if (value === null || value === undefined || value === '') return '';
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 6 });
-  }
-  return String(value);
-}
-
-const CAMPOS_OCULTOS = new Set([
-  'geometry', 'capa_id', 'capa_nombre', 'capa_tipo', 'capa_origen', 'color', 'id',
-]);
-
-function popupPersonalizadoHTML(nombreCapa: string, color: string, props: Record<string, any>, tipo?: string) {
-  const titleKey = ['nombre', 'NOMBRE', 'name', 'NAME', 'nomgeo', 'NOMGEO', 'nom_loc', 'NOM_LOC'].find(k => props[k]);
-  const title = titleKey ? props[titleKey] : nombreCapa;
-
-  const campos = Object.entries(props)
-    .filter(([k, v]) => v != null && v !== '' && !CAMPOS_OCULTOS.has(k.toLowerCase()))
-    .slice(0, 12)
-    .map(([k, v]) => `<p class="truncate"><span class="font-medium text-secondary-900">${k}:</span> ${formatearValorSimple(v)}</p>`)
-    .join('');
-
-  return `
-    <div class="font-sans min-w-[220px] max-w-[280px]">
-      <div class="mb-2 border-b-2 pb-1.5" style="border-color: ${color}">
-        <p class="text-base font-bold text-secondary-900 leading-tight">${title}</p>
-        ${title !== nombreCapa ? `<p class="text-xs text-secondary-500">${nombreCapa}</p>` : ''}
-      </div>
-      <div class="space-y-1 text-sm text-secondary-700 max-h-[240px] overflow-auto pr-1">
-        ${campos || '<p class="text-secondary-500">Sin propiedades</p>'}
-      </div>
-    </div>
-  `;
-}
-
-function CapaPersonalizada({ data, color, nombre }: { data: any; color: string; nombre: string; tipo?: string }) {
-  const style = () => ({
-    fillColor: color,
-    color: color,
-    weight: 2,
-    opacity: 0.9,
-    fillOpacity: 0.35,
-  });
-
-  const onEachFeature = (feature: any, layer: L.Layer) => {
-    const props = feature.properties || {};
-    layer.bindPopup(popupPersonalizadoHTML(nombre, color, props));
-  };
-
-  return <GeoJSON data={data} style={style} onEachFeature={onEachFeature} />;
-}
-
-function CapaDibujo() {
-  const map = useMap();
-  const drawRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (!map || drawRef.current) return;
-
-    const drawnItems = new (L as any).FeatureGroup();
-    map.addLayer(drawnItems);
-
-    const drawControl = new (L as any).Control.Draw({
-      edit: { featureGroup: drawnItems },
-      draw: {
-        polygon: { allowIntersection: false, showArea: true },
-        polyline: true,
-        rectangle: true,
-        circle: true,
-        marker: true,
-        circlemarker: false,
-      },
-    });
-
-    map.addControl(drawControl);
-    drawRef.current = { drawControl, drawnItems };
-
-    const onCreated = (e: any) => {
-      drawnItems.addLayer(e.layer);
-      // Aquí se podría guardar en backend
-      console.log('Dibujo creado:', e.layer.toGeoJSON());
-    };
-
-    map.on((L as any).Draw.Event.CREATED, onCreated);
-
-    return () => {
-      map.off((L as any).Draw.Event.CREATED, onCreated);
-      map.removeControl(drawControl);
-      map.removeLayer(drawnItems);
-      drawRef.current = null;
-    };
-  }, [map]);
-
-  return null;
-}
-
-function CapaSeleccionada({ seleccion }: { seleccion: { geometry: any; properties?: any; tipo?: string; nombre?: string } }) {
-  const { geometry, properties, tipo, nombre } = seleccion;
-  const key = JSON.stringify(geometry);
-
-  const style = () => ({
-    fillColor: '#D73216',
-    color: '#D73216',
-    weight: 3,
-    opacity: 1,
-    fillOpacity: 0.15,
-    dashArray: '4 6',
-  });
-
-  const pointToLayer = (_feature: any, latlng: L.LatLng) => {
-    return L.circleMarker(latlng, {
-      radius: 10,
-      fillColor: '#D73216',
-      color: '#fff',
-      weight: 3,
-      opacity: 1,
-      fillOpacity: 0.8,
-    });
-  };
-
-  const onEachFeature = (feature: any, layer: L.Layer) => {
-    const props = feature.properties || properties || {};
-    const title = nombre || props.nombre || props.seccion || props.NOMGEO || props.NOMBRE || 'Selección';
-    layer.bindPopup(`
-      <div class="font-sans min-w-[180px]">
-        <p class="text-sm font-bold text-secondary-900 mb-1">${title}</p>
-        <p class="text-xs text-secondary-500 capitalize">${tipo || props.tipo || 'Territorio seleccionado'}</p>
-      </div>
-    `);
-  };
-
-  return (
-    <GeoJSON
-      key={key}
-      data={geometry}
-      style={style}
-      pointToLayer={pointToLayer}
-      onEachFeature={onEachFeature}
-    />
-  );
-}
-
-function formatFecha(fecha?: string) {
-  if (!fecha) return '';
-  try {
-    return format(new Date(fecha), "d 'de' MMMM, h:mm a", { locale: es });
-  } catch {
-    return fecha;
-  }
 }

@@ -21,6 +21,7 @@ import {
   EyeOff,
   TrendingUp,
   Plus,
+  Search,
   LucideProps,
 } from 'lucide-react';
 
@@ -47,6 +48,7 @@ const iconMap = {
   ocultar: EyeOff,
   historico: TrendingUp,
   plus: Plus,
+  buscar: Search,
 };
 
 export type IconName = keyof typeof iconMap;

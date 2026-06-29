@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { inteligenciaElectoralApi } from '@/lib/api';
 import { Icon } from '@/components/ui/Icon';
 import {
@@ -38,6 +39,8 @@ interface Actor {
   nombre_visual: string;
   color_hex?: string;
   columna_excel_alias: string;
+  tipo_voto: 'TOTAL' | 'DIFERENCIADO';
+  tipo_actor: 'PARTIDO' | 'CANDIDATO' | 'COALICION' | 'INDEPENDIENTE';
   orden: number;
   partido?: Partido;
 }
@@ -65,6 +68,8 @@ interface SeccionData {
   proyeccion_votos?: number;
 }
 
+const MapaSecciones = dynamic(() => import('./MapaSecciones'), { ssr: false });
+
 export default function InteligenciaElectoralPage() {
   const [elecciones, setElecciones] = useState<Eleccion[]>([]);
   const [partidos, setPartidos] = useState<Partido[]>([]);
@@ -79,6 +84,8 @@ export default function InteligenciaElectoralPage() {
   const [importResult, setImportResult] = useState<any>(null);
   const [analizando, setAnalizando] = useState<string | null>(null);
   const [analisisResult, setAnalisisResult] = useState<any>(null);
+  const [geojsonMapa, setGeojsonMapa] = useState<any>(null);
+  const [cargandoMapa, setCargandoMapa] = useState(false);
 
   // Formularios
   const [partidoForm, setPartidoForm] = useState<Partial<Partido>>({});
@@ -99,8 +106,15 @@ export default function InteligenciaElectoralPage() {
       setEleccion(null);
       setActores([]);
       setSecciones([]);
+      setGeojsonMapa(null);
     }
   }, [eleccionId]);
+
+  useEffect(() => {
+    if (activeTab === 'mapa' && eleccionId) {
+      cargarMapaSecciones(eleccionId);
+    }
+  }, [activeTab, eleccionId]);
 
   const cargarInicial = async () => {
     try {
@@ -231,6 +245,22 @@ export default function InteligenciaElectoralPage() {
     }
   };
 
+  const descargarSabana = async () => {
+    if (!eleccionId) return;
+    try {
+      const res = await inteligenciaElectoralApi.descargarSabana(eleccionId);
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sabana_${eleccion?.nombre?.replace(/\s+/g, '_') || 'eleccion'}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al descargar sábana');
+    }
+  };
+
   const cargarExcel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eleccionId) return;
@@ -250,6 +280,19 @@ export default function InteligenciaElectoralPage() {
       setImportResult({ error: err.response?.data?.message || 'Error al cargar Excel' });
     } finally {
       setImporting(false);
+    }
+  };
+
+  const cargarMapaSecciones = async (id: string) => {
+    setCargandoMapa(true);
+    setGeojsonMapa(null);
+    try {
+      const { data } = await inteligenciaElectoralApi.getMapaSecciones(id);
+      setGeojsonMapa(data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al cargar mapa de secciones');
+    } finally {
+      setCargandoMapa(false);
     }
   };
 
@@ -321,8 +364,7 @@ export default function InteligenciaElectoralPage() {
           </button>
           <button
             onClick={() => setActiveTab('carga')}
-            disabled={!eleccionId}
-            className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-secondary-700 transition hover:bg-secondary-50 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-secondary-700 transition hover:bg-secondary-50"
           >
             <Upload size={16} /> Cargar
           </button>
@@ -412,11 +454,10 @@ export default function InteligenciaElectoralPage() {
 
             <form onSubmit={guardarEleccion} className="mb-4 grid gap-3 sm:grid-cols-5">
               <input
-                placeholder="Nombre"
+                placeholder="Nombre (opcional)"
                 value={eleccionForm.nombre || ''}
                 onChange={(e) => setEleccionForm({ ...eleccionForm, nombre: e.target.value })}
                 className="input"
-                required
               />
               <input
                 type="number"
@@ -426,13 +467,19 @@ export default function InteligenciaElectoralPage() {
                 className="input"
                 required
               />
-              <input
-                placeholder="Puesto"
+              <select
                 value={eleccionForm.puesto || ''}
                 onChange={(e) => setEleccionForm({ ...eleccionForm, puesto: e.target.value })}
                 className="input"
                 required
-              />
+              >
+                <option value="">Seleccionar cargo...</option>
+                <option value="Presidente República">Presidente República</option>
+                <option value="Diputaciones Federales">Diputaciones Federales</option>
+                <option value="Diputaciones Locales">Diputaciones Locales</option>
+                <option value="Alcalde">Alcalde</option>
+                <option value="Otro">Otro</option>
+              </select>
               <select
                 value={eleccionForm.activa ? 'true' : 'false'}
                 onChange={(e) => setEleccionForm({ ...eleccionForm, activa: e.target.value === 'true' })}
@@ -481,7 +528,7 @@ export default function InteligenciaElectoralPage() {
 
             {eleccionId ? (
               <>
-                <form onSubmit={guardarActor} className="mb-4 grid gap-3 sm:grid-cols-7">
+                <form onSubmit={guardarActor} className="mb-4 grid gap-3 sm:grid-cols-8">
                   <select
                     value={actorForm.partido_id || ''}
                     onChange={(e) => setActorForm({ ...actorForm, partido_id: e.target.value || undefined })}
@@ -492,25 +539,30 @@ export default function InteligenciaElectoralPage() {
                       <option key={p.id} value={p.id}>{p.siglas}</option>
                     ))}
                   </select>
-                  <input
-                    type="checkbox"
-                    checked={actorForm.es_coalicion || false}
-                    onChange={(e) => setActorForm({ ...actorForm, es_coalicion: e.target.checked })}
-                    className="h-10 w-6"
-                    title="Es coalición"
-                  />
-                  <input
-                    placeholder="Nombre coalición"
-                    value={actorForm.nombre_coalicion || ''}
-                    onChange={(e) => setActorForm({ ...actorForm, nombre_coalicion: e.target.value })}
+                  <select
+                    value={actorForm.tipo_actor || 'PARTIDO'}
+                    onChange={(e) => setActorForm({ ...actorForm, tipo_actor: e.target.value as any })}
                     className="input"
-                  />
+                    title="Tipo de actor"
+                  >
+                    <option value="PARTIDO">Partido</option>
+                    <option value="CANDIDATO">Candidato</option>
+                    <option value="COALICION">Coalición</option>
+                    <option value="INDEPENDIENTE">Independiente</option>
+                  </select>
                   <input
                     placeholder="Nombre visual"
                     value={actorForm.nombre_visual || ''}
                     onChange={(e) => setActorForm({ ...actorForm, nombre_visual: e.target.value })}
                     className="input"
                     required
+                  />
+                  <input
+                    placeholder="Nombre coalición"
+                    value={actorForm.nombre_coalicion || ''}
+                    onChange={(e) => setActorForm({ ...actorForm, nombre_coalicion: e.target.value })}
+                    className="input"
+                    title="Solo si es coalición"
                   />
                   <input
                     type="color"
@@ -525,6 +577,15 @@ export default function InteligenciaElectoralPage() {
                     className="input"
                     required
                   />
+                  <select
+                    value={actorForm.tipo_voto || 'TOTAL'}
+                    onChange={(e) => setActorForm({ ...actorForm, tipo_voto: e.target.value as any })}
+                    className="input"
+                    title="¿Voto total o diferenciado?"
+                  >
+                    <option value="TOTAL">Voto total</option>
+                    <option value="DIFERENCIADO">Voto diferenciado</option>
+                  </select>
                   <button type="submit" className="btn-primary flex items-center justify-center gap-1">
                     <Plus size={16} /> {actorEdit ? 'Actualizar' : 'Agregar'}
                   </button>
@@ -538,7 +599,7 @@ export default function InteligenciaElectoralPage() {
                         <div>
                           <p className="font-medium">{a.nombre_visual}</p>
                           <p className="text-xs text-secondary-500">
-                            {a.es_coalicion ? `Coalición: ${a.nombre_coalicion || '—'}` : a.partido?.siglas || 'Independiente'} · Excel: {a.columna_excel_alias}
+                            {a.tipo_actor === 'COALICION' ? `Coalición: ${a.nombre_coalicion || '—'}` : a.partido?.siglas || a.tipo_actor} · {a.tipo_voto === 'DIFERENCIADO' ? 'Voto diferenciado' : 'Voto total'} · Excel: {a.columna_excel_alias}
                           </p>
                         </div>
                       </div>
@@ -567,33 +628,48 @@ export default function InteligenciaElectoralPage() {
         </div>
       )}
 
-      {activeTab === 'carga' && eleccion && (
+      {activeTab === 'carga' && (
         <div className="card p-6">
-          <h3 className="mb-2 text-lg font-bold text-secondary-900">Cargar sábanas de votación</h3>
-          <p className="mb-4 text-sm text-secondary-500">
-            Elección: <strong>{eleccion.nombre}</strong> · {actores.length} actores configurados · {secciones.length} secciones cargadas
-          </p>
-
-          <div className="mb-6 flex gap-3">
-            <button onClick={descargarPlantilla} className="btn-secondary flex items-center gap-2">
-              <Download size={16} /> Descargar plantilla Excel
-            </button>
-          </div>
-
-          <form onSubmit={cargarExcel} className="space-y-4">
-            <div>
-              <label className="label">Archivo Excel (.xlsx, .xls o .csv)</label>
-              <input type="file" name="archivo" accept=".xlsx,.xls,.csv" className="input" required />
+          {!eleccion ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <strong>Paso 1:</strong> selecciona o crea una elección arriba para poder cargar sábanas.
             </div>
-            <button
-              type="submit"
-              disabled={importing}
-              className="btn-primary flex items-center gap-2 disabled:opacity-60"
-            >
-              <Upload size={18} />
-              {importing ? 'Procesando...' : 'Cargar sábanas'}
-            </button>
-          </form>
+          ) : (
+            <>
+              <h3 className="mb-2 text-lg font-bold text-secondary-900">Cargar sábanas de votación</h3>
+              <p className="mb-4 text-sm text-secondary-500">
+                Elección: <strong>{eleccion.nombre}</strong> · {actores.length} actores configurados · {secciones.length} secciones cargadas
+              </p>
+
+              <div className="mb-6 flex flex-wrap gap-3">
+                <button onClick={descargarPlantilla} className="btn-secondary flex items-center gap-2">
+                  <Download size={16} /> Plantilla para carga
+                </button>
+                <button onClick={descargarSabana} disabled={secciones.length === 0} className="btn-secondary flex items-center gap-2 disabled:opacity-50" title={secciones.length === 0 ? 'Carga resultados primero' : ''}>
+                  <Download size={16} /> Sábana completa
+                </button>
+              </div>
+
+              <form onSubmit={cargarExcel} className="space-y-4">
+                <div>
+                  <label className="label">Archivo Excel (.xlsx, .xls o .csv)</label>
+                  <input type="file" name="archivo" accept=".xlsx,.xls,.csv" className="input" required />
+                </div>
+                <button
+                  type="submit"
+                  disabled={importing || actores.length === 0}
+                  className="btn-primary flex items-center gap-2 disabled:opacity-60"
+                  title={actores.length === 0 ? 'Configura actores antes de cargar' : ''}
+                >
+                  <Upload size={18} />
+                  {importing ? 'Procesando...' : 'Cargar sábanas'}
+                </button>
+                {actores.length === 0 && (
+                  <p className="text-sm text-amber-700">Configura al menos un actor/coalición en la pestaña Catálogos para poder cargar votos.</p>
+                )}
+              </form>
+            </>
+          )}
 
           {importResult && (
             <div className={`mt-6 rounded-lg border p-4 ${importResult.error ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`}>
@@ -736,8 +812,22 @@ export default function InteligenciaElectoralPage() {
       )}
 
       {activeTab === 'mapa' && (
-        <div className="card p-6 text-center">
-          <p className="text-secondary-500">La visualización en mapa territorial coloreado por ganador se habilitará en la siguiente fase.</p>
+        <div className="space-y-4">
+          <div className="card p-4">
+            <h3 className="mb-2 text-lg font-bold text-secondary-900 flex items-center gap-2">
+              <Icon name="mapa" size={20} className="text-primary-600" /> Mapa territorial por ganador
+            </h3>
+            <p className="text-sm text-secondary-500">
+              {eleccion
+                ? `Elección: ${eleccion.nombre} · Se muestran las secciones coloreadas según el actor ganador y clasificación estratégica.`
+                : 'Selecciona una elección para ver el mapa.'}
+            </p>
+          </div>
+          {eleccion && (
+            <div className="card overflow-hidden p-2">
+              <MapaSecciones geojson={geojsonMapa} cargando={cargandoMapa} />
+            </div>
+          )}
         </div>
       )}
     </div>

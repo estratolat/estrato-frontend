@@ -35,6 +35,7 @@ export interface CapaMapa {
   visible: boolean;
   orden: number;
   metadata?: Record<string, any>;
+  estilos?: Record<string, { color?: string; nombre?: string }>;
 }
 
 export interface MapaData {
@@ -66,7 +67,7 @@ export interface SeccionStats {
   color?: string;
 }
 
-export type TipoResultadoGlobal = 'capa';
+export type TipoResultadoGlobal = 'capa' | 'capa_feature';
 
 export interface ResultadoGlobal {
   id: string;
@@ -79,6 +80,10 @@ export interface ResultadoGlobal {
   municipio?: string;
   seccion?: string;
   clave?: string;
+  capaId?: string;
+  featureId?: string;
+  capaNombre?: string;
+  color?: string;
   bbox?: [number, number, number, number];
   geometry?: any;
 }

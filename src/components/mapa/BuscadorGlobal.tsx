@@ -12,6 +12,7 @@ interface Props {
 
 const ETIQUETAS_TIPO: Record<TipoResultadoGlobal | string, { label: string; color: string }> = {
   capa: { label: 'Capa', color: '#D73216' },
+  capa_feature: { label: 'Polígono', color: '#3B82F6' },
 };
 
 function etiquetaTipo(tipo: string) {
@@ -21,6 +22,7 @@ function etiquetaTipo(tipo: string) {
 const FILTROS: { key: string; label: string }[] = [
   { key: 'todos', label: 'Todas' },
   { key: 'capa', label: 'Capas' },
+  { key: 'capa_feature', label: 'Polígonos' },
 ];
 
 export default function BuscadorGlobal({ onSeleccionar }: Props) {
@@ -54,9 +56,12 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
       setCargando(true);
       try {
         const res = await mapaApi.buscarGlobal(q.trim(), 20, tipoFiltro);
-        setResultados(res.data?.resultados || []);
+        const resultados = res.data?.resultados || [];
+        console.log('[BuscadorGlobal] resultados:', resultados.length, resultados);
+        setResultados(resultados);
         setAbierto(true);
-      } catch (e) {
+      } catch (e: any) {
+        console.error('[BuscadorGlobal] error:', e);
         setError(errorToString(e));
         setResultados([]);
       } finally {
@@ -93,7 +98,7 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => setAbierto(true)}
-          placeholder="Buscar capa..."
+          placeholder="Buscar capa, municipio, colonia, sección..."
           className="h-10 w-full rounded-lg border border-secondary-200 bg-white pl-10 pr-9 text-sm shadow-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
         {q && (
@@ -104,6 +109,11 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
           >
             <X size={16} />
           </button>
+        )}
+        {cargando && (
+          <div className="absolute right-9 top-1/2 -translate-y-1/2">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+          </div>
         )}
       </div>
 
@@ -174,6 +184,7 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
                         {r.municipio ? ` • ${r.municipio}` : ''}
                         {r.seccion ? ` • Sección ${r.seccion}` : ''}
                         {r.clave ? ` • Clave ${r.clave}` : ''}
+                        {r.capaNombre ? ` • ${r.capaNombre}` : ''}
                       </p>
                     </div>
                     <ChevronRight size={16} className="shrink-0 text-secondary-300" />

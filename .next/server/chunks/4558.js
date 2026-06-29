@@ -1,0 +1,1 @@
+"use strict";exports.id=4558,exports.ids=[4558],exports.modules={44558:(e,r,t)=>{t.r(r),t.d(r,{default:()=>s});let s=(0,t(2772).createProxy)(String.raw`/Users/gaboibarra/Documents/ESTRATO SOFT/estrato-skeleton/frontend/src/components/mapa/MapaTerritorial.tsx#default`)}};

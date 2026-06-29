@@ -1,0 +1,93 @@
+{
+  "type": "FeatureCollection",
+  "name": "Secciones INE Demo Dolores Hidalgo 014",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "SECCION": "0001",
+        "SECC": "0001",
+        "MUNICIPIO": "Dolores Hidalgo",
+        "MUN": "014",
+        "ESTADO": "Guanajuato",
+        "ENT": "11",
+        "DISTRITO_F": 1,
+        "DISTRITO_L": 10,
+        "PADRON_2024": 14580,
+        "LISTA_NOMINAL_2024": 13820
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [-100.9553, 21.1661],
+              [-100.9353, 21.1661],
+              [-100.9353, 21.1761],
+              [-100.9553, 21.1761],
+              [-100.9553, 21.1661]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "SECCION": "0002",
+        "SECC": "0002",
+        "MUNICIPIO": "Dolores Hidalgo",
+        "MUN": "014",
+        "ESTADO": "Guanajuato",
+        "ENT": "11",
+        "DISTRITO_F": 1,
+        "DISTRITO_L": 10,
+        "PADRON_2024": 12840,
+        "LISTA_NOMINAL_2024": 12100
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [-100.9553, 21.1561],
+              [-100.9353, 21.1561],
+              [-100.9353, 21.1661],
+              [-100.9553, 21.1661],
+              [-100.9553, 21.1561]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "SECCION": "0003",
+        "SECC": "0003",
+        "MUNICIPIO": "Dolores Hidalgo",
+        "MUN": "014",
+        "ESTADO": "Guanajuato",
+        "ENT": "11",
+        "DISTRITO_F": 1,
+        "DISTRITO_L": 10,
+        "PADRON_2024": 11200,
+        "LISTA_NOMINAL_2024": 10650
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [-100.9753, 21.1561],
+              [-100.9553, 21.1561],
+              [-100.9553, 21.1661],
+              [-100.9753, 21.1661],
+              [-100.9753, 21.1561]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

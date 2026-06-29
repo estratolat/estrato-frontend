@@ -1,0 +1,1 @@
+self.__NEXT_FONT_MANIFEST='{"pages":{},"app":{"/Users/gaboibarra/Documents/ESTRATO SOFT/estrato-skeleton/frontend/src/app/layout":["static/media/2d7e2612348d6da3-s.p.woff2","static/media/ad568a422332bf51-s.p.woff2","static/media/e47562ad3173d2c2-s.p.woff2","static/media/34999d525b81e4a0-s.p.woff2"]},"appUsingSizeAdjust":true,"pagesUsingSizeAdjust":false}';

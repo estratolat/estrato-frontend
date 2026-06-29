@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Alacrity Sans';
+  src: url('/fonts/AlacritySans-Regular.woff2') format('woff2'),
+       url('/fonts/AlacritySans-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alacrity Sans';
+  src: url('/fonts/AlacritySans-Semibold.woff2') format('woff2'),
+       url('/fonts/AlacritySans-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alacrity Sans';
+  src: url('/fonts/AlacritySans-Bold.woff2') format('woff2'),
+       url('/fonts/AlacritySans-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alacrity Sans';
+  src: url('/fonts/AlacritySans-Black.woff2') format('woff2'),
+       url('/fonts/AlacritySans-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-alacrity: 'Alacrity Sans', system-ui, sans-serif;
+  --foreground-rgb: 56, 55, 69;
+  --background-start-rgb: 244, 244, 246;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply antialiased font-sans;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary-200 text-secondary-800 hover:bg-secondary-300;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-secondary-200 p-6;
+  }
+
+  .input {
+    @apply w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-secondary-700 mb-1;
+  }
+}
+
+/* Mapbox custom styles */
+.mapboxgl-popup-content {
+  @apply rounded-lg shadow-lg p-0 overflow-hidden;
+}
+
+/* Leaflet map full height */
+.leaflet-container {
+  @apply h-full w-full rounded-xl;
+  font-family: var(--font-alacrity), system-ui, sans-serif;
+  z-index: 1;
+}
+
+.leaflet-control,
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 1 !important;
+}
+
+/* Custom map markers */
+.custom-marker-apoyo,
+.custom-marker-evento,
+.custom-marker-peticion,
+.custom-marker-brigada {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Leaflet popups styled */
+.leaflet-popup-content-wrapper {
+  @apply rounded-lg shadow-lg p-0 overflow-hidden;
+}
+
+.leaflet-popup-content {
+  @apply p-0 m-0;
+}
+
+.leaflet-popup-tip {
+  @apply bg-white;
+}
+
+/* Leaflet draw toolbar icons */
+.leaflet-draw-toolbar a {
+  background-image: url('https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/images/spritesheet.png') !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}

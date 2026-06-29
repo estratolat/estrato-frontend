@@ -307,6 +307,10 @@ export const inteligenciaElectoralApi = {
   getMapaSecciones: (eleccionId: string) => api.get(`/inteligencia-electoral/elecciones/${eleccionId}/mapa-secciones`),
   analizarSeccion: (eleccionId: string, seccion: string) =>
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/analizar-seccion/${seccion}`),
+
+  // Consultor IA
+  consultarIA: (data: { pregunta: string; contextoCampana?: Record<string, any>; eleccionId?: string }) =>
+    api.post('/inteligencia-electoral/consultar-ia', data),
 };
 
 // === API de Fichas Seccionales ===

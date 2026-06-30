@@ -532,8 +532,10 @@ export default function MapaTerritorial() {
   }, [featureEditando, capasPersonalizadas]);
 
   useEffect(() => {
+    // No cargar capas geográficas hasta tener bounds del mapa; evita traer TODO el país.
+    if (!mapBounds) return;
     cargarDatos();
-  }, [cargarDatos]);
+  }, [cargarDatos, mapBounds]);
 
   const onExitoGuardado = useCallback((tipo?: 'lider' | 'evento' | 'apoyo', id?: string, lat?: number, lng?: number) => {
     cerrarModal();

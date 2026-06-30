@@ -325,6 +325,8 @@ export const mapaApi = {
   getCapas: () => api.get('/mapas/capas'),
   getGeoJson: (capas: string[], params?: any) =>
     api.get('/mapas/geojson', { params: { capas: capas.join(','), ...params } }),
+  getGeoJsonCapa: (capa: string, params?: any) =>
+    api.get(`/mapas/geojson/${capa}`, { params }),
   getEstadisticas: (nivel: 'seccion' | 'zona' = 'seccion') =>
     api.get('/mapas/estadisticas', { params: { nivel } }),
   createCapa: (data: any) => api.post('/mapas/capas', data),

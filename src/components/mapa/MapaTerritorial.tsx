@@ -375,6 +375,10 @@ export default function MapaTerritorial() {
 
       if (capasActivas.length === 0) {
         setData({});
+      } else if (!mapBounds) {
+        // Esperar a que el mapa reporte bounds; evita cargar capas sin viewport.
+        setLoading(false);
+        return;
       } else {
         const nextLoading: Record<string, boolean> = {};
         capasActivas.forEach(id => { nextLoading[id] = true; });

@@ -88,6 +88,7 @@ interface Props {
   seleccion?: { geometry: any; properties?: any; tipo?: string; nombre?: string } | null;
   onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
   resultadoDestacado?: ResultadoGlobal | null;
+  onBoundsChange?: (bounds: { south: number; west: number; north: number; east: number }) => void;
 }
 
 // Refs compartidos entre MapaBridge y CapaPersonalizada para resaltar features
@@ -95,7 +96,7 @@ const highlightRef: { layer: L.GeoJSON | null; timer: any } = { layer: null, tim
 let pendingHighlight: { capaId: string; featureId: string; intentos: number } | null = null;
 
 export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
-  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado },
+  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange },
   ref
 ) {
   const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
@@ -124,6 +125,7 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
       <MapaBridge ref={ref} capasGeoJSONRef={capasGeoJSONRef} />
       <ControlRecargar onRecargar={onRecargar} />
       <GuardarCentro />
+      {onBoundsChange && <ManejadorBounds onBoundsChange={onBoundsChange} />}
       {onSeleccionarCoordenada && <DetectorClicMapa onSeleccionar={onSeleccionarCoordenada} />}
 
       <ManejadorResultadoDestacado resultado={resultadoDestacado} capasGeoJSONRef={capasGeoJSONRef} />
@@ -462,6 +464,34 @@ function DetectorClicMapa({ onSeleccionar }: { onSeleccionar: (lat: number, lng:
       onSeleccionar(e.latlng.lat, e.latlng.lng);
     },
   });
+  return null;
+}
+
+function ManejadorBounds({
+  onBoundsChange,
+}: {
+  onBoundsChange: (bounds: { south: number; west: number; north: number; east: number }) => void;
+}) {
+  const map = useMap();
+  const notificar = useCallback(() => {
+    const b = map.getBounds();
+    onBoundsChange({
+      south: b.getSouth(),
+      west: b.getWest(),
+      north: b.getNorth(),
+      east: b.getEast(),
+    });
+  }, [map, onBoundsChange]);
+
+  useEffect(() => {
+    notificar();
+  }, [notificar]);
+
+  useMapEvents({
+    moveend: notificar,
+    zoomend: notificar,
+  });
+
   return null;
 }
 

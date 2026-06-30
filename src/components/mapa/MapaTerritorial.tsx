@@ -163,11 +163,13 @@ export default function MapaTerritorial() {
   const [conSinCoordenadas, setConSinCoordenadas] = useState<'todos' | 'con' | 'sin'>(prefs.conSinCoordenadas);
   const [topN, setTopN] = useState<number | ''>(prefs.topN);
   const [modoLideres, setModoLideres] = useState<'pines' | 'circulos' | 'heatmap' | 'solo_puntos'>(prefs.modoLideres);
+  const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
   const mapRef = useRef<MapaLeafletRef | null>(null);
+  const debounceBoundsRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
   // Persistir cada cambio de preferencias
@@ -232,6 +234,13 @@ export default function MapaTerritorial() {
       mapRef.current?.flyTo(c.lat, c.lng, 17);
     }, 150);
   }, [activas.lideres]);
+
+  const handleBoundsChange = useCallback((bounds: { south: number; west: number; north: number; east: number }) => {
+    if (debounceBoundsRef.current) clearTimeout(debounceBoundsRef.current);
+    debounceBoundsRef.current = setTimeout(() => {
+      setMapBounds(bounds);
+    }, 400);
+  }, []);
 
   const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo', coords?: { lat: number; lng: number } | null) => {
     setPuntoInicial(coords || null);
@@ -355,13 +364,14 @@ export default function MapaTerritorial() {
 
       // Cargar cada capa activa en paralelo con endpoints individuales para no bloquear una por una.
       // Si un endpoint falla, las demás capas siguen cargando.
-      const params: any = { limit: 5000 };
+      const params: any = { limit: 500 };
       if (soloLideresPadre) params.padres = 'true';
       if (scoreMin !== '') params.score_min = scoreMin;
       if (zonaFiltro) params.zona_id = zonaFiltro;
       if (conSinCoordenadas === 'con') params.sin_coordenadas = 'false';
       if (conSinCoordenadas === 'sin') params.sin_coordenadas = 'true';
-      if (topN !== '') params.limit = topN;
+      if (topN !== '') params.limit = Math.min(Number(topN), 2000);
+      if (mapBounds) params.bbox = `${mapBounds.west},${mapBounds.south},${mapBounds.east},${mapBounds.north}`;
 
       if (capasActivas.length === 0) {
         setData({});
@@ -468,6 +478,7 @@ export default function MapaTerritorial() {
     conSinCoordenadas,
     topN,
     data,
+    mapBounds,
   ]);
 
   const guardarFeature = useCallback(async () => {
@@ -1427,6 +1438,7 @@ export default function MapaTerritorial() {
           seleccion={seleccion}
           onFeatureClick={handleFeatureClick}
           resultadoDestacado={resultadoDestacado}
+          onBoundsChange={handleBoundsChange}
         />
 
         <LeyendaMapa activas={activas} data={data} />

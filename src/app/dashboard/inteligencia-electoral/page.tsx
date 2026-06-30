@@ -108,7 +108,12 @@ export default function InteligenciaElectoralPage() {
     proyeccion: true,
     historico: true,
     votantes: true,
+    lideres: true,
+    eventos: true,
+    encuestas: true,
     sedes: true,
+    monitoreo: true,
+    candidato: true,
     eleccion: true,
   });
   const [filtroTerritorialIA, setFiltroTerritorialIA] = useState<{ tipo: 'todos' | 'zona' | 'seccion' | 'municipio'; valor: string }>({ tipo: 'todos', valor: '' });
@@ -866,8 +871,8 @@ export default function InteligenciaElectoralPage() {
               <h3 className="text-lg font-bold text-secondary-900">Consultor IA de Campaña</h3>
             </div>
             <p className="mb-4 text-sm text-secondary-600">
-              Escribe lo que quieres saber o decidir. La IA analiza tu proyección de votos, histórico electoral,
-              votantes, sedes y, si seleccionas una elección, los actores y sábanas cargadas.
+              Escribe lo que quieres saber o decidir. La IA cruza proyección, histórico, votantes, líderes, eventos,
+              encuestas, sedes, monitoreo de casillas y perfil del candidato. Selecciona abajo qué datos incluir.
             </p>
 
             <div className="mb-4 grid gap-4 lg:grid-cols-3">
@@ -880,7 +885,12 @@ export default function InteligenciaElectoralPage() {
                     { key: 'proyeccion', label: 'Proyección de votos' },
                     { key: 'historico', label: 'Histórico electoral' },
                     { key: 'votantes', label: 'Votantes / simpatizantes' },
+                    { key: 'lideres', label: 'Líderes territoriales' },
+                    { key: 'eventos', label: 'Eventos / mítines' },
+                    { key: 'encuestas', label: 'Encuestas' },
                     { key: 'sedes', label: 'Sedes / casillas' },
+                    { key: 'monitoreo', label: 'Casillas monitoreo' },
+                    { key: 'candidato', label: 'Perfil del candidato' },
                     { key: 'eleccion', label: 'Elección y actores' },
                   ].map((f) => (
                     <label

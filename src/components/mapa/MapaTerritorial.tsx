@@ -385,8 +385,12 @@ export default function MapaTerritorial() {
       let nuevoGeo: MapaData = {};
       if (capasActivas.length === 0) {
         setData({});
+        cargandoRef.current = false;
+        setLoading(false);
+        return;
       } else if (!mapBoundsRef.current) {
         // Esperar a que el mapa reporte bounds; evita cargar capas sin viewport.
+        cargandoRef.current = false;
         setLoading(false);
         return;
       } else {

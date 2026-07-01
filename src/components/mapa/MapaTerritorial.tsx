@@ -170,13 +170,17 @@ export default function MapaTerritorial() {
   const [modoDemo, setModoDemo] = useState(false);
   const mapRef = useRef<MapaLeafletRef | null>(null);
   const capasPersonalizadasRef = useRef<CapaMapa[]>([]);
+  const mapBoundsRef = useRef<{ south: number; west: number; north: number; east: number } | null>(null);
   const debounceBoundsRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
-  // Mantener ref sincronizada con el estado actual para lectura dentro de callbacks
+  // Mantener refs sincronizadas con el estado actual para lectura dentro de callbacks
   useEffect(() => {
     capasPersonalizadasRef.current = capasPersonalizadas;
   }, [capasPersonalizadas]);
+  useEffect(() => {
+    mapBoundsRef.current = mapBounds;
+  }, [mapBounds]);
 
   // Persistir cada cambio de preferencias
   useEffect(() => {
@@ -373,11 +377,12 @@ export default function MapaTerritorial() {
       if (conSinCoordenadas === 'con') params.sin_coordenadas = 'false';
       if (conSinCoordenadas === 'sin') params.sin_coordenadas = 'true';
       if (topN !== '') params.limit = Math.min(Number(topN), 2000);
-      if (mapBounds) params.bbox = `${mapBounds.west},${mapBounds.south},${mapBounds.east},${mapBounds.north}`;
+      if (mapBoundsRef.current) params.bbox = `${mapBoundsRef.current.west},${mapBoundsRef.current.south},${mapBoundsRef.current.east},${mapBoundsRef.current.north}`;
 
+      let nuevoGeo: MapaData = {};
       if (capasActivas.length === 0) {
         setData({});
-      } else if (!mapBounds) {
+      } else if (!mapBoundsRef.current) {
         // Esperar a que el mapa reporte bounds; evita cargar capas sin viewport.
         setLoading(false);
         return;
@@ -397,7 +402,6 @@ export default function MapaTerritorial() {
         );
 
         const resultados = await Promise.all(promises);
-        const nuevoGeo: MapaData = {};
         let todasFallaron = true;
         resultados.forEach(r => {
           if (r.ok && r.data) {
@@ -457,9 +461,11 @@ export default function MapaTerritorial() {
 
       // Extraer tipos de apoyo para filtros (mantener preferencias del usuario)
       const tiposApoyo = new Set<string>(['despensa', 'medicamento', 'lamina', 'otro']);
-      (data.apoyos?.features || []).forEach((f: any) => {
-        const t = f.properties?.tipo_apoyo;
-        if (t) tiposApoyo.add(String(t));
+      Object.values(nuevoGeo || {}).forEach((capa: any) => {
+        (capa?.features || []).forEach((f: any) => {
+          const t = f.properties?.tipo_apoyo;
+          if (t) tiposApoyo.add(String(t));
+        });
       });
       setFiltrosApoyos(prev => {
         const next: Record<string, boolean> = { ...prev };
@@ -482,8 +488,6 @@ export default function MapaTerritorial() {
     zonaFiltro,
     conSinCoordenadas,
     topN,
-    data,
-    mapBounds,
   ]);
 
   const guardarFeature = useCallback(async () => {

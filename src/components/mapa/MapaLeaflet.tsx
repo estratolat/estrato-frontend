@@ -41,6 +41,16 @@ const CENTRO_STORAGE_KEY = 'mapa-centro';
 const RESALTAR_REINTENTOS = 40;
 const RESALTAR_INTERVALO = 300;
 
+// Evita que movimientos programáticos del mapa (fitBounds/flyTo/openPopup)
+// disparen recargas de capas por cambio de bounds.
+let ignoreMoveEndUntil = 0;
+function shouldIgnoreMoveEnd() {
+  return Date.now() < ignoreMoveEndUntil;
+}
+function registerProgrammaticMove(duration = 1200) {
+  ignoreMoveEndUntil = Date.now() + duration + 200;
+}
+
 function getCentroInicial(): { center: [number, number]; zoom: number } {
   if (typeof window === 'undefined') {
     return { center: CENTRO_LEON, zoom: ZOOM_INICIAL };
@@ -77,7 +87,7 @@ interface Props {
   data: MapaData;
   activas: Record<string, boolean>;
   onRecargar: () => void;
-  personalizadas: { id: string; nombre: string; tipo: string; color: string }[];
+  personalizadas: { id: string; nombre: string; tipo: string; color: string; bloqueada?: boolean; orden?: number }[];
   lideres?: Lider[];
   modoLideres?: 'pines' | 'circulos' | 'heatmap' | 'solo_puntos';
   puntoSeleccionado?: { lat: number; lng: number } | null;
@@ -222,16 +232,19 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
       const bounds = (target as any).getBounds ? (target as any).getBounds() : null;
       if (bounds?.isValid?.()) {
         // Ajustar el mapa para que el polígono ocupe toda la vista
+        registerProgrammaticMove(1200);
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
       } else if (geometryFallback) {
         const fallback = L.geoJSON(geometryFallback);
         const fb = fallback.getBounds();
         fallback.remove();
         if (fb?.isValid?.()) {
+          registerProgrammaticMove(1200);
           map.fitBounds(fb, { padding: [60, 60], maxZoom: 16, animate: true });
         }
       } else if ((target as any).getLatLng) {
         const ll = (target as any).getLatLng();
+        registerProgrammaticMove(1200);
         map.flyTo(ll, 16, { duration: 1.2 });
       }
 
@@ -309,6 +322,7 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
         }
         console.log('[MapaBridge] fitBounds computed:', bounds?.isValid?.() ? bounds.toBBoxString() : 'invalid');
         if (bounds && bounds.isValid()) {
+          registerProgrammaticMove(1200);
           map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18, animate: true });
         } else {
           console.warn('[MapaBridge] fitBounds: bounds inválido', geometryOrBbox);
@@ -318,6 +332,7 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
       }
     },
     openPopup: (lat, lng) => {
+      registerProgrammaticMove(1200);
       map.flyTo([lat, lng], 16, { duration: 1.2 });
     },
     resaltarFeature: (capaId, featureId) => resaltarFeature(capaId, featureId, undefined),
@@ -353,6 +368,7 @@ function ManejadorResultadoDestacado({
       }
       if (bounds && bounds.isValid()) {
         console.log('[ManejadorResultadoDestacado] haciendo fitBounds');
+        registerProgrammaticMove(1200);
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
       } else {
         console.warn('[ManejadorResultadoDestacado] bounds inválido');
@@ -474,6 +490,7 @@ function ManejadorBounds({
 }) {
   const map = useMap();
   const notificar = useCallback(() => {
+    if (shouldIgnoreMoveEnd()) return;
     const b = map.getBounds();
     onBoundsChange({
       south: b.getSouth(),
@@ -484,6 +501,7 @@ function ManejadorBounds({
   }, [map, onBoundsChange]);
 
   useEffect(() => {
+    if (shouldIgnoreMoveEnd()) return;
     notificar();
   }, [notificar]);
 
@@ -529,7 +547,7 @@ function CapaDibujo() {
 
 interface CapaPersonalizadaProps {
   data: any;
-  capa: { id: string; nombre: string; color: string };
+  capa: { id: string; nombre: string; color: string; bloqueada?: boolean; orden?: number };
   capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
   onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
   onRender?: () => void;
@@ -625,6 +643,18 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
     if (!data?.features?.length) return;
 
     const esCapaSindical = /STASE|Sindicales/i.test(capa.nombre);
+    const bloqueada = !!capa.bloqueada;
+    const orden = typeof capa.orden === 'number' ? capa.orden : 0;
+    const paneName = `capa-${capa.id}`;
+    const zIndex = 500 + orden * 10;
+
+    // Crear/actualizar pane propio para controlar z-index y bloqueo de interacción
+    let pane = map.getPane(paneName);
+    if (!pane) {
+      pane = map.createPane(paneName);
+    }
+    pane.style.zIndex = String(zIndex);
+    pane.style.pointerEvents = bloqueada ? 'none' : 'auto';
 
     const baseStyle = (feature: any) => {
       const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
@@ -638,43 +668,46 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
     };
 
     const layer = L.geoJSON(data, {
-      ...(esCapaSindical ? { pane: 'sindical' } : {}),
+      pane: paneName,
       style: baseStyle,
-      onEachFeature: (feature: any, l: any) => {
-        const props = feature?.properties || {};
-        const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
+      onEachFeature: bloqueada
+        ? undefined
+        : (feature: any, l: any) => {
+            const props = feature?.properties || {};
+            const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
 
-        l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre), {
-          maxWidth: 320,
-          className: 'capa-popup-sindical',
-        });
+            l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre), {
+              maxWidth: 320,
+              className: 'capa-popup-sindical',
+              autoPan: false,
+            });
 
-        l.on('click', (e: any) => {
-          L.DomEvent.stopPropagation(e);
-          l.bringToFront();
-          l.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.5 });
-          l.openPopup();
-          if (onFeatureClick) onFeatureClick(capa.id, featureId, props);
-        });
+            l.on('click', (e: any) => {
+              L.DomEvent.stopPropagation(e);
+              l.bringToFront();
+              l.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.5 });
+              l.openPopup();
+              if (onFeatureClick) onFeatureClick(capa.id, featureId, props);
+            });
 
-        l.on('popupclose', () => {
-          l.setStyle(baseStyle(l.feature));
-        });
+            l.on('popupclose', () => {
+              l.setStyle(baseStyle(l.feature));
+            });
 
-        l.on('popupopen', () => {
-          const btn = document.getElementById(`btn-editar-feature-${featureId}`);
-          if (btn && onFeatureClick) {
-            const handler = () => onFeatureClick(capa.id, featureId, props);
-            btn.addEventListener('click', handler);
-            // Limpiar listener al cerrar popup para evitar duplicados
-            const cleanup = () => {
-              btn.removeEventListener('click', handler);
-              l.off('popupclose', cleanup);
-            };
-            l.on('popupclose', cleanup);
-          }
-        });
-      },
+            l.on('popupopen', () => {
+              const btn = document.getElementById(`btn-editar-feature-${featureId}`);
+              if (btn && onFeatureClick) {
+                const handler = () => onFeatureClick(capa.id, featureId, props);
+                btn.addEventListener('click', handler);
+                // Limpiar listener al cerrar popup para evitar duplicados
+                const cleanup = () => {
+                  btn.removeEventListener('click', handler);
+                  l.off('popupclose', cleanup);
+                };
+                l.on('popupclose', cleanup);
+              }
+            });
+          },
       pointToLayer: (feature: any, latlng: any) => {
         const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
         return L.circleMarker(latlng, {
@@ -684,14 +717,16 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
           weight: 2,
           opacity: 1,
           fillOpacity: 0.8,
-        });
+          pane: paneName,
+          interactive: !bloqueada,
+        } as any);
       },
     });
 
     layer.addTo(map);
     capaRef.current = layer;
     capasGeoJSONRef.current?.set(capa.id, layer);
-    console.log('[CapaPersonalizada] renderizada', capa.id, capa.nombre, 'features:', data.features.length);
+    console.log('[CapaPersonalizada] renderizada', capa.id, capa.nombre, 'bloqueada:', bloqueada, 'orden:', orden, 'features:', data.features.length);
     onRender?.();
 
     return () => {
@@ -700,7 +735,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
         capasGeoJSONRef.current?.delete(capa.id);
       }
     };
-  }, [data, capa.id, capa.color, capa.nombre, map, capasGeoJSONRef, onFeatureClick, onRender]);
+  }, [data, capa.id, capa.color, capa.nombre, capa.bloqueada, capa.orden, map, capasGeoJSONRef, onFeatureClick, onRender]);
 
   return null;
 }

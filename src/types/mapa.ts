@@ -33,6 +33,7 @@ export interface CapaMapa {
   origen: string;
   color: string;
   visible: boolean;
+  bloqueada: boolean;
   orden: number;
   metadata?: Record<string, any>;
   estilos?: Record<string, { color?: string; nombre?: string }>;

@@ -80,6 +80,7 @@ export const adminApi = {
   getProjects: () => api.get('/admin/projects'),
   createProject: (data: any) => api.post('/admin/projects', data),
   getProject: (id: string) => api.get(`/admin/projects/${id}`),
+  updateProject: (id: string, data: any) => api.patch(`/admin/projects/${id}`, data),
 };
 
 // === API de Tenants ===

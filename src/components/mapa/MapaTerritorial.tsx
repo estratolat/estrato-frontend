@@ -207,6 +207,51 @@ export default function MapaTerritorial() {
     setActivas(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
+  const guardarOrdenCapa = useCallback(async (id: string, nuevoOrden: number) => {
+    try {
+      await mapaApi.updateCapa(id, { orden: nuevoOrden });
+      setCapasPersonalizadas(prev =>
+        prev.map(c => (c.id === id ? { ...c, orden: nuevoOrden } : c)).sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
+      );
+    } catch (e) {
+      console.error('[MapaTerritorial] Error guardando orden de capa:', e);
+      setError('No se pudo guardar el orden de la capa');
+    }
+  }, []);
+
+  const subirCapa = useCallback((id: string) => {
+    const capas = [...capasPersonalizadasRef.current].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
+    const idx = capas.findIndex(c => c.id === id);
+    if (idx <= 0) return;
+    const ordenActual = capas[idx].orden;
+    const ordenAnterior = capas[idx - 1].orden;
+    const nuevoOrden = ordenAnterior - 1;
+    guardarOrdenCapa(id, nuevoOrden);
+  }, [guardarOrdenCapa]);
+
+  const bajarCapa = useCallback((id: string) => {
+    const capas = [...capasPersonalizadasRef.current].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
+    const idx = capas.findIndex(c => c.id === id);
+    if (idx < 0 || idx >= capas.length - 1) return;
+    const ordenActual = capas[idx].orden;
+    const ordenSiguiente = capas[idx + 1].orden;
+    const nuevoOrden = ordenSiguiente + 1;
+    guardarOrdenCapa(id, nuevoOrden);
+  }, [guardarOrdenCapa]);
+
+  const toggleBloquearCapa = useCallback(async (id: string) => {
+    const capa = capasPersonalizadasRef.current.find(c => c.id === id);
+    if (!capa) return;
+    const nuevoBloqueo = !capa.bloqueada;
+    try {
+      await mapaApi.updateCapa(id, { bloqueada: nuevoBloqueo });
+      setCapasPersonalizadas(prev => prev.map(c => (c.id === id ? { ...c, bloqueada: nuevoBloqueo } : c)));
+    } catch (e) {
+      console.error('[MapaTerritorial] Error cambiando bloqueo de capa:', e);
+      setError('No se pudo cambiar el bloqueo de la capa');
+    }
+  }, []);
+
   const toggleExpandir = useCallback((id: string) => {
     setCapasExpandidas(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);
@@ -553,7 +598,8 @@ export default function MapaTerritorial() {
     let cancelado = false;
     mapaApi.getCapas().then(res => {
       if (cancelado) return;
-      setCapasPersonalizadas(res.data?.personalizadas || []);
+      const capas = (res.data?.personalizadas || []).map((c: CapaMapa) => ({ ...c, bloqueada: !!c.bloqueada }));
+      setCapasPersonalizadas(capas.sort((a: CapaMapa, b: CapaMapa) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)));
     }).catch(err => {
       if (cancelado) return;
       console.error('Error cargando capas personalizadas:', err);
@@ -748,13 +794,36 @@ export default function MapaTerritorial() {
           {!activas[capa.id] && <p className="mt-0.5 text-[10px] text-secondary-400">Toca el switch para activar</p>}
         </button>
 
-        <button
-          onClick={() => setCapaEditar(capa)}
-          title="Editar capa"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
-        >
-          <Icon name="seguridad" size={14} />
-        </button>
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => subirCapa(capa.id)}
+              title="Subir capa (arriba)"
+              disabled={capa.orden <= 0}
+              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-700 disabled:opacity-30"
+            >
+              ▲
+            </button>
+            <button
+              onClick={() => bajarCapa(capa.id)}
+              title="Bajar capa (abajo)"
+              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-700 disabled:opacity-30"
+            >
+              ▼
+            </button>
+          </div>
+          <button
+            onClick={() => toggleBloquearCapa(capa.id)}
+            title={capa.bloqueada ? 'Desbloquear capa (permitir selección)' : 'Bloquear capa (evitar selección)'}
+            className={`flex h-6 w-6 items-center justify-center rounded-md text-[11px] transition ${
+              capa.bloqueada
+                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                : 'text-secondary-400 hover:bg-secondary-100 hover:text-secondary-600'
+            }`}
+          >
+            {capa.bloqueada ? '🔒' : '🔓'}
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-3 gap-1.5">
         <button

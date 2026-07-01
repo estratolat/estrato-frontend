@@ -20,6 +20,12 @@ import {
   Award,
   AlertCircle,
   CheckCircle2,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Filter,
+  Database,
+  MapPin,
 } from 'lucide-react';
 
 interface Partido {
@@ -79,13 +85,39 @@ export default function InteligenciaElectoralPage() {
   const [secciones, setSecciones] = useState<SeccionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'catalogos' | 'carga' | 'analisis' | 'mapa'>('catalogos');
+  const [activeTab, setActiveTab] = useState<'catalogos' | 'carga' | 'analisis' | 'mapa' | 'consultor'>('catalogos');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [analizando, setAnalizando] = useState<string | null>(null);
   const [analisisResult, setAnalisisResult] = useState<any>(null);
   const [geojsonMapa, setGeojsonMapa] = useState<any>(null);
   const [cargandoMapa, setCargandoMapa] = useState(false);
+
+  // Consultor IA
+  const [pregunta, setPregunta] = useState('');
+  const [consultando, setConsultando] = useState(false);
+  const [respuestaIA, setRespuestaIA] = useState<string | null>(null);
+  const [contextoCampana, setContextoCampana] = useState<Record<string, string>>({
+    objetivo: '',
+    escenario: '',
+    preocupaciones: '',
+    oportunidades: '',
+    instrucciones: '',
+  });
+  const [fuentesIA, setFuentesIA] = useState<Record<string, boolean>>({
+    proyeccion: true,
+    historico: true,
+    votantes: true,
+    lideres: true,
+    eventos: true,
+    encuestas: true,
+    sedes: true,
+    monitoreo: true,
+    candidato: true,
+    eleccion: true,
+  });
+  const [filtroTerritorialIA, setFiltroTerritorialIA] = useState<{ tipo: 'todos' | 'zona' | 'seccion' | 'municipio'; valor: string }>({ tipo: 'todos', valor: '' });
+  const [zonasDisponibles, setZonasDisponibles] = useState<Array<{ id: string; nombre: string }>>([]);
 
   // Formularios
   const [partidoForm, setPartidoForm] = useState<Partial<Partido>>({});
@@ -97,6 +129,7 @@ export default function InteligenciaElectoralPage() {
 
   useEffect(() => {
     cargarInicial();
+    cargarZonas();
   }, []);
 
   useEffect(() => {
@@ -130,6 +163,15 @@ export default function InteligenciaElectoralPage() {
       setError(err.response?.data?.message || 'Error al cargar datos iniciales');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarZonas = async () => {
+    try {
+      const { data } = await import('@/lib/api').then((m) => m.zonasApi.getAll());
+      setZonasDisponibles((data || []).map((z: any) => ({ id: z.id, nombre: z.nombre })));
+    } catch (err) {
+      // No crítico: algunos tenants no usan zonas
     }
   };
 
@@ -374,6 +416,16 @@ export default function InteligenciaElectoralPage() {
             className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-secondary-700 transition hover:bg-secondary-50 disabled:opacity-50"
           >
             <BrainCircuit size={16} /> Análisis
+          </button>
+          <button
+            onClick={() => setActiveTab('consultor')}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              activeTab === 'consultor'
+                ? 'bg-primary-600 text-white'
+                : 'bg-white text-secondary-700 hover:bg-secondary-50'
+            }`}
+          >
+            <Sparkles size={16} /> Consultor IA
           </button>
         </div>
       </div>
@@ -805,6 +857,187 @@ export default function InteligenciaElectoralPage() {
                     <li key={i}>{s}</li>
                   ))}
                 </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'consultor' && (
+        <div className="space-y-6">
+          <div className="card p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles size={22} className="text-primary-600" />
+              <h3 className="text-lg font-bold text-secondary-900">Consultor IA de Campaña</h3>
+            </div>
+            <p className="mb-4 text-sm text-secondary-600">
+              Escribe lo que quieres saber o decidir. La IA cruza proyección, histórico, votantes, líderes, eventos,
+              encuestas, sedes, monitoreo de casillas y perfil del candidato. Selecciona abajo qué datos incluir.
+            </p>
+
+            <div className="mb-4 grid gap-4 lg:grid-cols-3">
+              <div className="space-y-3 lg:col-span-1">
+                <label className="label flex items-center gap-2">
+                  <Database size={16} className="text-primary-600" /> Fuentes de datos a vincular
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'proyeccion', label: 'Proyección de votos' },
+                    { key: 'historico', label: 'Histórico electoral' },
+                    { key: 'votantes', label: 'Votantes / simpatizantes' },
+                    { key: 'lideres', label: 'Líderes territoriales' },
+                    { key: 'eventos', label: 'Eventos / mítines' },
+                    { key: 'encuestas', label: 'Encuestas' },
+                    { key: 'sedes', label: 'Sedes / casillas' },
+                    { key: 'monitoreo', label: 'Casillas monitoreo' },
+                    { key: 'candidato', label: 'Perfil del candidato' },
+                    { key: 'eleccion', label: 'Elección y actores' },
+                  ].map((f) => (
+                    <label
+                      key={f.key}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                        fuentesIA[f.key] ? 'border-primary-300 bg-primary-50 text-secondary-900' : 'border-gray-200 bg-white text-secondary-600'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={fuentesIA[f.key]}
+                        onChange={(e) => setFuentesIA({ ...fuentesIA, [f.key]: e.target.checked })}
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      {f.label}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <label className="label flex items-center gap-2">
+                    <MapPin size={16} className="text-primary-600" /> Filtro territorial
+                  </label>
+                  <select
+                    value={filtroTerritorialIA.tipo}
+                    onChange={(e) => setFiltroTerritorialIA({ tipo: e.target.value as any, valor: '' })}
+                    className="input"
+                  >
+                    <option value="todos">Todo el territorio</option>
+                    {zonasDisponibles.length > 0 && <option value="zona">Zona / Nodo</option>}
+                    <option value="seccion">Sección electoral</option>
+                    <option value="municipio">Municipio / Delegación</option>
+                  </select>
+                  {filtroTerritorialIA.tipo === 'zona' && zonasDisponibles.length > 0 && (
+                    <select
+                      value={filtroTerritorialIA.valor}
+                      onChange={(e) => setFiltroTerritorialIA({ ...filtroTerritorialIA, valor: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Seleccionar zona...</option>
+                      {zonasDisponibles.map((z) => (
+                        <option key={z.id} value={z.nombre}>{z.nombre}</option>
+                      ))}
+                    </select>
+                  )}
+                  {filtroTerritorialIA.tipo !== 'todos' && filtroTerritorialIA.tipo !== 'zona' && (
+                    <input
+                      type="text"
+                      value={filtroTerritorialIA.valor}
+                      onChange={(e) => setFiltroTerritorialIA({ ...filtroTerritorialIA, valor: e.target.value })}
+                      placeholder={
+                        filtroTerritorialIA.tipo === 'seccion'
+                          ? 'Ej. 0123'
+                          : 'Ej. Culiacán'
+                      }
+                      className="input"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3 lg:col-span-1">
+                <label className="label">Describe el contexto de tu campaña (formulario libre)</label>
+                {[
+                  { key: 'objetivo', label: 'Objetivo electoral', placeholder: 'Ej. Ganar la gubernatura con 45% de votos válidos' },
+                  { key: 'escenario', label: 'Escenario / rivalidad', placeholder: 'Ej. Competencia tripartita, el PRI lleva 12 años gobernando' },
+                  { key: 'preocupaciones', label: 'Preocupaciones', placeholder: 'Ej. Baja participación en zonas rurales y votos nulos altos' },
+                  { key: 'oportunidades', label: 'Oportunidades', placeholder: 'Ej. Fuerte crecimiento de jóvenes votantes en zona metropolitana' },
+                  { key: 'instrucciones', label: 'Instrucciones especiales', placeholder: 'Ej. Enfócate en defender bastiones y recuperar secciones pérdidas en 2021' },
+                ].map((campo) => (
+                  <div key={campo.key}>
+                    <p className="mb-1 text-xs font-medium text-secondary-700">{campo.label}</p>
+                    <textarea
+                      value={contextoCampana[campo.key] || ''}
+                      onChange={(e) => setContextoCampana({ ...contextoCampana, [campo.key]: e.target.value })}
+                      placeholder={campo.placeholder}
+                      rows={2}
+                      className="input resize-none"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-3 lg:col-span-1">
+                <label className="label">Tu pregunta o instrucción para la IA</label>
+                <textarea
+                  value={pregunta}
+                  onChange={(e) => setPregunta(e.target.value)}
+                  placeholder="Ej. ¿En qué 3 secciones debo enfocar recursos esta semana según la proyección y el histórico?"
+                  rows={6}
+                  className="input resize-none"
+                />
+                <button
+                  onClick={async () => {
+                    if (!pregunta.trim()) return;
+                    setConsultando(true);
+                    setRespuestaIA(null);
+                    setError(null);
+                    try {
+                      const { data } = await inteligenciaElectoralApi.consultarIA({
+                        pregunta,
+                        contextoCampana,
+                        eleccionId: eleccionId || undefined,
+                        fuentes: fuentesIA,
+                        filtroTerritorial: filtroTerritorialIA,
+                      });
+                      setRespuestaIA(data.respuesta);
+                    } catch (err: any) {
+                      setError(err.response?.data?.message || 'Error al consultar la IA');
+                    } finally {
+                      setConsultando(false);
+                    }
+                  }}
+                  disabled={consultando || !pregunta.trim()}
+                  className="btn-primary flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {consultando ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+                      Consultando...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={16} /> Preguntar a la IA
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {respuestaIA && (
+            <div className="card p-6">
+              <div className="mb-3 flex items-center gap-2">
+                <MessageSquare size={20} className="text-primary-600" />
+                <h4 className="font-bold text-secondary-900">Respuesta</h4>
+              </div>
+              <div className="prose prose-sm max-w-none text-secondary-800">
+                {respuestaIA.split('\n').map((line, i) => {
+                  if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold">{line.replace('# ', '')}</h1>;
+                  if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold">{line.replace('## ', '')}</h2>;
+                  if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold">{line.replace('### ', '')}</h3>;
+                  if (line.startsWith('- ')) return <li key={i}>{line.replace('- ', '')}</li>;
+                  if (line.match(/^\d+\. /)) return <li key={i}>{line.replace(/^\d+\. /, '')}</li>;
+                  if (line.trim() === '') return <br key={i} />;
+                  return <p key={i}>{line}</p>;
+                })}
               </div>
             </div>
           )}

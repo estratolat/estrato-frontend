@@ -26,6 +26,7 @@ export default function ProyeccionPage() {
   const [loading, setLoading] = useState(true);
   const [showMetaForm, setShowMetaForm] = useState(false);
   const [metaForm, setMetaForm] = useState({ seccion: '', proceso: '2027', meta_votos: '', meta_lista_nominal: '' });
+  const [padronForm, setPadronForm] = useState<{ proceso: string; meta_votos: string; meta_lista_nominal: string; meta_participacion: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -42,6 +43,18 @@ export default function ProyeccionPage() {
       setResumen(res.data);
       setSecciones(sec.data || []);
       setMetas(mets.data || []);
+
+      const global = (mets.data || []).find((m: MetaVotacion) => !m.seccion && !m.zona_id);
+      if (global) {
+        setPadronForm({
+          proceso: global.proceso || '2027',
+          meta_votos: String(global.meta_votos || ''),
+          meta_lista_nominal: String(global.meta_lista_nominal || ''),
+          meta_participacion: String(global.meta_participacion || ''),
+        });
+      } else {
+        setPadronForm({ proceso: '2027', meta_votos: '', meta_lista_nominal: '', meta_participacion: '' });
+      }
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -67,6 +80,29 @@ export default function ProyeccionPage() {
     }
   };
 
+  const handleSavePadron = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!padronForm) return;
+    if (!padronForm.meta_votos || !padronForm.meta_lista_nominal) return;
+    try {
+      const global = metas.find((m) => !m.seccion && !m.zona_id);
+      const payload = {
+        proceso: padronForm.proceso,
+        meta_votos: parseInt(padronForm.meta_votos, 10),
+        meta_lista_nominal: parseInt(padronForm.meta_lista_nominal, 10),
+        meta_participacion: padronForm.meta_participacion ? parseFloat(padronForm.meta_participacion) : undefined,
+      };
+      if (global) {
+        await proyeccionApi.updateMeta(global.id, payload);
+      } else {
+        await proyeccionApi.createMeta(payload);
+      }
+      loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error al guardar padrón global');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -87,18 +123,30 @@ export default function ProyeccionPage() {
         </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="card">
-          <p className="text-sm text-secondary-600">Simpatizantes</p>
+          <p className="text-sm text-secondary-600">Padrón total</p>
           <p className="text-2xl font-bold text-secondary-900">{(resumen?.votantes_registrados || 0).toLocaleString()}</p>
+          {resumen?.meta_lista_nominal ? (
+            <p className="text-xs text-secondary-500">Lista nominal configurada</p>
+          ) : null}
         </div>
         <div className="card">
-          <p className="text-sm text-secondary-600">Meta total</p>
+          <p className="text-sm text-secondary-600">Capturados en sistema</p>
+          <p className="text-2xl font-bold text-secondary-900">{(resumen?.votantes_capturados || 0).toLocaleString()}</p>
+          {resumen?.avance_padron != null ? (
+            <p className="text-xs text-secondary-500">{resumen.avance_padron}% del padrón</p>
+          ) : null}
+        </div>
+        <div className="card">
+          <p className="text-sm text-secondary-600">Meta total votos</p>
           <p className="text-2xl font-bold text-secondary-900">{(resumen?.meta_votos_total || 0).toLocaleString()}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-secondary-600">Apoyos</p>
-          <p className="text-2xl font-bold text-secondary-900">{(resumen?.apoyos_registrados || 0).toLocaleString()}</p>
+          <p className="text-sm text-secondary-600">Participación esperada</p>
+          <p className="text-2xl font-bold text-secondary-900">
+            {resumen?.meta_participacion ? `${resumen.meta_participacion}%` : '-'}
+          </p>
         </div>
         <div className="card">
           <p className="text-sm text-secondary-600">Brecha vs meta</p>
@@ -108,13 +156,58 @@ export default function ProyeccionPage() {
         </div>
       </div>
 
+      {padronForm && (
+        <form onSubmit={handleSavePadron} className="card space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-secondary-900">Configuración global del padrón</h3>
+            <button type="submit" className="btn-primary flex items-center gap-2 px-4 py-2">
+              <Save size={18} /> Guardar
+            </button>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-4">
+            <input
+              type="text"
+              value={padronForm.proceso}
+              onChange={(e) => setPadronForm({ ...padronForm, proceso: e.target.value })}
+              placeholder="Proceso"
+              className="input"
+              required
+            />
+            <input
+              type="number"
+              value={padronForm.meta_lista_nominal}
+              onChange={(e) => setPadronForm({ ...padronForm, meta_lista_nominal: e.target.value })}
+              placeholder="Padrón total (lista nominal)"
+              className="input"
+              required
+            />
+            <input
+              type="number"
+              value={padronForm.meta_votos}
+              onChange={(e) => setPadronForm({ ...padronForm, meta_votos: e.target.value })}
+              placeholder="Meta total de votos"
+              className="input"
+              required
+            />
+            <input
+              type="number"
+              step="0.1"
+              value={padronForm.meta_participacion}
+              onChange={(e) => setPadronForm({ ...padronForm, meta_participacion: e.target.value })}
+              placeholder="Participación esperada (%)"
+              className="input"
+            />
+          </div>
+        </form>
+      )}
+
       {showMetaForm && (
         <form onSubmit={handleSaveMeta} className="card grid gap-4 sm:grid-cols-4">
           <input
             type="text"
             value={metaForm.seccion}
             onChange={(e) => setMetaForm({ ...metaForm, seccion: e.target.value })}
-            placeholder="Sección"
+            placeholder="Sección o Zona"
             className="input"
             required
           />
@@ -154,7 +247,7 @@ export default function ProyeccionPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-secondary-200 bg-secondary-50">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-secondary-600">Sección</th>
+                <th className="px-4 py-3 text-left font-medium text-secondary-600">Sección / Zona</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Simp.</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Líderes</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Meta votos</th>
@@ -173,7 +266,7 @@ export default function ProyeccionPage() {
                   const Icon = tendenciaIcons[s.tendencia] || Minus;
                   return (
                     <tr key={s.seccion}>
-                      <td className="px-4 py-3 font-medium text-secondary-900">Sección {s.seccion}</td>
+                      <td className="px-4 py-3 font-medium text-secondary-900">{s.seccion}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.votantes}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.lideres}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.meta_votos?.toLocaleString() || '-'}</td>

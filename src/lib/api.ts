@@ -307,6 +307,10 @@ export const inteligenciaElectoralApi = {
   getMapaSecciones: (eleccionId: string) => api.get(`/inteligencia-electoral/elecciones/${eleccionId}/mapa-secciones`),
   analizarSeccion: (eleccionId: string, seccion: string) =>
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/analizar-seccion/${seccion}`),
+
+  // Consultor IA
+  consultarIA: (data: { pregunta: string; contextoCampana?: Record<string, any>; eleccionId?: string; fuentes?: Record<string, boolean>; filtroTerritorial?: { tipo: string; valor: string } }) =>
+    api.post('/inteligencia-electoral/consultar-ia', data),
 };
 
 // === API de Fichas Seccionales ===
@@ -321,6 +325,8 @@ export const mapaApi = {
   getCapas: () => api.get('/mapas/capas'),
   getGeoJson: (capas: string[], params?: any) =>
     api.get('/mapas/geojson', { params: { capas: capas.join(','), ...params } }),
+  getGeoJsonCapa: (capa: string, params?: any) =>
+    api.get(`/mapas/geojson/${capa}`, { params }),
   getEstadisticas: (nivel: 'seccion' | 'zona' = 'seccion') =>
     api.get('/mapas/estadisticas', { params: { nivel } }),
   createCapa: (data: any) => api.post('/mapas/capas', data),

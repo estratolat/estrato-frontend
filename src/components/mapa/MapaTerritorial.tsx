@@ -163,12 +163,14 @@ export default function MapaTerritorial() {
   const [conSinCoordenadas, setConSinCoordenadas] = useState<'todos' | 'con' | 'sin'>(prefs.conSinCoordenadas);
   const [topN, setTopN] = useState<number | ''>(prefs.topN);
   const [modoLideres, setModoLideres] = useState<'pines' | 'circulos' | 'heatmap' | 'solo_puntos'>(prefs.modoLideres);
+  const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
   const mapRef = useRef<MapaLeafletRef | null>(null);
   const capasPersonalizadasRef = useRef<CapaMapa[]>([]);
+  const debounceBoundsRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
   // Mantener ref sincronizada con el estado actual para lectura dentro de callbacks
@@ -238,6 +240,13 @@ export default function MapaTerritorial() {
       mapRef.current?.flyTo(c.lat, c.lng, 17);
     }, 150);
   }, [activas.lideres]);
+
+  const handleBoundsChange = useCallback((bounds: { south: number; west: number; north: number; east: number }) => {
+    if (debounceBoundsRef.current) clearTimeout(debounceBoundsRef.current);
+    debounceBoundsRef.current = setTimeout(() => {
+      setMapBounds(bounds);
+    }, 400);
+  }, []);
 
   const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo', coords?: { lat: number; lng: number } | null) => {
     setPuntoInicial(coords || null);
@@ -345,6 +354,8 @@ export default function MapaTerritorial() {
     }
   }, [asegurarCapaCargada]);
 
+  const [loadingCapas, setLoadingCapas] = useState<Record<string, boolean>>({});
+
   const cargarDatos = useCallback(async (forzarDemo = false) => {
     setLoading(true);
     setError(null);
@@ -353,49 +364,76 @@ export default function MapaTerritorial() {
       const idsPersonalizados = capasPersonalizadasRef.current.filter((c: CapaMapa) => activas[c.id]).map((c: CapaMapa) => c.id);
       const capasActivas = [...idsPredefinidos, ...idsPersonalizados];
 
-      // GeoJSON es crítico; si falla, reportamos el error real y solo usamos demo si se fuerza explícitamente
-      let geo: MapaData = {};
-      try {
-        const geoRes = await mapaApi.getGeoJson(capasActivas, { limit: 5000 });
-        geo = geoRes.data as MapaData;
-        setData(geo);
-      } catch (geoErr: any) {
-        console.error('Error cargando geojson:', geoErr);
-        if (forzarDemo) {
-          const demo = generarDemoData();
-          setData(demo);
-          setModoDemo(true);
-          setSecciones([]);
-          setLideres(demo.lideres?.features.map((f: any) => ({
-            id: f.properties.id,
-            votante: { nombre: f.properties.nombre, coordenadas: { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] } },
-            score: f.properties.score,
-            alcance_estimado: f.properties.alcance_estimado,
-          } as unknown as Lider)) || []);
-          setStats([]);
-          setZonas([]);
-          setError('Modo demo activado manualmente. No se pudo conectar con el servidor de mapas.');
-          setLoading(false);
-          return;
-        }
-        const status = geoErr?.response?.status;
-        const msg = errorToString(geoErr) || 'Error de red';
-        setError(status === 401
-          ? 'Tu sesión expiró. Inicia sesión de nuevo para ver los datos reales del mapa.'
-          : `No se pudieron cargar las capas del mapa (${status || 'red'}: ${msg}). Presiona el botón de recargar.`);
-        setLoading(false);
-        return;
-      }
-
-      // Estadísticas, líderes y zonas son complementarios; si fallan, seguimos mostrando el mapa real
-      const params: any = {};
+      // Cargar cada capa activa en paralelo con endpoints individuales para no bloquear una por una.
+      // Si un endpoint falla, las demás capas siguen cargando.
+      const params: any = { limit: 500 };
       if (soloLideresPadre) params.padres = 'true';
       if (scoreMin !== '') params.score_min = scoreMin;
       if (zonaFiltro) params.zona_id = zonaFiltro;
       if (conSinCoordenadas === 'con') params.sin_coordenadas = 'false';
       if (conSinCoordenadas === 'sin') params.sin_coordenadas = 'true';
-      if (topN !== '') params.limit = topN;
+      if (topN !== '') params.limit = Math.min(Number(topN), 2000);
+      if (mapBounds) params.bbox = `${mapBounds.west},${mapBounds.south},${mapBounds.east},${mapBounds.north}`;
 
+      if (capasActivas.length === 0) {
+        setData({});
+      } else if (!mapBounds) {
+        // Esperar a que el mapa reporte bounds; evita cargar capas sin viewport.
+        setLoading(false);
+        return;
+      } else {
+        const nextLoading: Record<string, boolean> = {};
+        capasActivas.forEach(id => { nextLoading[id] = true; });
+        setLoadingCapas(nextLoading);
+
+        const promises = capasActivas.map(id =>
+          mapaApi.getGeoJsonCapa(id, params)
+            .then(res => ({ ok: true, id, data: (res.data as MapaData)?.[id] }))
+            .catch(err => {
+              console.error(`[MapaTerritorial] Error cargando capa ${id}:`, err);
+              return { ok: false, id, data: null };
+            })
+            .finally(() => setLoadingCapas(prev => ({ ...prev, [id]: false })))
+        );
+
+        const resultados = await Promise.all(promises);
+        const nuevoGeo: MapaData = {};
+        let todasFallaron = true;
+        resultados.forEach(r => {
+          if (r.ok && r.data) {
+            nuevoGeo[r.id] = r.data;
+            todasFallaron = false;
+          }
+        });
+
+        if (todasFallaron && capasActivas.length > 0) {
+          if (forzarDemo) {
+            const demo = generarDemoData();
+            setData(demo);
+            setModoDemo(true);
+            setSecciones([]);
+            setLideres(demo.lideres?.features.map((f: any) => ({
+              id: f.properties.id,
+              votante: { nombre: f.properties.nombre, coordenadas: { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] } },
+              score: f.properties.score,
+              alcance_estimado: f.properties.alcance_estimado,
+            } as unknown as Lider)) || []);
+            setStats([]);
+            setZonas([]);
+            setError('Modo demo activado manualmente. No se pudo conectar con el servidor de mapas.');
+            setLoading(false);
+            return;
+          }
+          setError('No se pudieron cargar las capas activas del mapa. Intenta recargar o activar menos capas.');
+          setData({});
+          setLoading(false);
+          return;
+        }
+
+        setData(prev => ({ ...prev, ...nuevoGeo }));
+      }
+
+      // Estadísticas, líderes y zonas son complementarios; si fallan, seguimos mostrando el mapa real
       const [statsRes, lideresRes, zonasRes] = await Promise.all([
         mapaApi.getEstadisticas('seccion').catch((err: any) => {
           console.warn('Estadísticas no disponibles:', err);
@@ -415,12 +453,11 @@ export default function MapaTerritorial() {
       setLideres(lideresRes.data || []);
       setZonas(zonasRes.data || []);
       setModoDemo(false);
-
       setSecciones([]);
 
       // Extraer tipos de apoyo para filtros (mantener preferencias del usuario)
       const tiposApoyo = new Set<string>(['despensa', 'medicamento', 'lamina', 'otro']);
-      (geo.apoyos?.features || []).forEach((f: any) => {
+      (data.apoyos?.features || []).forEach((f: any) => {
         const t = f.properties?.tipo_apoyo;
         if (t) tiposApoyo.add(String(t));
       });
@@ -445,6 +482,8 @@ export default function MapaTerritorial() {
     zonaFiltro,
     conSinCoordenadas,
     topN,
+    data,
+    mapBounds,
   ]);
 
   const guardarFeature = useCallback(async () => {
@@ -512,8 +551,10 @@ export default function MapaTerritorial() {
 
   // Cargar datos del mapa cuando cambian capas activas o filtros
   useEffect(() => {
+    // No cargar capas geográficas hasta tener bounds del mapa; evita traer TODO el país.
+    if (!mapBounds) return;
     cargarDatos();
-  }, [cargarDatos]);
+  }, [cargarDatos, mapBounds]);
 
   const onExitoGuardado = useCallback((tipo?: 'lider' | 'evento' | 'apoyo', id?: string, lat?: number, lng?: number) => {
     cerrarModal();
@@ -1418,6 +1459,7 @@ export default function MapaTerritorial() {
           seleccion={seleccion}
           onFeatureClick={handleFeatureClick}
           resultadoDestacado={resultadoDestacado}
+          onBoundsChange={handleBoundsChange}
         />
 
         <LeyendaMapa activas={activas} data={data} />

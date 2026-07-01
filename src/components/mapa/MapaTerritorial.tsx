@@ -172,6 +172,7 @@ export default function MapaTerritorial() {
   const capasPersonalizadasRef = useRef<CapaMapa[]>([]);
   const mapBoundsRef = useRef<{ south: number; west: number; north: number; east: number } | null>(null);
   const debounceBoundsRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cargandoRef = useRef(false);
   const router = useRouter();
 
   // Mantener refs sincronizadas con el estado actual para lectura dentro de callbacks
@@ -361,6 +362,8 @@ export default function MapaTerritorial() {
   const [loadingCapas, setLoadingCapas] = useState<Record<string, boolean>>({});
 
   const cargarDatos = useCallback(async (forzarDemo = false) => {
+    if (cargandoRef.current) return;
+    cargandoRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -479,6 +482,7 @@ export default function MapaTerritorial() {
       const msg = errorToString(err) || 'Error cargando datos del mapa';
       setError(msg);
     } finally {
+      cargandoRef.current = false;
       setLoading(false);
     }
   }, [

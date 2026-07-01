@@ -168,7 +168,13 @@ export default function MapaTerritorial() {
   const [error, setError] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
   const mapRef = useRef<MapaLeafletRef | null>(null);
+  const capasPersonalizadasRef = useRef<CapaMapa[]>([]);
   const router = useRouter();
+
+  // Mantener ref sincronizada con el estado actual para lectura dentro de callbacks
+  useEffect(() => {
+    capasPersonalizadasRef.current = capasPersonalizadas;
+  }, [capasPersonalizadas]);
 
   // Persistir cada cambio de preferencias
   useEffect(() => {
@@ -343,12 +349,8 @@ export default function MapaTerritorial() {
     setLoading(true);
     setError(null);
     try {
-      const capasRes = await mapaApi.getCapas();
-      const personalizadas = capasRes.data?.personalizadas || [];
-      setCapasPersonalizadas(personalizadas);
-
       const idsPredefinidos = CAPAS_CONFIG.filter(c => activas[c.id]).map(c => c.id as string);
-      const idsPersonalizados = personalizadas.filter((c: CapaMapa) => activas[c.id]).map((c: CapaMapa) => c.id);
+      const idsPersonalizados = capasPersonalizadasRef.current.filter((c: CapaMapa) => activas[c.id]).map((c: CapaMapa) => c.id);
       const capasActivas = [...idsPredefinidos, ...idsPersonalizados];
 
       // GeoJSON es crítico; si falla, reportamos el error real y solo usamos demo si se fuerza explícitamente
@@ -438,7 +440,6 @@ export default function MapaTerritorial() {
     }
   }, [
     activas,
-    capasPersonalizadas.length,
     soloLideresPadre,
     scoreMin,
     zonaFiltro,
@@ -496,6 +497,20 @@ export default function MapaTerritorial() {
     }
   }, [featureEditando, capasPersonalizadas]);
 
+  // Cargar listado de capas personalizadas una sola vez al montar
+  useEffect(() => {
+    let cancelado = false;
+    mapaApi.getCapas().then(res => {
+      if (cancelado) return;
+      setCapasPersonalizadas(res.data?.personalizadas || []);
+    }).catch(err => {
+      if (cancelado) return;
+      console.error('Error cargando capas personalizadas:', err);
+    });
+    return () => { cancelado = true; };
+  }, []);
+
+  // Cargar datos del mapa cuando cambian capas activas o filtros
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);

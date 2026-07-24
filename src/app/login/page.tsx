@@ -132,14 +132,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-white/50">
-          <p className="mb-2 font-medium text-white/70">Cuentas de demo:</p>
-          <ul className="space-y-1">
-            <li>owner@demo.com / demo123</li>
-            <li>candidato@demo.com / demo123</li>
-            <li>coord@demo.com / demo123</li>
-          </ul>
-        </div>
+        <p className="mt-6 text-center text-xs text-white/40">
+          ¿Necesitas acceso? Contacta al administrador de tu campaña.
+        </p>
       </div>
     </div>
   );

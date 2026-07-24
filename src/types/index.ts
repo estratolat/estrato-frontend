@@ -237,6 +237,7 @@ export interface PreguntaEncuesta {
 export interface Encuesta {
   id: string;
   tenant_id: string;
+  tenant?: { id: string; slug: string; nombre_candidato: string };
   titulo: string;
   descripcion?: string;
   status: EstatusEncuesta;
@@ -254,9 +255,32 @@ export interface RespuestaEncuesta {
   votante_id?: string;
   votante?: { id?: string; nombre?: string };
   votante_nombre?: string;
+  email?: string;
   respuestas: { pregunta_id: string; valores: (string | number)[] }[];
   coordenadas?: { lat: number; lng: number };
   created_by?: string;
+  created_at: string;
+}
+
+export interface EncuestaContacto {
+  id: string;
+  tenant_id: string;
+  nombre?: string;
+  email: string;
+  telefono?: string;
+  metadata?: Record<string, string>;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface EncuestaEnvio {
+  id: string;
+  tenant_id: string;
+  encuesta_id: string;
+  contacto_id?: string;
+  destinatario?: string;
+  canal: 'whatsapp' | 'email' | 'link';
+  estado: string;
   created_at: string;
 }
 

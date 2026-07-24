@@ -1,11 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { encuestasApi } from '@/lib/api';
 import { Encuesta } from '@/types';
-import { ClipboardList, Eye, Trash2, Play, Square, FileText } from 'lucide-react';
+import {
+  ClipboardList,
+  Eye,
+  Trash2,
+  Play,
+  Square,
+  FileText,
+  Share2,
+  Upload,
+  X,
+  Copy,
+  Check,
+  Mail,
+  MessageCircle,
+} from 'lucide-react';
 
 export default function EncuestasPage() {
   const router = useRouter();
@@ -13,6 +27,10 @@ export default function EncuestasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [modal, setModal] = useState<'compartir' | 'importar' | null>(null);
+  const [selected, setSelected] = useState<Encuesta | null>(null);
+  const [importResult, setImportResult] = useState<{ importados: number; omitidos: number; total: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadEncuestas();
@@ -50,9 +68,33 @@ export default function EncuestasPage() {
     }
   };
 
-  const filtered = encuestas.filter((e) =>
-    e.titulo.toLowerCase().includes(search.toLowerCase())
-  );
+  const openCompartir = (e: React.MouseEvent, encuesta: Encuesta) => {
+    e.stopPropagation();
+    setSelected(encuesta);
+    setModal('compartir');
+  };
+
+  const openImportar = (e: React.MouseEvent, encuesta: Encuesta) => {
+    e.stopPropagation();
+    setSelected(encuesta);
+    setImportResult(null);
+    setModal('importar');
+  };
+
+  const handleFile = async (file: File | null) => {
+    if (!file || !selected) return;
+    const formData = new FormData();
+    formData.append('archivo', file);
+    try {
+      const { data } = await encuestasApi.importarContactos(selected.id, formData);
+      setImportResult(data);
+      loadEncuestas();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error al importar contactos');
+    }
+  };
+
+  const filtered = encuestas.filter((e) => e.titulo.toLowerCase().includes(search.toLowerCase()));
 
   const statusLabels: Record<string, string> = {
     borrador: 'Borrador',
@@ -79,16 +121,14 @@ export default function EncuestasPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-secondary-900">Encuestas de Opinión</h2>
-          <p className="text-secondary-600">Crea encuestas ciudadanas y consulta resultados</p>
+          <p className="text-secondary-600">Crea encuestas ciudadanas, compártelas y consulta resultados</p>
         </div>
         <Link href="/dashboard/encuestas/nueva" className="btn-primary flex items-center gap-2">
           <ClipboardList size={18} /> Nueva encuesta
         </Link>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       <div className="card">
         <input
@@ -131,9 +171,9 @@ export default function EncuestasPage() {
                     <td className="px-4 py-3 text-secondary-600">{e.preguntas?.length || 0}</td>
                     <td className="px-4 py-3 text-secondary-600">{(e as any)._count?.respuestas || 0}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <button
-                          onClick={() => toggleStatus(e.id, e.status)}
+                          onClick={(ev) => toggleStatus(e.id, e.status)}
                           title="Cambiar estatus"
                           className="rounded-md p-1.5 text-secondary-500 hover:bg-secondary-100 hover:text-primary-600"
                         >
@@ -149,12 +189,29 @@ export default function EncuestasPage() {
                         <Link
                           href={`/dashboard/encuestas/${e.id}/respuestas`}
                           className="rounded-md p-1.5 text-secondary-500 hover:bg-secondary-100 hover:text-primary-600"
-                          title="Respuestas"
+                          title="Ver respuestas"
                         >
                           <FileText size={16} />
                         </Link>
                         <button
-                          onClick={() => handleDelete(e.id)}
+                          onClick={(ev) => openCompartir(ev, e)}
+                          title="Compartir"
+                          className="rounded-md p-1.5 text-secondary-500 hover:bg-secondary-100 hover:text-primary-600"
+                        >
+                          <Share2 size={16} />
+                        </button>
+                        <button
+                          onClick={(ev) => openImportar(ev, e)}
+                          title="Importar contactos"
+                          className="rounded-md p-1.5 text-secondary-500 hover:bg-secondary-100 hover:text-primary-600"
+                        >
+                          <Upload size={16} />
+                        </button>
+                        <button
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleDelete(e.id);
+                          }}
                           title="Eliminar"
                           className="rounded-md p-1.5 text-secondary-500 hover:bg-red-50 hover:text-red-600"
                         >
@@ -168,6 +225,156 @@ export default function EncuestasPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {modal === 'compartir' && selected && (
+        <ModalCompartir encuesta={selected} onClose={() => setModal(null)} />
+      )}
+
+      {modal === 'importar' && selected && (
+        <ModalImportar
+          encuesta={selected}
+          fileRef={fileRef}
+          result={importResult}
+          onFile={handleFile}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalCompartir({ encuesta, onClose }: { encuesta: Encuesta; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const url = `${baseUrl}/encuesta/${encuesta.tenant?.slug || ''}/${encuesta.id}`;
+  const mensaje = `Hola, te invito a contestar la encuesta "${encuesta.titulo}": ${url}`;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    // registrar envío tipo link
+    encuestasApi.compartir(encuesta.id, { canal: 'link' }).catch(() => {});
+  };
+
+  const shareWhatsApp = () => {
+    const wa = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+    window.open(wa, '_blank', 'noopener,noreferrer');
+    encuestasApi.compartir(encuesta.id, { canal: 'whatsapp' }).catch(() => {});
+  };
+
+  const shareEmail = () => {
+    const subject = encodeURIComponent(`Encuesta: ${encuesta.titulo}`);
+    const body = encodeURIComponent(mensaje);
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+    encuestasApi.compartir(encuesta.id, { canal: 'email' }).catch(() => {});
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-secondary-900">Compartir encuesta</h3>
+          <button onClick={onClose} className="rounded-md p-1 text-secondary-400 hover:bg-secondary-100">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="mb-4 text-sm text-secondary-600">
+          Link público de la encuesta <strong>{encuesta.titulo}</strong>
+        </p>
+        <div className="mb-4 flex gap-2">
+          <input
+            type="text"
+            readOnly
+            value={url}
+            className="input flex-1 text-sm"
+          />
+          <button
+            onClick={copy}
+            className="btn-secondary flex items-center gap-2"
+            title="Copiar link"
+          >
+            {copied ? <Check size={16} /> : <Copy size={16} />}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={shareWhatsApp}
+            className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            <MessageCircle size={18} /> WhatsApp
+          </button>
+          <button
+            onClick={shareEmail}
+            className="flex items-center justify-center gap-2 rounded-lg bg-secondary-100 px-4 py-2 text-sm font-medium text-secondary-700 hover:bg-secondary-200"
+          >
+            <Mail size={18} /> Correo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalImportar({
+  encuesta,
+  fileRef,
+  result,
+  onFile,
+  onClose,
+}: {
+  encuesta: Encuesta;
+  fileRef: React.RefObject<HTMLInputElement>;
+  result: { importados: number; omitidos: number; total: number } | null;
+  onFile: (file: File | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-secondary-900">Importar contactos</h3>
+          <button onClick={onClose} className="rounded-md p-1 text-secondary-400 hover:bg-secondary-100">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="mb-4 text-sm text-secondary-600">
+          Sube un CSV con columnas <strong>email, nombre, telefono</strong>. Los contactos se asocian al proyecto{' '}
+          <strong>{encuesta.tenant?.nombre_candidato || ''}</strong> y pueden reutilizarse en cualquier encuesta.
+        </p>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv"
+          onChange={(e) => onFile(e.target.files?.[0] || null)}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="btn-secondary flex w-full items-center justify-center gap-2"
+        >
+          <Upload size={18} /> Seleccionar archivo CSV
+        </button>
+        {result && (
+          <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+            Importados: <strong>{result.importados}</strong> de {result.total} registros. Omitidos: {result.omitidos}.
+          </div>
+        )}
       </div>
     </div>
   );

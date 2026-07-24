@@ -79,8 +79,7 @@ export interface MapaLeafletRef {
   flyTo: (lat: number, lng: number, zoom?: number) => void;
   fitBounds: (geometryOrBbox: any) => void;
   openPopup: (lat: number, lng: number, contenido?: HTMLElement) => void;
-  resaltarFeature: (capaId: string, featureId: string) => void;
-  _resaltarFeatureConGeometria?: (capaId: string, featureId: string, geometry?: any) => void;
+  resaltarFeature: (capaId: string, featureId: string, geometry?: any) => void;
 }
 
 interface Props {
@@ -335,9 +334,7 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
       registerProgrammaticMove(1200);
       map.flyTo([lat, lng], 16, { duration: 1.2 });
     },
-    resaltarFeature: (capaId, featureId) => resaltarFeature(capaId, featureId, undefined),
-    // Exponer versión interna con fallback de geometría para que MapaTerritorial pueda pasarla
-    _resaltarFeatureConGeometria: resaltarFeature,
+    resaltarFeature: (capaId, featureId, geometry) => resaltarFeature(capaId, featureId, geometry),
   }), [map, resaltarFeature]);
   return null;
 });

@@ -8,25 +8,43 @@ import { Icon, IconName } from '@/components/ui/Icon';
 import { useAuth } from '@/hooks/useAuth';
 import { puedeAcceder } from '@/lib/permisos';
 
-const MENU_ITEMS: { href: string; icon: IconName; label: string; color: string; permiso: string }[] = [
-  { href: '/dashboard', icon: 'dashboard', label: 'Dashboard', color: '#D73216', permiso: 'dashboard' },
-  { href: '/dashboard/votantes', icon: 'votantes', label: 'Votantes', color: '#3B82F6', permiso: 'votantes' },
-  { href: '/dashboard/crm', icon: 'crm', label: 'CRM', color: '#25D366', permiso: 'crm' },
-  { href: '/dashboard/eventos', icon: 'eventos', label: 'Eventos', color: '#F59E0B', permiso: 'eventos' },
-  { href: '/dashboard/mapa', icon: 'mapa', label: 'Mapa Territorial', color: '#8B5CF6', permiso: 'mapa' },
-  { href: '/dashboard/encuestas', icon: 'crm', label: 'Encuestas', color: '#10B981', permiso: 'encuestas' },
-  { href: '/dashboard/casillas', icon: 'mapa', label: 'Casillas', color: '#6366F1', permiso: 'casillas' },
-  { href: '/dashboard/monitoreo', icon: 'dashboard', label: 'Monitoreo', color: '#F43F5E', permiso: 'monitoreo' },
-  { href: '/dashboard/proyeccion', icon: 'historico', label: 'Proyección', color: '#8B5CF6', permiso: 'proyeccion' },
-  { href: '/dashboard/ficha-seccional', icon: 'votantes', label: 'Ficha Seccional', color: '#06B6D4', permiso: 'ficha_seccional' },
-  { href: '/dashboard/boletines', icon: 'boletines', label: 'Boletines IA', color: '#06B6D4', permiso: 'boletines' },
-  { href: '/dashboard/historico-electoral', icon: 'historico', label: 'Histórico Electoral', color: '#F59E0B', permiso: 'historico_electoral' },
-  { href: '/dashboard/inteligencia-electoral', icon: 'ia', label: 'Inteligencia Electoral', color: '#7C3AED', permiso: 'inteligencia_electoral' },
-  { href: '/dashboard/llamadas', icon: 'llamadas', label: 'Llamadas', color: '#EC4899', permiso: 'llamadas' },
-  { href: '/dashboard/candidato', icon: 'user', label: 'Candidato', color: '#D73216', permiso: 'candidato' },
-  { href: '/dashboard/usuarios', icon: 'seguridad', label: 'Accesos', color: '#64748B', permiso: 'usuarios' },
-  { href: '/dashboard/admin', icon: 'seguridad', label: 'Admin', color: '#7C3AED', permiso: 'admin' },
-  { href: '/brigada/login', icon: 'app', label: 'App Brigada', color: '#D73216', permiso: 'app_brigada' },
+type MenuItem = { href: string; icon: IconName; label: string; color: string; permiso: string; externo?: boolean; grupo: string };
+
+// Flag para activar módulos avanzados/poco usados. Cambiar a true si se retoman.
+const HABILITAR_MODULOS_AVANZADOS = false;
+
+const MENU_ITEMS: MenuItem[] = [
+  // Operación diaria
+  { href: '/dashboard', icon: 'dashboard', label: 'Dashboard', color: '#D73216', permiso: 'dashboard', grupo: 'operacion' },
+  { href: '/dashboard/votantes', icon: 'votantes', label: 'Votantes', color: '#3B82F6', permiso: 'votantes', grupo: 'operacion' },
+  { href: '/dashboard/crm', icon: 'crm', label: 'CRM', color: '#25D366', permiso: 'crm', grupo: 'operacion' },
+  { href: '/dashboard/eventos', icon: 'eventos', label: 'Eventos', color: '#F59E0B', permiso: 'eventos', grupo: 'operacion' },
+  { href: '/dashboard/encuestas', icon: 'crm', label: 'Encuestas', color: '#10B981', permiso: 'encuestas', grupo: 'operacion' },
+  { href: '/dashboard/casillas', icon: 'mapa', label: 'Casillas', color: '#6366F1', permiso: 'casillas', grupo: 'operacion' },
+  { href: '/dashboard/monitoreo', icon: 'dashboard', label: 'Monitoreo', color: '#F43F5E', permiso: 'monitoreo', grupo: 'operacion' },
+
+  // Territorio e inteligencia
+  { href: '/dashboard/mapa', icon: 'mapa', label: 'Mapa Territorial', color: '#8B5CF6', permiso: 'mapa', grupo: 'inteligencia' },
+  { href: '/dashboard/historico-electoral', icon: 'historico', label: 'Histórico Electoral', color: '#F59E0B', permiso: 'historico_electoral', grupo: 'inteligencia' },
+  { href: '/dashboard/inteligencia-electoral', icon: 'ia', label: 'Inteligencia Electoral', color: '#7C3AED', permiso: 'inteligencia_electoral', grupo: 'inteligencia' },
+  { href: '/dashboard/proyeccion', icon: 'historico', label: 'Proyección', color: '#8B5CF6', permiso: 'proyeccion', grupo: 'inteligencia' },
+  { href: '/dashboard/ficha-seccional', icon: 'votantes', label: 'Ficha Seccional', color: '#06B6D4', permiso: 'ficha_seccional', grupo: 'inteligencia' },
+
+  // Configuración del proyecto
+  { href: '/dashboard/candidato', icon: 'user', label: 'Candidato', color: '#D73216', permiso: 'candidato', grupo: 'configuracion' },
+  { href: '/dashboard/usuarios', icon: 'seguridad', label: 'Accesos', color: '#64748B', permiso: 'usuarios', grupo: 'configuracion' },
+  { href: '/dashboard/admin', icon: 'seguridad', label: 'Admin', color: '#7C3AED', permiso: 'admin', grupo: 'configuracion' },
+
+  // Módulos avanzados desactivados por defecto
+  ...(HABILITAR_MODULOS_AVANZADOS
+    ? [
+        { href: '/dashboard/llamadas', icon: 'llamadas', label: 'Llamadas', color: '#EC4899', permiso: 'llamadas', grupo: 'avanzados' } as MenuItem,
+        { href: '/dashboard/boletines', icon: 'boletines', label: 'Boletines IA', color: '#06B6D4', permiso: 'boletines', grupo: 'avanzados' } as MenuItem,
+      ]
+    : []),
+
+  // App brigada (link externo)
+  { href: '/brigada/login', icon: 'app', label: 'App Brigada', color: '#D73216', permiso: 'app_brigada', externo: true, grupo: 'brigada' },
 ];
 
 export default function DashboardLayout({
@@ -84,17 +102,24 @@ export default function DashboardLayout({
 
           {/* Menú centrado absolutamente - solo iconos */}
           <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1">
-            {visibleMenu.map((item) => {
+            {visibleMenu.map((item, index) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const cambioGrupo = index > 0 && item.grupo !== visibleMenu[index - 1].grupo;
               return (
-                <NavIcon
-                  key={item.href}
-                  href={item.href}
-                  icon={item.icon}
-                  label={item.label}
-                  color={item.color}
-                  active={isActive}
-                />
+                <>
+                  {cambioGrupo && (
+                    <span key={`sep-${item.grupo}`} className="mx-1 h-6 w-px bg-secondary-200" />
+                  )}
+                  <NavIcon
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={item.label}
+                    color={item.color}
+                    active={isActive}
+                    externo={item.externo}
+                  />
+                </>
               );
             })}
           </div>
@@ -118,7 +143,11 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <main className="pt-16">
-        <div className="p-4 md:p-6">{children}</div>
+        {pathname === '/dashboard/mapa' ? (
+          <div className="h-[calc(100vh-4rem)] overflow-hidden">{children}</div>
+        ) : (
+          <div className="p-4 md:p-6">{children}</div>
+        )}
       </main>
     </div>
   );
@@ -130,21 +159,20 @@ function NavIcon({
   label,
   color,
   active,
+  externo,
 }: {
   href: string;
   icon: IconName;
   label: string;
   color: string;
   active: boolean;
+  externo?: boolean;
 }) {
-  return (
-    <Link
-      href={href}
-      className={`group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all ${
-        active ? 'bg-secondary-100' : 'hover:bg-secondary-50'
-      }`}
-      title={label}
-    >
+  const classes = `group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all ${
+    active ? 'bg-secondary-100' : 'hover:bg-secondary-50'
+  }`;
+  const content = (
+    <>
       <Icon
         name={icon}
         size={22}
@@ -160,6 +188,20 @@ function NavIcon({
         {label}
         <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-secondary-900" />
       </span>
+    </>
+  );
+
+  if (externo) {
+    return (
+      <a href={href} className={classes} title={label} target="_blank" rel="noopener noreferrer">
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={href} className={classes} title={label}>
+      {content}
     </Link>
   );
 }

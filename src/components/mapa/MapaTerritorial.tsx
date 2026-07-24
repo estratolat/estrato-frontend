@@ -20,6 +20,9 @@ import NuevoApoyoModal from './NuevoApoyoModal';
 import LeyendaMapa from './LeyendaMapa';
 import BuscadorGlobal from './BuscadorGlobal';
 import FichaTerritorial from './FichaTerritorial';
+import PanelFlotante from './PanelFlotante';
+import ExploradorCapa, { ElementoCapa } from './ExploradorCapa';
+import FichaFeature from './FichaFeature';
 import type { MapaLeafletRef } from './MapaLeaflet';
 
 const MapaLeaflet = dynamic(() => import('./MapaLeaflet').then(m => m.default), {
@@ -134,6 +137,18 @@ export default function MapaTerritorial() {
     featureId: string;
     props: Record<string, any>;
   } | null>(null);
+
+  // Estados del panel flotante / explorador / ficha
+  const [panelAbierto, setPanelAbierto] = useState(false);
+  const [panelVista, setPanelVista] = useState<'capas' | 'explorar'>('capas');
+  const [exploradorCapaId, setExploradorCapaId] = useState<string | null>(null);
+  const [featureSeleccionado, setFeatureSeleccionado] = useState<ElementoCapa | null>(null);
+  const [modoLimpio, setModoLimpio] = useState(false);
+  const [mostrarLeyenda, setMostrarLeyenda] = useState(false);
+  const [mostrarBuscador, setMostrarBuscador] = useState(true);
+  const [mostrarResumen, setMostrarResumen] = useState(true);
+  const [resumenPos, setResumenPos] = useState<{ x: number; y: number } | null>(null);
+
   const [guardandoFeature, setGuardandoFeature] = useState(false);
   const [modalIneSecciones, setModalIneSecciones] = useState(false);
   const [modalExcel, setModalExcel] = useState(false);
@@ -165,23 +180,18 @@ export default function MapaTerritorial() {
   const [modoLideres, setModoLideres] = useState<'pines' | 'circulos' | 'heatmap' | 'solo_puntos'>(prefs.modoLideres);
   const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadingGeo, setLoadingGeo] = useState(false);
+  const [loadingInicial, setLoadingInicial] = useState(true);
+  const [loadingCapas, setLoadingCapas] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
   const mapRef = useRef<MapaLeafletRef | null>(null);
-  const capasPersonalizadasRef = useRef<CapaMapa[]>([]);
-  const mapBoundsRef = useRef<{ south: number; west: number; north: number; east: number } | null>(null);
   const debounceBoundsRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cargandoRef = useRef(false);
+  const resumenRef = useRef<HTMLDivElement>(null);
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isDraggingRef = useRef(false);
   const router = useRouter();
-
-  // Mantener refs sincronizadas con el estado actual para lectura dentro de callbacks
-  useEffect(() => {
-    capasPersonalizadasRef.current = capasPersonalizadas;
-  }, [capasPersonalizadas]);
-  useEffect(() => {
-    mapBoundsRef.current = mapBounds;
-  }, [mapBounds]);
 
   // Persistir cada cambio de preferencias
   useEffect(() => {
@@ -205,51 +215,6 @@ export default function MapaTerritorial() {
 
   const toggleCapa = useCallback((id: string) => {
     setActivas(prev => ({ ...prev, [id]: !prev[id] }));
-  }, []);
-
-  const guardarOrdenCapa = useCallback(async (id: string, nuevoOrden: number) => {
-    try {
-      await mapaApi.updateCapa(id, { orden: nuevoOrden });
-      setCapasPersonalizadas(prev =>
-        prev.map(c => (c.id === id ? { ...c, orden: nuevoOrden } : c)).sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
-      );
-    } catch (e) {
-      console.error('[MapaTerritorial] Error guardando orden de capa:', e);
-      setError('No se pudo guardar el orden de la capa');
-    }
-  }, []);
-
-  const subirCapa = useCallback((id: string) => {
-    const capas = [...capasPersonalizadasRef.current].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
-    const idx = capas.findIndex(c => c.id === id);
-    if (idx <= 0) return;
-    const ordenActual = capas[idx].orden;
-    const ordenAnterior = capas[idx - 1].orden;
-    const nuevoOrden = ordenAnterior - 1;
-    guardarOrdenCapa(id, nuevoOrden);
-  }, [guardarOrdenCapa]);
-
-  const bajarCapa = useCallback((id: string) => {
-    const capas = [...capasPersonalizadasRef.current].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
-    const idx = capas.findIndex(c => c.id === id);
-    if (idx < 0 || idx >= capas.length - 1) return;
-    const ordenActual = capas[idx].orden;
-    const ordenSiguiente = capas[idx + 1].orden;
-    const nuevoOrden = ordenSiguiente + 1;
-    guardarOrdenCapa(id, nuevoOrden);
-  }, [guardarOrdenCapa]);
-
-  const toggleBloquearCapa = useCallback(async (id: string) => {
-    const capa = capasPersonalizadasRef.current.find(c => c.id === id);
-    if (!capa) return;
-    const nuevoBloqueo = !capa.bloqueada;
-    try {
-      await mapaApi.updateCapa(id, { bloqueada: nuevoBloqueo });
-      setCapasPersonalizadas(prev => prev.map(c => (c.id === id ? { ...c, bloqueada: nuevoBloqueo } : c)));
-    } catch (e) {
-      console.error('[MapaTerritorial] Error cambiando bloqueo de capa:', e);
-      setError('No se pudo cambiar el bloqueo de la capa');
-    }
   }, []);
 
   const toggleExpandir = useCallback((id: string) => {
@@ -320,6 +285,24 @@ export default function MapaTerritorial() {
     if (esCapaSindical) {
       setFeatureSindicalSeleccionado({ capaId, featureId, props });
     }
+
+    // Construir elemento para la ficha flotante
+    const capa = capasPersonalizadas.find(c => c.id === capaId) || CAPAS_CONFIG.find(c => c.id === capaId);
+    const feature = data[capaId]?.features?.find((f: any) => {
+      const p = f.properties || {};
+      const fid = String(p._feature_id || p.id || p.ID || p.OBJECTID || p.objectid || p.FID || p.fid || p.gid || p.GID);
+      return fid === featureId;
+    });
+    setFeatureSeleccionado({
+      id: featureId,
+      nombre: props._feature_nombre || props.NOMBRE || props.nombre || props.name || capa?.nombre || 'Elemento',
+      subtexto: capa?.nombre,
+      feature: feature || { type: 'Feature', properties: props, geometry: null } as any,
+      capaId,
+      capaNombre: capa?.nombre || capaId,
+      color: capa?.color,
+    });
+
     setFeatureEditando({
       capaId,
       featureId,
@@ -327,7 +310,7 @@ export default function MapaTerritorial() {
       color: props._feature_color || capasPersonalizadas.find(c => c.id === capaId)?.color || '#3B82F6',
       props,
     });
-  }, [capasPersonalizadas]);
+  }, [capasPersonalizadas, data]);
 
   const cerrarFeatureEditando = useCallback(() => {
     setFeatureEditando(null);
@@ -335,6 +318,21 @@ export default function MapaTerritorial() {
 
   const cerrarFeatureSindical = useCallback(() => {
     setFeatureSindicalSeleccionado(null);
+  }, []);
+
+  const abrirPanel = useCallback((vista: 'capas' | 'explorar' = 'capas') => {
+    setPanelVista(vista);
+    setPanelAbierto(true);
+  }, []);
+
+  const cerrarPanel = useCallback(() => {
+    setPanelAbierto(false);
+  }, []);
+
+  const abrirExplorador = useCallback((capaId: string | null = null) => {
+    setExploradorCapaId(capaId);
+    setPanelVista('explorar');
+    setPanelAbierto(true);
   }, []);
 
   const asegurarCapaCargada = useCallback(async (capaId: string, featureId: string, geometry?: any) => {
@@ -362,6 +360,21 @@ export default function MapaTerritorial() {
       console.error('[MapaTerritorial] Error cargando capa para resaltar:', e);
     }
   }, [data]);
+
+  const seleccionarElemento = useCallback(async (el: ElementoCapa) => {
+    // Activar la capa padre
+    setActivas(prev => ({ ...prev, [el.capaId]: true }));
+
+    const p = el.feature?.properties || {};
+    const id = String(p._feature_id || p.id || p.ID || p.OBJECTID || p.objectid || p.FID || p.fid || p.gid || p.GID);
+    const geometry = el.feature?.geometry;
+
+    await asegurarCapaCargada(el.capaId, id, geometry);
+    mapRef.current?.resaltarFeature(el.capaId, id, geometry);
+
+    setFeatureSeleccionado(el);
+    cerrarPanel();
+  }, [asegurarCapaCargada, cerrarPanel]);
 
   const seleccionarResultado = useCallback(async (r: ResultadoGlobal) => {
     setDetalle(null);
@@ -404,93 +417,93 @@ export default function MapaTerritorial() {
     }
   }, [asegurarCapaCargada]);
 
-  const [loadingCapas, setLoadingCapas] = useState<Record<string, boolean>>({});
+  const construirParamsGeo = useCallback(() => {
+    const params: any = { limit: 500 };
+    if (soloLideresPadre) params.padres = 'true';
+    if (scoreMin !== '') params.score_min = scoreMin;
+    if (zonaFiltro) params.zona_id = zonaFiltro;
+    if (conSinCoordenadas === 'con') params.sin_coordenadas = 'false';
+    if (conSinCoordenadas === 'sin') params.sin_coordenadas = 'true';
+    if (topN !== '') params.limit = Math.min(Number(topN), 2000);
+    if (mapBounds) params.bbox = `${mapBounds.west},${mapBounds.south},${mapBounds.east},${mapBounds.north}`;
+    return params;
+  }, [soloLideresPadre, scoreMin, zonaFiltro, conSinCoordenadas, topN, mapBounds]);
 
-  const cargarDatos = useCallback(async (forzarDemo = false) => {
-    if (cargandoRef.current) return;
-    cargandoRef.current = true;
-    setLoading(true);
+  const idsActivos = useCallback(() => {
+    const predefinidos = CAPAS_CONFIG.filter(c => activas[c.id]).map(c => c.id);
+    const personalizados = capasPersonalizadas.filter(c => activas[c.id]).map(c => c.id);
+    return [...predefinidos, ...personalizados];
+  }, [activas, capasPersonalizadas]);
+
+  const cargarConfigInicial = useCallback(async () => {
     setError(null);
     try {
-      const idsPredefinidos = CAPAS_CONFIG.filter(c => activas[c.id]).map(c => c.id as string);
-      const idsPersonalizados = capasPersonalizadasRef.current.filter((c: CapaMapa) => activas[c.id]).map((c: CapaMapa) => c.id);
-      const capasActivas = [...idsPredefinidos, ...idsPersonalizados];
+      const capasRes = await mapaApi.getCapas();
+      const personalizadas = capasRes.data?.personalizadas || [];
+      setCapasPersonalizadas(personalizadas);
+      const zonasRes = await zonasApi.getAll().catch((err: any) => {
+        console.warn('Zonas no disponibles:', err);
+        return { data: [] };
+      });
+      setZonas(zonasRes.data || []);
+    } catch (err: any) {
+      console.error('Error cargando configuración inicial del mapa:', err);
+      setError(errorToString(err) || 'Error cargando capas personalizadas');
+    } finally {
+      setLoadingInicial(false);
+    }
+  }, []);
 
-      // Cargar cada capa activa en paralelo con endpoints individuales para no bloquear una por una.
-      // Si un endpoint falla, las demás capas siguen cargando.
-      const params: any = { limit: 500 };
-      if (soloLideresPadre) params.padres = 'true';
-      if (scoreMin !== '') params.score_min = scoreMin;
-      if (zonaFiltro) params.zona_id = zonaFiltro;
-      if (conSinCoordenadas === 'con') params.sin_coordenadas = 'false';
-      if (conSinCoordenadas === 'sin') params.sin_coordenadas = 'true';
-      if (topN !== '') params.limit = Math.min(Number(topN), 2000);
-      if (mapBoundsRef.current) params.bbox = `${mapBoundsRef.current.west},${mapBoundsRef.current.south},${mapBoundsRef.current.east},${mapBoundsRef.current.north}`;
+  const cargarGeoJson = useCallback(async () => {
+    const capasActivas = idsActivos();
+    if (capasActivas.length === 0 || !mapBounds) {
+      setData({});
+      return { nuevoGeo: {}, todasFallaron: false };
+    }
 
-      let nuevoGeo: MapaData = {};
-      if (capasActivas.length === 0) {
-        setData({});
-        cargandoRef.current = false;
-        setLoading(false);
-        return;
-      } else if (!mapBoundsRef.current) {
-        // Esperar a que el mapa reporte bounds; evita cargar capas sin viewport.
-        cargandoRef.current = false;
-        setLoading(false);
-        return;
-      } else {
-        const nextLoading: Record<string, boolean> = {};
-        capasActivas.forEach(id => { nextLoading[id] = true; });
-        setLoadingCapas(nextLoading);
+    setLoadingGeo(true);
+    try {
+      const params = construirParamsGeo();
+      const nextLoading: Record<string, boolean> = {};
+      capasActivas.forEach(id => { nextLoading[id] = true; });
+      setLoadingCapas(nextLoading);
 
-        const promises = capasActivas.map(id =>
-          mapaApi.getGeoJsonCapa(id, params)
-            .then(res => ({ ok: true, id, data: (res.data as MapaData)?.[id] }))
-            .catch(err => {
-              console.error(`[MapaTerritorial] Error cargando capa ${id}:`, err);
-              return { ok: false, id, data: null };
-            })
-            .finally(() => setLoadingCapas(prev => ({ ...prev, [id]: false })))
-        );
+      const promises = capasActivas.map(id =>
+        mapaApi.getGeoJsonCapa(id, params)
+          .then(res => ({ ok: true, id, data: (res.data as MapaData)?.[id] }))
+          .catch(err => {
+            console.error(`[MapaTerritorial] Error cargando capa ${id}:`, err);
+            return { ok: false, id, data: null };
+          })
+          .finally(() => setLoadingCapas(prev => ({ ...prev, [id]: false })))
+      );
 
-        const resultados = await Promise.all(promises);
-        let todasFallaron = true;
-        resultados.forEach(r => {
-          if (r.ok && r.data) {
-            nuevoGeo[r.id] = r.data;
-            todasFallaron = false;
-          }
-        });
-
-        if (todasFallaron && capasActivas.length > 0) {
-          if (forzarDemo) {
-            const demo = generarDemoData();
-            setData(demo);
-            setModoDemo(true);
-            setSecciones([]);
-            setLideres(demo.lideres?.features.map((f: any) => ({
-              id: f.properties.id,
-              votante: { nombre: f.properties.nombre, coordenadas: { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] } },
-              score: f.properties.score,
-              alcance_estimado: f.properties.alcance_estimado,
-            } as unknown as Lider)) || []);
-            setStats([]);
-            setZonas([]);
-            setError('Modo demo activado manualmente. No se pudo conectar con el servidor de mapas.');
-            setLoading(false);
-            return;
-          }
-          setError('No se pudieron cargar las capas activas del mapa. Intenta recargar o activar menos capas.');
-          setData({});
-          setLoading(false);
-          return;
+      const resultados = await Promise.all(promises);
+      const nuevoGeo: MapaData = {};
+      let todasFallaron = true;
+      resultados.forEach(r => {
+        if (r.ok && r.data) {
+          nuevoGeo[r.id] = r.data;
+          todasFallaron = false;
         }
+      });
 
-        setData(prev => ({ ...prev, ...nuevoGeo }));
-      }
+      setData(nuevoGeo);
+      setModoDemo(false);
+      return { nuevoGeo, todasFallaron };
+    } catch (err: any) {
+      console.error('Error cargando GeoJSON del mapa:', err);
+      return { nuevoGeo: {}, todasFallaron: true };
+    } finally {
+      setLoadingGeo(false);
+    }
+  }, [idsActivos, mapBounds, construirParamsGeo]);
 
-      // Estadísticas, líderes y zonas son complementarios; si fallan, seguimos mostrando el mapa real
-      const [statsRes, lideresRes, zonasRes] = await Promise.all([
+  const cargarStatsYLideres = useCallback(async () => {
+    if (!mapBounds) return;
+    const params = construirParamsGeo();
+    try {
+      const [statsRes, lideresRes] = await Promise.all([
         mapaApi.getEstadisticas('seccion').catch((err: any) => {
           console.warn('Estadísticas no disponibles:', err);
           return { data: { items: [] } };
@@ -499,25 +512,49 @@ export default function MapaTerritorial() {
           console.warn('Líderes no disponibles:', err);
           return { data: [] };
         }),
-        zonasApi.getAll().catch((err: any) => {
-          console.warn('Zonas no disponibles:', err);
-          return { data: [] };
-        }),
       ]);
-
       setStats(statsRes.data?.items || []);
       setLideres(lideresRes.data || []);
-      setZonas(zonasRes.data || []);
-      setModoDemo(false);
+    } catch (err: any) {
+      console.error('Error cargando estadísticas y líderes:', err);
+    }
+  }, [mapBounds, construirParamsGeo]);
+
+  const cargarDatos = useCallback(async (forzarDemo = false) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await cargarConfigInicial();
+      const { nuevoGeo, todasFallaron } = await cargarGeoJson();
+      await cargarStatsYLideres();
+
+      if (todasFallaron && idsActivos().length > 0) {
+        if (forzarDemo) {
+          const demo = generarDemoData();
+          setData(demo);
+          setModoDemo(true);
+          setSecciones([]);
+          setLideres(demo.lideres?.features.map((f: any) => ({
+            id: f.properties.id,
+            votante: { nombre: f.properties.nombre, coordenadas: { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] } },
+            score: f.properties.score,
+            alcance_estimado: f.properties.alcance_estimado,
+          } as unknown as Lider)) || []);
+          setStats([]);
+          setZonas([]);
+          setError('Modo demo activado manualmente. No se pudo conectar con el servidor de mapas.');
+          return;
+        }
+        setError('No se pudieron cargar las capas activas del mapa. Intenta recargar o activar menos capas.');
+      }
+
       setSecciones([]);
 
       // Extraer tipos de apoyo para filtros (mantener preferencias del usuario)
       const tiposApoyo = new Set<string>(['despensa', 'medicamento', 'lamina', 'otro']);
-      Object.values(nuevoGeo || {}).forEach((capa: any) => {
-        (capa?.features || []).forEach((f: any) => {
-          const t = f.properties?.tipo_apoyo;
-          if (t) tiposApoyo.add(String(t));
-        });
+      (nuevoGeo.apoyos?.features || []).forEach((f: any) => {
+        const t = f.properties?.tipo_apoyo;
+        if (t) tiposApoyo.add(String(t));
       });
       setFiltrosApoyos(prev => {
         const next: Record<string, boolean> = { ...prev };
@@ -531,17 +568,9 @@ export default function MapaTerritorial() {
       const msg = errorToString(err) || 'Error cargando datos del mapa';
       setError(msg);
     } finally {
-      cargandoRef.current = false;
       setLoading(false);
     }
-  }, [
-    activas,
-    soloLideresPadre,
-    scoreMin,
-    zonaFiltro,
-    conSinCoordenadas,
-    topN,
-  ]);
+  }, [cargarConfigInicial, cargarGeoJson, cargarStatsYLideres, idsActivos]);
 
   const guardarFeature = useCallback(async () => {
     if (!featureEditando) return;
@@ -593,26 +622,38 @@ export default function MapaTerritorial() {
     }
   }, [featureEditando, capasPersonalizadas]);
 
-  // Cargar listado de capas personalizadas una sola vez al montar
   useEffect(() => {
-    let cancelado = false;
-    mapaApi.getCapas().then(res => {
-      if (cancelado) return;
-      const capas = (res.data?.personalizadas || []).map((c: CapaMapa) => ({ ...c, bloqueada: !!c.bloqueada }));
-      setCapasPersonalizadas(capas.sort((a: CapaMapa, b: CapaMapa) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)));
-    }).catch(err => {
-      if (cancelado) return;
-      console.error('Error cargando capas personalizadas:', err);
-    });
-    return () => { cancelado = true; };
-  }, []);
+    cargarConfigInicial();
+  }, [cargarConfigInicial]);
 
-  // Cargar datos del mapa cuando cambian capas activas o filtros
+  // Atajos de teclado
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const key = e.key.toLowerCase();
+      if (key === 'l') {
+        e.preventDefault();
+        abrirPanel('capas');
+      } else if (key === 'f' || key === 'escape') {
+        e.preventDefault();
+        setModoLimpio(prev => !prev);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [abrirPanel]);
+
   useEffect(() => {
     // No cargar capas geográficas hasta tener bounds del mapa; evita traer TODO el país.
     if (!mapBounds) return;
-    cargarDatos();
-  }, [cargarDatos, mapBounds]);
+    cargarGeoJson();
+  }, [cargarGeoJson, mapBounds]);
+
+  useEffect(() => {
+    // Estadísticas y líderes son complementarios; se cargan silenciosamente con bounds.
+    if (!mapBounds) return;
+    cargarStatsYLideres();
+  }, [cargarStatsYLideres, mapBounds]);
 
   const onExitoGuardado = useCallback((tipo?: 'lider' | 'evento' | 'apoyo', id?: string, lat?: number, lng?: number) => {
     cerrarModal();
@@ -630,6 +671,94 @@ export default function MapaTerritorial() {
     }
   }, [cargarDatos, cerrarModal, activas.apoyos]);
 
+  // Drag del panel de resumen
+  const iniciarDragResumen = useCallback((clientX: number, clientY: number) => {
+    const el = resumenRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
+    isDraggingRef.current = true;
+    el.style.cursor = 'grabbing';
+    setResumenPos(prev => {
+      if (prev) return prev;
+      const parent = el.offsetParent as HTMLElement | null;
+      if (!parent) return { x: 0, y: 0 };
+      const parentRect = parent.getBoundingClientRect();
+      return { x: rect.left - parentRect.left, y: rect.top - parentRect.top };
+    });
+  }, []);
+
+  const handleResumenMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    iniciarDragResumen(e.clientX, e.clientY);
+  }, [iniciarDragResumen]);
+
+  const handleResumenTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    iniciarDragResumen(e.touches[0].clientX, e.touches[0].clientY);
+  }, [iniciarDragResumen]);
+
+  useEffect(() => {
+    const onMove = (e: Event) => {
+      if (!isDraggingRef.current) return;
+      let clientX: number;
+      let clientY: number;
+      if ('TouchEvent' in window && e instanceof TouchEvent) {
+        if (e.touches.length === 0) return;
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+        e.preventDefault();
+      } else if (e instanceof MouseEvent) {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      } else {
+        return;
+      }
+      const el = resumenRef.current;
+      if (!el) return;
+      const parent = el.offsetParent as HTMLElement | null;
+      if (!parent) return;
+      const parentRect = parent.getBoundingClientRect();
+      setResumenPos({
+        x: clientX - dragOffsetRef.current.x - parentRect.left,
+        y: clientY - dragOffsetRef.current.y - parentRect.top,
+      });
+    };
+
+    const onUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      const el = resumenRef.current;
+      if (el) el.style.cursor = '';
+      setResumenPos(prev => {
+        if (!prev) return prev;
+        const panel = resumenRef.current;
+        if (!panel) return prev;
+        const parent = panel.offsetParent as HTMLElement | null;
+        if (!parent) return prev;
+        const rect = panel.getBoundingClientRect();
+        const parentRect = parent.getBoundingClientRect();
+        const maxLeft = Math.max(0, parentRect.width - rect.width);
+        const maxTop = Math.max(0, parentRect.height - rect.height);
+        return {
+          x: Math.max(0, Math.min(prev.x, maxLeft)),
+          y: Math.max(0, Math.min(prev.y, maxTop)),
+        };
+      });
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, []);
 
   const lideresFiltrados = useMemo(() => {
     let resultado = [...lideres];
@@ -794,36 +923,13 @@ export default function MapaTerritorial() {
           {!activas[capa.id] && <p className="mt-0.5 text-[10px] text-secondary-400">Toca el switch para activar</p>}
         </button>
 
-        <div className="flex shrink-0 flex-col items-center gap-1">
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={() => subirCapa(capa.id)}
-              title="Subir capa (arriba)"
-              disabled={capa.orden <= 0}
-              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-700 disabled:opacity-30"
-            >
-              ▲
-            </button>
-            <button
-              onClick={() => bajarCapa(capa.id)}
-              title="Bajar capa (abajo)"
-              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-700 disabled:opacity-30"
-            >
-              ▼
-            </button>
-          </div>
-          <button
-            onClick={() => toggleBloquearCapa(capa.id)}
-            title={capa.bloqueada ? 'Desbloquear capa (permitir selección)' : 'Bloquear capa (evitar selección)'}
-            className={`flex h-6 w-6 items-center justify-center rounded-md text-[11px] transition ${
-              capa.bloqueada
-                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                : 'text-secondary-400 hover:bg-secondary-100 hover:text-secondary-600'
-            }`}
-          >
-            {capa.bloqueada ? '🔒' : '🔓'}
-          </button>
-        </div>
+        <button
+          onClick={() => setCapaEditar(capa)}
+          title="Editar capa"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
+        >
+          <Icon name="seguridad" size={14} />
+        </button>
       </div>
       <div className="grid grid-cols-3 gap-1.5">
         <button
@@ -1298,98 +1404,285 @@ export default function MapaTerritorial() {
     );
   };
 
+  const capasConDatos = useMemo(() => [
+    ...CAPAS_CONFIG.filter(c => activas[c.id] && (data[c.id]?.features?.length || 0) > 0),
+    ...capasPersonalizadas.filter(c => activas[c.id] && (data[c.id]?.features?.length || 0) > 0),
+  ], [activas, capasPersonalizadas, data]);
+
+  const resumenTerritorial = useMemo(() => {
+    const votantes = data.votantes?.features?.length || 0;
+    const apoyos = data.apoyos?.features?.length || 0;
+    const peticiones = data.peticiones?.features?.length || 0;
+    const eventos = data.eventos?.features?.length || 0;
+    const lideresTotal = lideresFiltrados.length;
+    const secciones = data.secciones?.features?.length || 0;
+    const casillas = data.casillas?.features?.length || 0;
+
+    // Territorio propio / en riesgo: se infiere de propiedades del feature cuando existan.
+    // Fallback: si no hay clasificación, se cuentan las capas personalizadas según su contexto.
+    let territorioPropio = 0;
+    let territorioRiesgo = 0;
+
+    const featuresTerritorio = [
+      ...(data.secciones?.features || []),
+      ...(data.municipios?.features || []),
+      ...capasPersonalizadas.filter(c => activas[c.id]).flatMap(c => data[c.id]?.features || []),
+    ];
+
+    featuresTerritorio.forEach((f: any) => {
+      const p = f?.properties || {};
+      const status = String(p.status || p.estado || p.estatus || p.clasificacion || p.tipo_territorio || '').toLowerCase();
+      const color = String(p.color || p._feature_color || '').toLowerCase();
+      const esPropio = status.includes('propio') || status.includes('ganado') || status.includes('favorable') || status.includes('seguro') || status.includes('aliado') || color.includes('green') || color.includes('verde') || color.includes('22c55e') || color.includes('3b82f6');
+      const esRiesgo = status.includes('riesgo') || status.includes('enemigo') || status.includes('adverso') || status.includes('perdido') || status.includes('rival') || color.includes('red') || color.includes('rojo') || color.includes('ef4444') || color.includes('d73216');
+      if (esPropio) territorioPropio += 1;
+      else if (esRiesgo) territorioRiesgo += 1;
+    });
+
+    const totalItems = votantes + apoyos + peticiones + eventos + lideresTotal + secciones + casillas;
+    return [
+      { id: 'votantes', label: 'Votantes', value: votantes, color: '#EF4444' },
+      { id: 'apoyos', label: 'Apoyos', value: apoyos, color: '#F59E0B' },
+      { id: 'peticiones', label: 'Peticiones', value: peticiones, color: '#06B6D4' },
+      { id: 'eventos', label: 'Eventos', value: eventos, color: '#D73216' },
+      { id: 'lideres', label: 'Líderes', value: lideresTotal, color: '#383745' },
+      { id: 'secciones', label: 'Secciones', value: secciones, color: '#8B5CF6' },
+      { id: 'casillas', label: 'Casillas', value: casillas, color: '#6366F1' },
+      { id: 'territorio_riesgo', label: 'Territorio en riesgo', value: territorioRiesgo, color: '#DC2626' },
+      { id: 'territorio_propio', label: 'Territorio propio', value: territorioPropio, color: '#16A34A' },
+    ].filter(i => i.value > 0 || totalItems === 0);
+  }, [data, lideresFiltrados, capasPersonalizadas, activas]);
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4 lg:flex-row">
-      <aside className="flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-sm lg:w-96">
-        <div className="shrink-0 space-y-2 p-4 pb-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-bold text-secondary-900">Herramientas del mapa</h2>
-              <p className="text-xs text-secondary-500">Activa las capas que quieres ver</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                onClick={activarTodas}
-                title="Ver todas las capas"
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
-              >
-                <Icon name="ver" size={14} /> Ver todo
-              </button>
-              <button
-                onClick={desactivarTodas}
-                title="Ocultar todas las capas"
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
-              >
-                <Icon name="ocultar" size={14} /> Limpiar
-              </button>
-              <button
-                onClick={prefs.reset}
-                title="Restablecer preferencias del mapa"
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
-              >
-                <Icon name="seguridad" size={14} />
-              </button>
-            </div>
-          </div>
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Mapa full-bleed */}
+      <section className="absolute inset-0 z-0">
+        <MapaLeaflet
+          ref={mapRef}
+          data={data}
+          activas={activas}
+          onRecargar={() => cargarDatos()}
+          personalizadas={capasPersonalizadas}
+          lideres={lideresFiltrados}
+          modoLideres={modoLideres}
+          filtrosApoyos={filtrosApoyos}
+          puntoSeleccionado={puntoInicial}
+          onSeleccionarCoordenada={(lat, lng) => setPuntoInicial({ lat, lng })}
+          onAccionPunto={(tipo, lat, lng) => {
+            setPuntoInicial({ lat, lng });
+            abrirModal(tipo, { lat, lng });
+          }}
+          onCerrarPunto={() => setPuntoInicial(null)}
+          seleccion={seleccion}
+          onFeatureClick={handleFeatureClick}
+          resultadoDestacado={resultadoDestacado}
+          onBoundsChange={handleBoundsChange}
+        />
+      </section>
 
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <BuscadorGlobal onSeleccionar={seleccionarResultado} />
-            </div>
+      {/* Barra de herramientas flotante: buscador, resumen, panel */}
+      {!modoLimpio && (
+        <div className="pointer-events-auto absolute bottom-6 left-1/2 z-[550] flex -translate-x-1/2 items-center gap-2 rounded-full border border-secondary-200 bg-white p-1.5 shadow-xl">
+          <button
+            onClick={() => setMostrarBuscador(v => !v)}
+            className={`flex h-10 w-10 items-center justify-center rounded-full transition ${mostrarBuscador ? 'bg-primary-100 text-primary-700' : 'text-secondary-600 hover:bg-secondary-100'}`}
+            title="Buscar"
+          >
+            <Icon name="buscar" size={18} />
+          </button>
+          <button
+            onClick={() => setMostrarResumen(v => !v)}
+            className={`flex h-10 w-10 items-center justify-center rounded-full transition ${mostrarResumen ? 'bg-primary-100 text-primary-700' : 'text-secondary-600 hover:bg-secondary-100'}`}
+            title="Resumen territorial"
+          >
+            <Icon name="dashboard" size={18} />
+          </button>
+          <button
+            onClick={() => setMostrarLeyenda(v => !v)}
+            className={`flex h-10 w-10 items-center justify-center rounded-full transition ${mostrarLeyenda ? 'bg-primary-100 text-primary-700' : 'text-secondary-600 hover:bg-secondary-100'}`}
+            title="Leyenda"
+          >
+            <Icon name="ver" size={18} />
+          </button>
+          <button
+            onClick={() => abrirPanel('explorar')}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-600 text-white shadow transition hover:bg-primary-700"
+            title="Explorar elementos"
+          >
+            <Icon name="mapa" size={18} />
+          </button>
+          <button
+            onClick={() => abrirPanel('capas')}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary-800 text-white shadow transition hover:bg-secondary-900"
+            title="Capas"
+          >
+            <Icon name="seguridad" size={18} />
+          </button>
+        </div>
+      )}
 
-            <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 sm:flex">
-              {CAPAS_CONFIG.filter(c => activas[c.id]).map(c => {
-                const count = data[c.id]?.features?.length || 0;
-                return (
-                  <span
-                    key={c.id}
-                    className="inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-1 text-[10px] font-semibold text-white"
-                    style={{ backgroundColor: c.color }}
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
-                    <span className="truncate">{count} {c.nombre}</span>
-                  </span>
-                );
-              })}
-              {Object.keys(activas).filter(k => activas[k]).length === 0 && (
-                <span className="text-[10px] text-secondary-400">Ninguna capa activa</span>
+      {/* Buscador arriba a la derecha, compacto */}
+      {!modoLimpio && mostrarBuscador && (
+        <div className="pointer-events-auto absolute right-4 top-4 z-[500] w-full max-w-sm">
+          <div className="rounded-xl border border-secondary-200 bg-white p-3 shadow-lg">
+            <BuscadorGlobal onSeleccionar={seleccionarResultado} />
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {capasConDatos.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => abrirExplorador(c.id)}
+                  className="inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm transition hover:scale-105"
+                  style={{ backgroundColor: c.color }}
+                >
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
+                  <span className="truncate">{data[c.id]?.features?.length || 0} {c.nombre}</span>
+                </button>
+              ))}
+              {capasConDatos.length === 0 && (
+                <span className="rounded-full bg-secondary-100 px-2 py-0.5 text-[10px] text-secondary-500">Ninguna capa activa con datos</span>
               )}
             </div>
           </div>
         </div>
+      )}
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4 pt-0">
-          {/* Subir capa / KML — acceso rápido */}
-          <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600">
-                <Icon name="apoyos" size={20} />
+      {/* Numeralia colapsable arriba a la izquierda, compacta */}
+      {!modoLimpio && mostrarResumen && resumenTerritorial.length > 0 && (
+        <div
+          ref={resumenRef}
+          className="pointer-events-auto absolute left-4 top-4 z-[500] flex w-full max-w-[18rem] flex-col gap-2"
+          style={resumenPos ? { left: resumenPos.x, top: resumenPos.y } : undefined}
+        >
+          <div className="rounded-xl border border-secondary-200 bg-white p-3 shadow-lg">
+            <div
+              className="mb-2 flex cursor-grab select-none items-center justify-between active:cursor-grabbing"
+              onMouseDown={handleResumenMouseDown}
+              onTouchStart={handleResumenTouchStart}
+            >
+              <span className="text-xs font-bold uppercase tracking-wider text-secondary-700">Resumen</span>
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={() => setMostrarResumen(false)}
+                className="text-secondary-400 hover:text-secondary-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {resumenTerritorial.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (activas[item.id]) {
+                      abrirExplorador(item.id);
+                    } else if (CAPAS_CONFIG.some(c => c.id === item.id) || capasPersonalizadas.some(c => c.id === item.id)) {
+                      setActivas(prev => ({ ...prev, [item.id]: true }));
+                    }
+                  }}
+                  className="flex flex-col items-start rounded-md border border-secondary-100 bg-secondary-50/50 px-2 py-1 text-left transition hover:border-primary-200 hover:bg-primary-50"
+                >
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-secondary-500">{item.label}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-sm font-bold text-secondary-900">{item.value.toLocaleString()}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leyenda colapsable arriba a la izquierda debajo del resumen */}
+      {!modoLimpio && mostrarLeyenda && (
+        <div className="pointer-events-auto absolute left-4 top-[7.5rem] z-[490] flex w-full max-w-[14rem] flex-col gap-2">
+          <div className="rounded-xl border border-secondary-200 bg-white p-3 shadow-lg">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-secondary-700">Leyenda</span>
+              <button onClick={() => setMostrarLeyenda(false)} className="text-secondary-400 hover:text-secondary-600">✕</button>
+            </div>
+            <LeyendaMapa activas={activas} data={data} personalizadas={capasPersonalizadas} />
+          </div>
+        </div>
+      )}
+
+      {/* Panel lateral/bottom sheet */}
+      <PanelFlotante
+        abierto={panelAbierto}
+        onCerrar={cerrarPanel}
+        titulo={panelVista === 'explorar' ? 'Explorar elementos' : 'Herramientas del mapa'}
+        icono={panelVista === 'explorar' ? 'buscar' : 'mapa'}
+      >
+        {panelVista === 'explorar' ? (
+          <ExploradorCapa
+            capaId={exploradorCapaId || undefined}
+            capaNombre={exploradorCapaId ? (capasPersonalizadas.find(c => c.id === exploradorCapaId)?.nombre || CAPAS_CONFIG.find(c => c.id === exploradorCapaId)?.nombre) : undefined}
+            color={exploradorCapaId ? (capasPersonalizadas.find(c => c.id === exploradorCapaId)?.color || CAPAS_CONFIG.find(c => c.id === exploradorCapaId)?.color) : undefined}
+            capas={[
+              ...CAPAS_CONFIG.filter(c => activas[c.id] && (data[c.id]?.features?.length || 0) > 0).map(c => ({ capa: { id: c.id, nombre: c.nombre, color: c.color, tipo: 'custom', origen: 'propia', visible: true, orden: 0 } as CapaMapa, data: data[c.id] })),
+              ...capasPersonalizadas.filter(c => activas[c.id] && (data[c.id]?.features?.length || 0) > 0).map(c => ({ capa: c, data: data[c.id] })),
+            ]}
+            onSeleccionar={seleccionarElemento}
+            onCerrar={cerrarPanel}
+          />
+        ) : (
+          <div className="space-y-4">
+            {/* Encabezado + acciones globales */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-secondary-900">Herramientas del mapa</h2>
+                <p className="text-xs text-secondary-500">Activa las capas que quieres ver</p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-secondary-900">Subir KML / capa GIS</p>
-                <p className="text-xs text-secondary-600">
-                  Importa KML, GeoJSON o Shapefiles de Google Earth, QGIS o cualquier fuente.
-                </p>
+              <div className="flex shrink-0 items-center gap-1">
+                <button onClick={activarTodas} title="Ver todas" className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"><Icon name="ver" size={14} /> Ver todo</button>
+                <button onClick={desactivarTodas} title="Ocultar todas" className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"><Icon name="ocultar" size={14} /> Limpiar</button>
+                <button onClick={prefs.reset} title="Restablecer" className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"><Icon name="seguridad" size={14} /></button>
               </div>
             </div>
-            <button
-              onClick={() => setCapaSubir('custom')}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
-            >
-              <Icon name="apoyos" size={16} />
-              {capasPersonalizadas.length > 0 ? 'Subir más capas' : 'Subir mi primera capa'}
-            </button>
-            <p className="mt-2 text-center text-[10px] text-secondary-500">
-              Las capas nuevas se activan automáticamente en el mapa.
-            </p>
-          </div>
 
-          {/* Capas subidas */}
-          {capasPersonalizadas.length > 0 && renderGrupoColapsable(
-            'subidas',
-            'Capas subidas',
-            <span className="rounded bg-secondary-100 px-1.5 py-0.5 text-[10px] font-bold text-secondary-600">{capasPersonalizadas.length}</span>,
-            (
+            {/* Tabs */}
+            <div className="flex items-center gap-1 rounded-lg bg-secondary-50 p-1">
+              <button
+                onClick={() => setPanelVista('capas')}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${panelVista === 'capas' ? 'bg-white text-primary-700 shadow-sm' : 'text-secondary-500 hover:text-secondary-700'}`}
+              >Capas</button>
+              <button
+                onClick={() => abrirExplorador(null)}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${panelVista !== 'capas' ? 'bg-white text-primary-700 shadow-sm' : 'text-secondary-500 hover:text-secondary-700'}`}
+              >Explorar</button>
+            </div>
+
+            {/* Botón explorar por capa activa */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                ...CAPAS_CONFIG.filter(c => activas[c.id] && (data[c.id]?.features?.length || 0) > 0),
+                ...capasPersonalizadas.filter(c => activas[c.id] && (data[c.id]?.features?.length || 0) > 0),
+              ].map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => abrirExplorador(c.id)}
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold text-white"
+                  style={{ backgroundColor: c.color }}
+                >
+                  <Icon name="buscar" size={10} /> {c.nombre} ({data[c.id]?.features?.length || 0})
+                </button>
+              ))}
+            </div>
+
+            {/* Subir capa / KML */}
+            <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600"><Icon name="apoyos" size={20} /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-secondary-900">Subir KML / capa GIS</p>
+                  <p className="text-xs text-secondary-600">Importa KML, GeoJSON o Shapefiles.</p>
+                </div>
+              </div>
+              <button onClick={() => setCapaSubir('custom')} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"><Icon name="apoyos" size={16} /> {capasPersonalizadas.length > 0 ? 'Subir más capas' : 'Subir mi primera capa'}</button>
+            </div>
+
+            {capasPersonalizadas.length > 0 && renderGrupoColapsable('subidas', 'Capas subidas', <span className="rounded bg-secondary-100 px-1.5 py-0.5 text-[10px] font-bold text-secondary-600">{capasPersonalizadas.length}</span>, (
               <div className="space-y-2">
                 {Object.entries(capasPorGrupo.grupos).map(([grupoNombre, capas]) => {
                   const grupoId = `subidas-${grupoNombre}`;
@@ -1422,49 +1715,52 @@ export default function MapaTerritorial() {
                   </div>
                 )}
               </div>
-            ),
-            true
-          )}
+            ), true)}
 
-          {/* Campaña */}
-          {renderGrupoColapsable(
-            'campania',
-            'Campaña',
-            <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-700">{CAPAS_CONFIG.filter(c => activas[c.id]).length}/{CAPAS_CONFIG.length}</span>,
-            CAPAS_CONFIG.map(capa => renderCapaItem(capa)),
-            true
-          )}
+            {renderGrupoColapsable(
+              'campania',
+              'Campaña',
+              <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-700">{CAPAS_CONFIG.filter(c => activas[c.id]).length}/{CAPAS_CONFIG.length}</span>,
+              CAPAS_CONFIG.map(capa => renderCapaItem(capa)),
+              true
+            )}
 
-          {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-xs text-red-700">
-              <p className="font-semibold">{modoDemo ? 'Modo demo activado' : 'Error del servidor'}</p>
-              <p>{error}</p>
-              {!modoDemo && (
-                <button
-                  onClick={() => cargarDatos(true)}
-                  className="mt-2 text-xs font-semibold underline hover:no-underline"
-                >
-                  Usar modo demo
-                </button>
-              )}
-            </div>
-          )}
-
-        </div>
-      </aside>
-
-      <section className="relative min-h-[400px] flex-1 overflow-hidden rounded-xl bg-white shadow-sm">
-        {detalle && <FichaTerritorial detalle={detalle} onCerrar={cerrarFicha} />}
-
-        {featureSindicalSeleccionado && (
-          <PanelSindicalFeature
-            feature={featureSindicalSeleccionado}
-            onCerrar={cerrarFeatureSindical}
-          />
+            {error && (
+              <div className="rounded-lg bg-red-50 p-3 text-xs text-red-700">
+                <p className="font-semibold">{modoDemo ? 'Modo demo activado' : 'Error del servidor'}</p>
+                <p>{error}</p>
+                {!modoDemo && <button onClick={() => cargarDatos(true)} className="mt-2 text-xs font-semibold underline hover:no-underline">Usar modo demo</button>}
+              </div>
+            )}
+          </div>
         )}
+      </PanelFlotante>
 
-        {featureEditando && (
-          <div className="absolute left-4 right-4 top-4 z-[600] mx-auto max-w-sm rounded-xl border border-secondary-200 bg-white p-4 shadow-xl">
+      {/* Ficha del feature seleccionado */}
+      {featureSeleccionado && (
+        <FichaFeature
+          elemento={featureSeleccionado}
+          onCerrar={() => setFeatureSeleccionado(null)}
+          onVerDetalle={(el) => {
+            // Si es capa personalizada, abrir editor de estilos
+            const esPersonalizada = capasPersonalizadas.some(c => c.id === el.capaId);
+            if (esPersonalizada) {
+              const capa = capasPersonalizadas.find(c => c.id === el.capaId);
+              if (capa) {
+                const p = el.feature?.properties || {};
+                const id = String(p._feature_id || p.id || p.ID || p.OBJECTID || p.objectid || p.FID || p.fid || p.gid || p.GID);
+                setFeatureEditando({ capaId: el.capaId, featureId: id, nombre: el.nombre, color: p._feature_color || p.color || capa.color || '#3B82F6', props: p });
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* Fichas existentes */}
+      {detalle && <FichaTerritorial detalle={detalle} onCerrar={cerrarFicha} />}
+      {featureSindicalSeleccionado && <PanelSindicalFeature feature={featureSindicalSeleccionado} onCerrar={cerrarFeatureSindical} />}
+      {featureEditando && (
+          <div className="fixed inset-x-0 bottom-4 z-[660] mx-auto max-w-sm rounded-xl border border-secondary-200 bg-white p-4 shadow-xl lg:left-auto lg:right-4 lg:top-20 lg:max-w-xs">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-bold text-secondary-900">Editar polígono</h3>
               <button
@@ -1511,50 +1807,21 @@ export default function MapaTerritorial() {
             </div>
           </div>
         )}
+      {cargandoDetalle && !detalle && (
+        <div className="pointer-events-none absolute bottom-4 right-4 top-20 z-[500] flex w-[92vw] max-w-md items-center justify-center rounded-xl border border-secondary-200 bg-white/95 shadow-xl">
+          <div className="flex items-center gap-2 text-sm text-secondary-600"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" /> Cargando detalle territorial...</div>
+        </div>
+      )}
 
-        {cargandoDetalle && !detalle && (
-          <div className="absolute bottom-4 right-4 top-20 z-[500] flex w-[92vw] max-w-md items-center justify-center rounded-xl border border-secondary-200 bg-white/95 shadow-xl">
-            <div className="flex items-center gap-2 text-sm text-secondary-600">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-              Cargando detalle territorial...
-            </div>
-          </div>
-        )}
+      {/* Indicador sutil de carga */}
+      {(loadingInicial || loading || loadingGeo) && idsActivos().length > 0 && (
+        <div className="pointer-events-none absolute right-4 top-16 z-[550] flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-secondary-600 shadow-sm backdrop-blur">
+          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+          {loadingGeo ? 'Actualizando capas...' : 'Cargando capas...'}
+        </div>
+      )}
 
-        <MapaLeaflet
-          ref={mapRef}
-          data={data}
-          activas={activas}
-          onRecargar={() => cargarDatos()}
-          personalizadas={capasPersonalizadas}
-          lideres={lideresFiltrados}
-          modoLideres={modoLideres}
-          filtrosApoyos={filtrosApoyos}
-          puntoSeleccionado={puntoInicial}
-          onSeleccionarCoordenada={(lat, lng) => setPuntoInicial({ lat, lng })}
-          onAccionPunto={(tipo, lat, lng) => {
-            setPuntoInicial({ lat, lng });
-            abrirModal(tipo, { lat, lng });
-          }}
-          onCerrarPunto={() => setPuntoInicial(null)}
-          seleccion={seleccion}
-          onFeatureClick={handleFeatureClick}
-          resultadoDestacado={resultadoDestacado}
-          onBoundsChange={handleBoundsChange}
-        />
-
-        <LeyendaMapa activas={activas} data={data} />
-
-        {loading && (
-          <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center bg-white/60">
-            <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-              <span className="text-sm font-medium text-secondary-700">Cargando capas...</span>
-            </div>
-          </div>
-        )}
-      </section>
-
+      {/* Modales (se mantienen fuera del flujo) */}
       <SubirCapaModal
         abierto={!!capaSubir}
         onCerrar={() => setCapaSubir(null)}

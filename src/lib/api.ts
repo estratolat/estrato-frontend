@@ -54,8 +54,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Redirigir a login si el token expiró
-      if (typeof window !== 'undefined') {
+      const url = error.config?.url || '';
+      const isLogin = url.includes('/auth/login');
+
+      // No redirigir en el login para que el formulario pueda mostrar el error
+      if (!isLogin && typeof window !== 'undefined') {
         localStorage.removeItem('token');
         const isBrigada = window.location.pathname.startsWith('/brigada');
         window.location.href = isBrigada ? '/brigada/login' : '/login';
@@ -229,7 +232,12 @@ export const candidatoApi = {
 export const resultadosHistoricosApi = {
   getAll: (filters?: any) => api.get('/resultados-historicos', { params: filters }),
   getResumen: () => api.get('/resultados-historicos/resumen'),
+  getTipos: () => api.get('/resultados-historicos/tipos'),
+  preview: (formData: FormData) => api.post('/resultados-historicos/preview', formData),
   importar: (formData: FormData) => api.post('/resultados-historicos/importar', formData),
+  eliminarLote: (data: any) => api.delete('/resultados-historicos/lote', { data }),
+  previewRaw: (formData: FormData) => api.post('/resultados-historicos/preview-raw', formData),
+  sugerirMapeo: (formData: FormData) => api.post('/resultados-historicos/sugerir-mapeo', formData),
 };
 
 // === API de Encuestas ===
@@ -243,6 +251,14 @@ export const encuestasApi = {
   getRespuestas: (id: string, filters?: any) => api.get(`/encuestas/${id}/respuestas`, { params: filters }),
   createRespuesta: (id: string, data: any) => api.post(`/encuestas/${id}/respuestas`, data),
   getResumen: (id: string) => api.get(`/encuestas/${id}/resumen`),
+  // Flujo público
+  getPublica: (slug: string, id: string) => api.get(`/encuestas/publica/${slug}/${id}`),
+  enviarRespuestaPublica: (slug: string, id: string, data: any) => api.post(`/encuestas/publica/${slug}/${id}/respuestas`, data),
+  // Contactos y compartir
+  getContactos: (id: string, filters?: any) => api.get(`/encuestas/${id}/contactos`, { params: filters }),
+  importarContactos: (id: string, formData: FormData) => api.post(`/encuestas/${id}/contactos/importar`, formData),
+  compartir: (id: string, data: any) => api.post(`/encuestas/${id}/compartir`, data),
+  getEnvios: (id: string) => api.get(`/encuestas/${id}/envios`),
 };
 
 // === API de Casillas ===

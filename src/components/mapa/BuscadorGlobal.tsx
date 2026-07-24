@@ -117,21 +117,23 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
         )}
       </div>
 
-      <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-        {FILTROS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setTipoFiltro(f.key)}
-            className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-              tipoFiltro === f.key
-                ? 'bg-primary-600 text-white shadow-sm'
-                : 'bg-white text-secondary-600 hover:bg-primary-50'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {(abierto || q.length > 0) && (
+        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+          {FILTROS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setTipoFiltro(f.key)}
+              className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                tipoFiltro === f.key
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-white text-secondary-600 hover:bg-primary-50'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {abierto && (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[70vh] overflow-y-auto rounded-xl border border-secondary-200 bg-white py-2 shadow-xl">

@@ -14,6 +14,7 @@ export default function CandidatoPage() {
   const [perfil, setPerfil] = useState<any>(null);
   const [form, setForm] = useState({
     nombre: '',
+    nombre_publico: '',
     biografia: '',
     gustos: '',
     discurso: '',
@@ -43,6 +44,7 @@ export default function CandidatoPage() {
         setPerfil(data);
         setForm({
           nombre: data.nombre || '',
+          nombre_publico: data.nombre_publico || '',
           biografia: data.biografia || '',
           gustos: data.gustos || '',
           discurso: data.discurso || '',
@@ -129,6 +131,19 @@ export default function CandidatoPage() {
                   onChange={(e) => handleChange('nombre', e.target.value)}
                   placeholder="Ej. Juan Pérez"
                 />
+              </div>
+              <div>
+                <label className="label">Nombre público</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  value={form.nombre_publico}
+                  onChange={(e) => handleChange('nombre_publico', e.target.value)}
+                  placeholder="Ej. Yaz, Chucho, Juanito — como lo conoce la gente"
+                />
+                <p className="mt-1 text-xs text-secondary-500">
+                  Alias o nombre con el que la gente identifica al candidato, si es diferente al nombre oficial.
+                </p>
               </div>
               <div>
                 <label className="label">Biografía / Trayectoria</label>

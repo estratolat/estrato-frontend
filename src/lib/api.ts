@@ -343,6 +343,14 @@ export const fichasApi = {
   getComparativa: (secciones: string[]) => api.post('/fichas-seccionales/comparativa', { secciones }),
 };
 
+// === API de Opositores ===
+export const opositoresApi = {
+  getAll: () => api.get('/opositores'),
+  create: (data: any) => api.post('/opositores', data),
+  update: (id: string, data: any) => api.patch(`/opositores/${id}`, data),
+  delete: (id: string) => api.delete(`/opositores/${id}`),
+};
+
 // === API de Mapa Territorial ===
 export const mapaApi = {
   getCapas: () => api.get('/mapas/capas'),

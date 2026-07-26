@@ -25,6 +25,7 @@ import {
   ShieldCheckIcon,
   DevicePhoneMobileIcon,
   ClipboardDocumentCheckIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/solid';
 
 type IconComponent = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -51,6 +52,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/inteligencia-electoral', icon: SparklesIcon, label: 'Inteligencia Electoral', color: '#9333EA', permiso: 'inteligencia_electoral', grupo: 'inteligencia' },
   { href: '/dashboard/proyeccion', icon: ArrowTrendingUpIcon, label: 'Proyección', color: '#0F766E', permiso: 'proyeccion', grupo: 'inteligencia' },
   { href: '/dashboard/ficha-seccional', icon: DocumentTextIcon, label: 'Ficha Seccional', color: '#C2410C', permiso: 'ficha_seccional', grupo: 'inteligencia' },
+  { href: '/dashboard/opositores', icon: UserGroupIcon, label: 'Opositores', color: '#DC2626', permiso: 'opositores', grupo: 'inteligencia' },
 
   // Configuración del proyecto
   { href: '/dashboard/candidato', icon: UserIcon, label: 'Candidato', color: '#BE185D', permiso: 'candidato', grupo: 'configuracion' },

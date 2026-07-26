@@ -27,16 +27,17 @@ export const SECCIONES: Seccion[] = [
   { id: 'historico_electoral', label: 'Histórico Electoral', icon: 'historico', color: '#4338CA' },
   { id: 'inteligencia_electoral', label: 'Inteligencia Electoral', icon: 'historico', color: '#9333EA' },
   { id: 'admin', label: 'Admin Proyectos', icon: 'seguridad', color: '#1E40AF' },
+  { id: 'opositores', label: 'Opositores', icon: 'opositores', color: '#DC2626' },
 ];
 
 export function permisosPorRol(rol: UserRole | string): string[] {
   const defaults: Record<string, string[]> = {
-    owner: ['dashboard', 'votantes', 'crm', 'peticiones', 'eventos', 'mapa', 'boletines', 'llamadas', 'candidato', 'encuestas', 'casillas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'usuarios', 'app_brigada', 'historico_electoral', 'inteligencia_electoral'],
-    candidato: ['dashboard', 'votantes', 'crm', 'peticiones', 'eventos', 'mapa', 'boletines', 'llamadas', 'candidato', 'encuestas', 'casillas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'usuarios', 'app_brigada', 'historico_electoral', 'inteligencia_electoral'],
-    coord_general: ['dashboard', 'votantes', 'crm', 'peticiones', 'eventos', 'mapa', 'boletines', 'llamadas', 'encuestas', 'casillas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'app_brigada', 'historico_electoral', 'inteligencia_electoral'],
+    owner: ['dashboard', 'votantes', 'crm', 'peticiones', 'eventos', 'mapa', 'boletines', 'llamadas', 'candidato', 'encuestas', 'casillas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'usuarios', 'app_brigada', 'historico_electoral', 'inteligencia_electoral', 'opositores'],
+    candidato: ['dashboard', 'votantes', 'crm', 'peticiones', 'eventos', 'mapa', 'boletines', 'llamadas', 'candidato', 'encuestas', 'casillas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'usuarios', 'app_brigada', 'historico_electoral', 'inteligencia_electoral', 'opositores'],
+    coord_general: ['dashboard', 'votantes', 'crm', 'peticiones', 'eventos', 'mapa', 'boletines', 'llamadas', 'encuestas', 'casillas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'app_brigada', 'historico_electoral', 'inteligencia_electoral', 'opositores'],
     coord_zona: ['dashboard', 'votantes', 'crm', 'peticiones', 'eventos', 'mapa', 'encuestas', 'casillas', 'monitoreo', 'ficha_seccional', 'app_brigada'],
     brigadista: ['app_brigada'],
-    cm: ['dashboard', 'crm', 'boletines', 'candidato', 'encuestas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'historico_electoral', 'inteligencia_electoral'],
+    cm: ['dashboard', 'crm', 'boletines', 'candidato', 'encuestas', 'monitoreo', 'proyeccion', 'ficha_seccional', 'historico_electoral', 'inteligencia_electoral', 'opositores'],
     encargado_peticiones: ['dashboard', 'peticiones', 'votantes', 'crm', 'mapa', 'encuestas', 'monitoreo', 'ficha_seccional'],
     superadmin: ['admin'],
   };

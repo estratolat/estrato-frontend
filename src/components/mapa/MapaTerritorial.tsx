@@ -10,6 +10,7 @@ import { mapaApi, lideresApi, zonasApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
 import { Icon } from '@/components/ui/Icon';
 import { useMapaPrefs } from '@/hooks/useMapaPrefs';
+import { shouldIgnoreMoveEnd } from './mapa-move-utils';
 import SubirCapaModal from './SubirCapaModal';
 import ImportarSeccionesIneModal from './ImportarSeccionesIneModal';
 import ImportarSeccionesExcelModal from './ImportarSeccionesExcelModal';
@@ -257,6 +258,8 @@ export default function MapaTerritorial() {
   const handleBoundsChange = useCallback((bounds: { south: number; west: number; north: number; east: number }) => {
     if (debounceBoundsRef.current) clearTimeout(debounceBoundsRef.current);
     debounceBoundsRef.current = setTimeout(() => {
+      // Revalidar: si el movimiento fue programático, ignorar para evitar ciclos.
+      if (shouldIgnoreMoveEnd()) return;
       setMapBounds(bounds);
     }, 400);
   }, []);

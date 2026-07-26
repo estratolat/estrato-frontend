@@ -28,7 +28,7 @@ import 'leaflet.heat';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
-import { MapaData, ResultadoGlobal } from '@/types/mapa';
+import { MapaData, ResultadoGlobal, GeoJSONCollection } from '@/types/mapa';
 import { Lider } from '@/types';
 import { Icon } from '@/components/ui/Icon';
 import { errorToString } from '@/lib/error-utils';
@@ -41,15 +41,7 @@ const CENTRO_STORAGE_KEY = 'mapa-centro';
 const RESALTAR_REINTENTOS = 40;
 const RESALTAR_INTERVALO = 300;
 
-// Evita que movimientos programáticos del mapa (fitBounds/flyTo/openPopup)
-// disparen recargas de capas por cambio de bounds.
-let ignoreMoveEndUntil = 0;
-function shouldIgnoreMoveEnd() {
-  return Date.now() < ignoreMoveEndUntil;
-}
-function registerProgrammaticMove(duration = 1200) {
-  ignoreMoveEndUntil = Date.now() + duration + 200;
-}
+import { shouldIgnoreMoveEnd, registerProgrammaticMove } from './mapa-move-utils';
 
 function getCentroInicial(): { center: [number, number]; zoom: number } {
   if (typeof window === 'undefined') {
@@ -530,10 +522,6 @@ function CapaPeticiones({ data }: { data: any }) {
   return null;
 }
 
-function CapaEventos({ data }: { data: any }) {
-  return null;
-}
-
 function colorPorScore(score = 0) {
   return score >= 80 ? '#16A34A' : score >= 50 ? '#F59E0B' : '#EF4444';
 }
@@ -651,13 +639,6 @@ function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
     if (layer) {
       layer.addTo(map);
       layerRef.current = layer;
-
-      // Ajustar vista solo la primera vez que aparecen líderes, sin forzar constantemente
-      const bounds = (layer as any).getBounds?.();
-      if (bounds?.isValid?.()) {
-        registerProgrammaticMove(800);
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
-      }
     }
 
     return () => {
@@ -667,6 +648,62 @@ function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
       }
     };
   }, [lideres, modo, map]);
+
+  return null;
+}
+
+function CapaEventos({ data }: { data?: GeoJSONCollection }) {
+  const map = useMap();
+  const layerRef = useRef<L.GeoJSON | null>(null);
+
+  useEffect(() => {
+    if (layerRef.current) {
+      try { layerRef.current.removeFrom(map); } catch {}
+      layerRef.current = null;
+    }
+    if (!data?.features?.length) return;
+
+    const layer = L.geoJSON(data, {
+      pointToLayer: (_feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 8,
+          fillColor: '#D73216',
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.9,
+        });
+      },
+      onEachFeature: (feature, l) => {
+        const props = feature?.properties || {};
+        const nombre = escaparHtml(props.nombre || props.titulo || 'Evento');
+        const direccion = escaparHtml(props.direccion || 'Sin dirección');
+        const fecha = props.fecha_inicio
+          ? format(new Date(props.fecha_inicio), "d 'de' MMMM, h:mm a", { locale: es })
+          : 'Sin fecha';
+        const status = props.status || 'programado';
+        l.bindPopup(`
+          <div class="min-w-[200px] font-sans">
+            <p class="text-sm font-bold text-secondary-900">${nombre}</p>
+            <p class="text-[10px] uppercase tracking-wide text-secondary-500 mb-2">${escaparHtml(status)} • ${fecha}</p>
+            <div class="text-xs text-secondary-700">
+              <span class="font-semibold">Dirección:</span> ${direccion}
+            </div>
+          </div>
+        `);
+      },
+    });
+
+    layer.addTo(map);
+    layerRef.current = layer;
+
+    return () => {
+      if (layerRef.current) {
+        try { layerRef.current.removeFrom(map); } catch {}
+        layerRef.current = null;
+      }
+    };
+  }, [data, map]);
 
   return null;
 }

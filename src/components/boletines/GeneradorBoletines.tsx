@@ -10,9 +10,9 @@ interface GeneradorBoletinesProps {
 
 const CAMPOS = [
   { key: 'tema', label: 'Tema', placeholder: 'Ej. inicio de campaña, seguridad, empleo...' },
-  { key: 'que', label: '¿Qué?', placeholder: '¿Qué se anuncia o propone?' },
-  { key: 'quien', label: '¿Quién?', placeholder: '¿Quién participa o se beneficia?' },
-  { key: 'como', label: '¿Cómo?', placeholder: '¿Cómo se va a hacer?' },
+  { key: 'que', label: '¿Qué pasó?', placeholder: '¿Qué sucedió o se anuncia?' },
+  { key: 'quien', label: '¿Quién participó?', placeholder: '¿Quiénes estuvieron involucrados?' },
+  { key: 'como', label: '¿Cómo sucedió el hecho?', placeholder: '¿De qué forma ocurrió?' },
   { key: 'cuando', label: '¿Cuándo?', placeholder: '¿En qué fecha o momento?' },
   { key: 'donde', label: '¿Dónde?', placeholder: '¿En qué lugar o zona?' },
   { key: 'por_que', label: '¿Por qué?', placeholder: '¿Por qué es importante?' },
@@ -34,7 +34,7 @@ export default function GeneradorBoletines({ perfil, onGenerado }: GeneradorBole
   const [resultado, setResultado] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [copiado, setCopiado] = useState(false);
-  const [copiadoVersion, setCopiadoVersion] = useState<number | null>(null);
+  const [copiadoRed, setCopiadoRed] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const handleChange = (key: string, value: string) => {
@@ -62,11 +62,11 @@ export default function GeneradorBoletines({ perfil, onGenerado }: GeneradorBole
     }
   };
 
-  const copiar = (texto: string, versionIndex?: number) => {
+  const copiar = (texto: string, red?: string) => {
     navigator.clipboard.writeText(texto).then(() => {
-      if (typeof versionIndex === 'number') {
-        setCopiadoVersion(versionIndex);
-        setTimeout(() => setCopiadoVersion(null), 2000);
+      if (red) {
+        setCopiadoRed(red);
+        setTimeout(() => setCopiadoRed(null), 2000);
       } else {
         setCopiado(true);
         setTimeout(() => setCopiado(false), 2000);
@@ -78,14 +78,13 @@ export default function GeneradorBoletines({ perfil, onGenerado }: GeneradorBole
 
   const textoGenerado =
     tipo === 'redes'
-      ? resultado?.versiones_redes?.length > 0
-        ? resultado.versiones_redes
-            .map(
-              (v: any, i: number) =>
-                `Versión ${i + 1}:\n${v.caption}\n\n${v.hashtags?.join(' ') || ''}\n\nIdea de imagen: ${v.idea_imagen || ''}`,
-            )
-            .join('\n\n---\n\n')
-        : resultado?.caption || ''
+      ? [resultado?.posts_redes?.facebook, resultado?.posts_redes?.instagram, resultado?.posts_redes?.tiktok]
+          .filter(Boolean)
+          .map(
+            (v: any, i: number) =>
+              `${['Facebook', 'Instagram', 'TikTok'][i]}:\n${v.caption}\n\n${v.hashtags?.join(' ') || ''}\n\nIdea: ${v.idea_imagen || ''}`,
+          )
+          .join('\n\n---\n\n')
       : [resultado?.titulo, resultado?.bajada, resultado?.desarrollo || resultado?.texto]
           .filter(Boolean)
           .join('\n\n');
@@ -101,7 +100,7 @@ export default function GeneradorBoletines({ perfil, onGenerado }: GeneradorBole
         )}
       </div>
       <p className="mb-4 text-sm text-secondary-500">
-        Responde las 7 preguntas básicas para crear boletines o captions que suenen como el candidato.
+        Responde las 7 preguntas básicas para crear boletines y posts para redes sociales con la voz del candidato.
       </p>
 
       {!perfil?.analizado_en && (
@@ -169,7 +168,7 @@ export default function GeneradorBoletines({ perfil, onGenerado }: GeneradorBole
       >
         {loading
           ? 'Generando con IA...'
-          : `Generar ${tipo === 'boletin' ? 'boletín' : tipo === 'redes' ? '5 versiones de posts' : 'caption'}`}
+          : `Generar ${tipo === 'boletin' ? 'boletín + posts' : 'posts para redes'}`}
       </button>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -191,47 +190,8 @@ export default function GeneradorBoletines({ perfil, onGenerado }: GeneradorBole
             )}
           </div>
 
-          {tipo === 'redes' ? (
-            <div className="space-y-5">
-              <p className="text-xs font-semibold uppercase text-secondary-500">
-                5 versiones de post
-              </p>
-              {(resultado.versiones_redes?.length > 0
-                ? resultado.versiones_redes
-                : resultado.caption
-                ? [{ caption: resultado.caption, hashtags: resultado.hashtags || [], idea_imagen: resultado.idea_imagen || '' }]
-                : []
-              ).map((v: any, i: number) => {
-                const textoCompleto = [v.caption, v.hashtags?.join(' ') || '', v.idea_imagen ? `Idea de imagen: ${v.idea_imagen}` : '']
-                  .filter(Boolean)
-                  .join('\n\n');
-                return (
-                  <div key={i} className="rounded-lg border border-secondary-200 bg-white p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase text-primary-600">Versión {i + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() => copiar(textoCompleto, i)}
-                        className="text-xs font-medium text-primary-600 hover:text-primary-700"
-                      >
-                        {copiadoVersion === i ? '¡Copiado!' : 'Copiar'}
-                      </button>
-                    </div>
-                    {v.caption && (
-                      <p className="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-secondary-800">
-                        {v.caption}
-                      </p>
-                    )}
-                    {v.hashtags?.length > 0 && (
-                      <p className="mb-2 text-sm text-primary-700">{v.hashtags.join(' ')}</p>
-                    )}
-                    {v.idea_imagen && <TextBlock title="Idea de imagen" text={v.idea_imagen} />}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-3">
+          {tipo === 'boletin' && (
+            <div className="mb-5 space-y-3">
               {resultado.titulo && (
                 <div>
                   <p className="text-xs font-semibold uppercase text-secondary-500">Título</p>
@@ -256,16 +216,39 @@ export default function GeneradorBoletines({ perfil, onGenerado }: GeneradorBole
               )}
               {!resultado.desarrollo && resultado.texto && (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-secondary-500">
-                    Cuerpo del boletín
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary-800">
-                    {resultado.texto}
-                  </p>
+                  <p className="text-xs font-semibold uppercase text-secondary-500">Cuerpo del boletín</p>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary-800">{resultado.texto}</p>
                 </div>
               )}
             </div>
           )}
+
+          <div className="space-y-4">
+            <p className="text-xs font-semibold uppercase text-secondary-500">
+              {tipo === 'boletin' ? 'Posts para redes sociales' : 'Posts por red social'}
+            </p>
+            <PostRedSocial
+              red="facebook"
+              label="Facebook"
+              post={resultado.posts_redes?.facebook}
+              copiado={copiadoRed === 'facebook'}
+              onCopiar={copiar}
+            />
+            <PostRedSocial
+              red="instagram"
+              label="Instagram"
+              post={resultado.posts_redes?.instagram}
+              copiado={copiadoRed === 'instagram'}
+              onCopiar={copiar}
+            />
+            <PostRedSocial
+              red="tiktok"
+              label="TikTok"
+              post={resultado.posts_redes?.tiktok}
+              copiado={copiadoRed === 'tiktok'}
+              onCopiar={copiar}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -277,6 +260,55 @@ function TextBlock({ title, text }: { title: string; text: string }) {
     <div className="pt-2">
       <p className="text-xs font-semibold uppercase text-secondary-500">{title}</p>
       <p className="text-sm text-secondary-700">{text}</p>
+    </div>
+  );
+}
+
+function PostRedSocial({
+  red,
+  label,
+  post,
+  copiado,
+  onCopiar,
+}: {
+  red: string;
+  label: string;
+  post?: { caption: string; hashtags: string[]; idea_imagen: string };
+  copiado: boolean;
+  onCopiar: (texto: string, red: string) => void;
+}) {
+  if (!post?.caption) return null;
+  const textoCompleto = [post.caption, post.hashtags?.join(' ') || '', post.idea_imagen ? `Idea: ${post.idea_imagen}` : '']
+    .filter(Boolean)
+    .join('\n\n');
+
+  const colores: Record<string, string> = {
+    facebook: '#1877F2',
+    instagram: '#E1306C',
+    tiktok: '#000000',
+  };
+
+  return (
+    <div className="rounded-lg border border-secondary-200 bg-white p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-bold uppercase" style={{ color: colores[red] || '#4B5563' }}>
+          {label}
+        </span>
+        <button
+          type="button"
+          onClick={() => onCopiar(textoCompleto, red)}
+          className="text-xs font-medium text-primary-600 hover:text-primary-700"
+        >
+          {copiado ? '¡Copiado!' : 'Copiar'}
+        </button>
+      </div>
+      {post.caption && (
+        <p className="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-secondary-800">{post.caption}</p>
+      )}
+      {post.hashtags?.length > 0 && (
+        <p className="mb-2 text-sm text-primary-700">{post.hashtags.join(' ')}</p>
+      )}
+      {post.idea_imagen && <TextBlock title="Idea de imagen / video" text={post.idea_imagen} />}
     </div>
   );
 }

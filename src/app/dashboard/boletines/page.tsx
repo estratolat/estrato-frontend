@@ -94,14 +94,14 @@ export default function BoletinesPage() {
 
   const tituloBoletin = (b: any) => {
     if (b.titulo) return b.titulo;
-    if (b.versiones_redes?.length > 0) return resumenPrompt(b.prompt_usuario);
     return resumenPrompt(b.prompt_usuario);
   };
   const bajadaBoletin = (b: any) => b.bajada || '';
   const desarrolloBoletin = (b: any) =>
     b.desarrollo || b.copy_generado || b.caption_redes || 'Sin contenido generado';
   const esRedes = (b: any) =>
-    Array.isArray(b.versiones_redes) && b.versiones_redes.length > 0;
+    !!b.posts_redes || (Array.isArray(b.versiones_redes) && b.versiones_redes.length > 0);
+  const tienePostsRedes = (b: any) => !!b.posts_redes;
 
   if (authLoading) {
     return (
@@ -189,7 +189,11 @@ export default function BoletinesPage() {
                       </p>
                     )}
 
-                    {esRedes(b) ? (
+                    {tienePostsRedes(b) ? (
+                      <p className="mb-3 text-sm text-secondary-600">
+                        {b.titulo ? 'Boletín + 3 posts para redes sociales' : '3 posts para redes sociales'}
+                      </p>
+                    ) : esRedes(b) ? (
                       <p className="mb-3 text-sm text-secondary-600">
                         {b.versiones_redes.length} versiones de post para redes
                       </p>
@@ -269,7 +273,38 @@ export default function BoletinesPage() {
               </p>
             )}
 
-            {esRedes(abierto) ? (
+            {abierto.posts_redes ? (
+              <div className="space-y-5">
+                <p className="text-xs font-semibold uppercase text-secondary-500">
+                  Posts para redes sociales
+                </p>
+                {[
+                  { key: 'facebook', label: 'Facebook', color: '#1877F2' },
+                  { key: 'instagram', label: 'Instagram', color: '#E1306C' },
+                  { key: 'tiktok', label: 'TikTok', color: '#000000' },
+                ].map(({ key, label, color }) => {
+                  const v = abierto.posts_redes[key];
+                  if (!v?.caption) return null;
+                  return (
+                    <div key={key} className="rounded-lg border border-secondary-100 bg-secondary-50 p-4">
+                      <p className="mb-2 text-xs font-bold uppercase" style={{ color }}>{label}</p>
+                      {v.caption && (
+                        <p className="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-secondary-800">{v.caption}</p>
+                      )}
+                      {v.hashtags?.length > 0 && (
+                        <p className="mb-2 text-sm text-primary-700">{v.hashtags.join(' ')}</p>
+                      )}
+                      {v.idea_imagen && (
+                        <div className="pt-2">
+                          <p className="text-xs font-semibold uppercase text-secondary-500">Idea de imagen / video</p>
+                          <p className="text-sm text-secondary-700">{v.idea_imagen}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : esRedes(abierto) ? (
               <div className="space-y-5">
                 <p className="text-xs font-semibold uppercase text-secondary-500">
                   Versiones de redes sociales

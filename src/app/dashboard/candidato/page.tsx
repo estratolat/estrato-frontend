@@ -7,6 +7,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { puedeAcceder } from '@/lib/permisos';
 import VideoUploader from '@/components/candidato/VideoUploader';
 import HuellaPanel from '@/components/candidato/HuellaPanel';
+import {
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Globe,
+  Music2,
+  Link as LinkIcon,
+  PlusIcon as PlusIconLucide,
+  TrashIcon as TrashIconLucide,
+} from 'lucide-react';
 
 export default function CandidatoPage() {
   const router = useRouter();
@@ -15,6 +26,9 @@ export default function CandidatoPage() {
   const [form, setForm] = useState({
     nombre: '',
     nombre_publico: '',
+    cargo: '',
+    foto_url: '',
+    redes_sociales: [] as { red: string; url?: string }[],
     biografia: '',
     gustos: '',
     discurso: '',
@@ -26,6 +40,41 @@ export default function CandidatoPage() {
   const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
+  const REDES_SOPORTADAS = [
+    { id: 'facebook', label: 'Facebook', icon: Facebook, color: '#1877F2' },
+    { id: 'instagram', label: 'Instagram', icon: Instagram, color: '#E4405F' },
+    { id: 'tiktok', label: 'TikTok', icon: Music2, color: '#000000' },
+    { id: 'x', label: 'X / Twitter', icon: Twitter, color: '#0F1419' },
+    { id: 'youtube', label: 'YouTube', icon: Youtube, color: '#FF0000' },
+    { id: 'web', label: 'Sitio web', icon: Globe, color: '#2563EB' },
+    { id: 'otro', label: 'Otro', icon: LinkIcon, color: '#64748B' },
+  ];
+
+  const iconoRed = (id: string) =>
+    REDES_SOPORTADAS.find((r) => r.id === id) || REDES_SOPORTADAS[REDES_SOPORTADAS.length - 1];
+
+  const actualizarRed = (index: number, campo: 'red' | 'url', valor: string) => {
+    setForm((f) => {
+      const next = [...f.redes_sociales];
+      next[index] = { ...next[index], [campo]: valor };
+      return { ...f, redes_sociales: next };
+    });
+  };
+
+  const agregarRed = () => {
+    setForm((f) => ({
+      ...f,
+      redes_sociales: [...f.redes_sociales, { red: 'otro', url: '' }],
+    }));
+  };
+
+  const eliminarRed = (index: number) => {
+    setForm((f) => ({
+      ...f,
+      redes_sociales: f.redes_sociales.filter((_, i) => i !== index),
+    }));
+  };
 
   useEffect(() => {
     if (!authLoading && user && !puedeAcceder(user.permisos, 'candidato', user.rol)) {
@@ -45,6 +94,9 @@ export default function CandidatoPage() {
         setForm({
           nombre: data.nombre || '',
           nombre_publico: data.nombre_publico || '',
+          cargo: data.cargo || '',
+          foto_url: data.foto_url || '',
+          redes_sociales: Array.isArray(data.redes_sociales) ? [...data.redes_sociales] : [],
           biografia: data.biografia || '',
           gustos: data.gustos || '',
           discurso: data.discurso || '',
@@ -65,7 +117,13 @@ export default function CandidatoPage() {
     try {
       setSaving(true);
       setError('');
-      const { data } = await candidatoApi.upsertPerfil(form);
+      const payload = {
+        ...form,
+        redes_sociales: form.redes_sociales
+          .map((r) => ({ red: r.red.trim(), url: r.url?.trim() }))
+          .filter((r) => r.red && r.url),
+      };
+      const { data } = await candidatoApi.upsertPerfil(payload);
       setPerfil(data);
       setMessage('Perfil guardado correctamente');
       setTimeout(() => setMessage(''), 3000);
@@ -146,6 +204,79 @@ export default function CandidatoPage() {
                 </p>
               </div>
               <div>
+                <label className="label">Cargo que busca</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  value={form.cargo}
+                  onChange={(e) => handleChange('cargo', e.target.value)}
+                  placeholder="Ej. Presidenta Municipal, Diputada Local..."
+                />
+              </div>
+              <div>
+                <label className="label">Fotografía del candidato (URL o base64)</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  value={form.foto_url}
+                  onChange={(e) => handleChange('foto_url', e.target.value)}
+                  placeholder="https://..."
+                />
+              </div>
+              <div>
+                <label className="label">Redes sociales</label>
+                <p className="mb-2 text-xs text-secondary-500">
+                  Agrega Facebook, Instagram, TikTok, X, YouTube, sitio web u otra liga.
+                </p>
+                <div className="space-y-2">
+                  {form.redes_sociales.map((r, index) => {
+                    const meta = iconoRed(r.red);
+                    const Icon = meta.icon;
+                    return (
+                      <div key={index} className="flex items-center gap-2">
+                        <select
+                          className="input shrink-0 w-[140px]"
+                          value={r.red}
+                          onChange={(e) => actualizarRed(index, 'red', e.target.value)}
+                        >
+                          {REDES_SOPORTADAS.map((red) => (
+                            <option key={red.id} value={red.id}>{red.label}</option>
+                          ))}
+                        </select>
+                        <div className="relative flex-1">
+                          <Icon
+                            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: meta.color }}
+                          />
+                          <input
+                            type="url"
+                            className="input w-full pl-9"
+                            value={r.url}
+                            onChange={(e) => actualizarRed(index, 'url', e.target.value)}
+                            placeholder={`https://${r.red === 'web' ? 'sitio.com' : r.red + '.com/usuario'}`}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => eliminarRed(index)}
+                          className="rounded-md p-2 text-secondary-400 hover:bg-red-50 hover:text-red-600"
+                          title="Eliminar red"
+                        >
+                          <TrashIconLucide className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={agregarRed}
+                    className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-primary-600 transition hover:bg-primary-50"
+                  >
+                    <PlusIconLucide className="h-3.5 w-3.5" /> Agregar red social
+                  </button>
+                </div>
+              </div>
+              <div>
                 <label className="label">Biografía / Trayectoria</label>
                 <textarea
                   className="input w-full min-h-[100px]"
@@ -219,9 +350,74 @@ export default function CandidatoPage() {
           </div>        </div>
 
         <div className="space-y-6">
+          <FichaCandidato perfil={perfil} />
           <HuellaPanel perfil={perfil} />
         </div>
       </div>
     </div>
   );
+
+function FichaCandidato({ perfil }: { perfil: any }) {
+  const iniciales = (perfil?.nombre || 'C')
+    .split(' ')
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const redes = Array.isArray(perfil?.redes_sociales) ? perfil.redes_sociales.filter((r: any) => r?.url?.trim()) : [];
+
+  return (
+    <div className="rounded-xl border border-secondary-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-primary-100 bg-secondary-100 text-secondary-400">
+          {perfil?.foto_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={perfil.foto_url} alt={perfil.nombre || 'Candidato'} className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-3xl font-bold">{iniciales}</span>
+          )}
+        </div>
+
+        <h3 className="text-xl font-bold text-secondary-900">
+          {perfil?.nombre_publico || perfil?.nombre || 'Candidato'}
+        </h3>
+        {(perfil?.nombre_publico && perfil?.nombre) && (
+          <p className="text-sm text-secondary-500">{perfil.nombre}</p>
+        )}
+        {perfil?.cargo && (
+          <p className="mt-1 inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
+            {perfil.cargo}
+          </p>
+        )}
+      </div>
+
+      {redes.length > 0 && (
+        <div className="mt-5 border-t border-secondary-100 pt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-500">Redes sociales</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {redes.map((r: any, idx: number) => {
+              const meta = REDES_SOPORTADAS.find((x) => x.id === r.red) || REDES_SOPORTADAS[REDES_SOPORTADAS.length - 1];
+              const Icon = meta.icon;
+              return (
+                <a
+                  key={`${r.red}-${idx}`}
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={meta.label}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition hover:opacity-80"
+                  style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
+                >
+                  <Icon className="h-4 w-4" /> {meta.label}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 }

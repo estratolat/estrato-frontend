@@ -6,6 +6,7 @@ interface Props {
   activas: Record<string, boolean>;
   data: Record<string, any>;
   personalizadas?: CapaMapa[];
+  className?: string;
 }
 
 const CAPAS = [
@@ -17,7 +18,7 @@ const CAPAS = [
   { id: 'lideres', nombre: 'Líderes territoriales', color: '#383745', descripcion: 'Líderes y su radio de influencia' },
 ];
 
-export default function LeyendaMapa({ activas, data, personalizadas = [] }: Props) {
+export default function LeyendaMapa({ activas, data, personalizadas = [], className = '' }: Props) {
   const activasPredefinidas = CAPAS.filter(
     c => activas[c.id] && (data[c.id]?.features?.length || 0) > 0
   );
@@ -28,7 +29,7 @@ export default function LeyendaMapa({ activas, data, personalizadas = [] }: Prop
   if (activasPredefinidas.length === 0 && activasPersonalizadas.length === 0) return null;
 
   return (
-    <div className="pointer-events-none absolute right-4 top-16 z-[500] max-w-xs rounded-lg border border-white/60 bg-white/95 p-3 shadow-lg backdrop-blur-sm">
+    <div className={`pointer-events-auto rounded-lg border border-white/60 bg-white/95 p-3 shadow-lg backdrop-blur-sm ${className}`}>
       <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-secondary-500">Capas activas</p>
       <div className="space-y-1.5">
         {activasPredefinidas.map(c => {

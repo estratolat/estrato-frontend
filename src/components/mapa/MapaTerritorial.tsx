@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { Search, LayoutGrid, Compass, Layers, Map, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { MapaData, CapaMapa, MapaPrefs, ResultadoGlobal, DetalleTerritorial } from '@/types/mapa';
+import { MapaData, CapaMapa, MapaPrefs, ResultadoGlobal, DetalleTerritorial, GeoJSONCollection } from '@/types/mapa';
 import { Lider, Zona } from '@/types';
 import { mapaApi, lideresApi, zonasApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
@@ -17,9 +18,12 @@ import EditarEstilosCapaModal from './EditarEstilosCapaModal';
 import NuevoLiderModal from './NuevoLiderModal';
 import NuevoEventoModal from './NuevoEventoModal';
 import NuevoApoyoModal from './NuevoApoyoModal';
-import LeyendaMapa from './LeyendaMapa';
 import BuscadorGlobal from './BuscadorGlobal';
 import FichaTerritorial from './FichaTerritorial';
+import FichaFeature from './FichaFeature';
+import ExploradorCapa, { ElementoCapa } from './ExploradorCapa';
+import PanelFlotante from './PanelFlotante';
+import LeyendaMapa from './LeyendaMapa';
 import type { MapaLeafletRef } from './MapaLeaflet';
 
 const MapaLeaflet = dynamic(() => import('./MapaLeaflet').then(m => m.default), {
@@ -172,6 +176,21 @@ export default function MapaTerritorial() {
   const debounceBoundsRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
+  // Visibilidad de herramientas flotantes
+  const [mostrarBuscador, setMostrarBuscador] = useState(true);
+  const [mostrarResumen, setMostrarResumen] = useState(true);
+  const [mostrarExplorador, setMostrarExplorador] = useState(false);
+  const [mostrarPanelCapas, setMostrarPanelCapas] = useState(false);
+  const [elementoExplorador, setElementoExplorador] = useState<{ capaId?: string; capaNombre?: string; color?: string } | null>(null);
+  const [elementoFicha, setElementoFicha] = useState<ElementoCapa | null>(null);
+
+  // Posición arrastrable del resumen
+  const [resumenPos, setResumenPos] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
+  const dragRef = useRef<{ dragging: boolean; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+
+  // Leyenda y otros flotantes
+  const [mostrarLeyenda, setMostrarLeyenda] = useState(false);
+
   // Persistir cada cambio de preferencias
   useEffect(() => {
     prefs.save({
@@ -257,29 +276,12 @@ export default function MapaTerritorial() {
     setSeleccion(null);
   }, []);
 
-  const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
-    const esCapaSindical = /STASE|Sindicales/i.test(
-      capasPersonalizadas.find(c => c.id === capaId)?.nombre || ''
-    );
-    if (esCapaSindical) {
-      setFeatureSindicalSeleccionado({ capaId, featureId, props });
-    }
-    setFeatureEditando({
-      capaId,
-      featureId,
-      nombre: props._feature_nombre || featureId,
-      color: props._feature_color || capasPersonalizadas.find(c => c.id === capaId)?.color || '#3B82F6',
-      props,
-    });
-  }, [capasPersonalizadas]);
-
-  const cerrarFeatureEditando = useCallback(() => {
-    setFeatureEditando(null);
+  const abrirExplorador = useCallback((capaId?: string, capaNombre?: string, color?: string) => {
+    setElementoExplorador(capaId ? { capaId, capaNombre, color } : null);
+    setMostrarExplorador(true);
   }, []);
 
-  const cerrarFeatureSindical = useCallback(() => {
-    setFeatureSindicalSeleccionado(null);
-  }, []);
+  const cerrarExplorador = useCallback(() => setMostrarExplorador(false), []);
 
   const asegurarCapaCargada = useCallback(async (capaId: string, featureId: string, geometry?: any) => {
     if (data[capaId]?.features?.length) return; // ya cargada
@@ -306,6 +308,61 @@ export default function MapaTerritorial() {
       console.error('[MapaTerritorial] Error cargando capa para resaltar:', e);
     }
   }, [data]);
+
+  const seleccionarElementoExplorador = useCallback((el: ElementoCapa) => {
+    setElementoFicha(el);
+    setMostrarExplorador(false);
+
+    // Asegurar que la capa padre esté activa y cargada antes de resaltar
+    if (!activas[el.capaId]) {
+      setActivas(prev => ({ ...prev, [el.capaId]: true }));
+    }
+    const props = el.feature?.properties || {};
+    const featureId = String(
+      props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.GID || props.gid || el.id.split('-').slice(1).join('-')
+    );
+    asegurarCapaCargada(el.capaId, featureId, el.feature?.geometry);
+    setTimeout(() => {
+      mapRef.current?.resaltarFeature?.(el.capaId, featureId, el.feature?.geometry);
+    }, 300);
+  }, [activas, asegurarCapaCargada]);
+
+  const abrirFichaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
+    const capa = capasPersonalizadas.find(c => c.id === capaId);
+    setElementoFicha({
+      id: featureId,
+      nombre: props._feature_nombre || featureId,
+      feature: { type: 'Feature', properties: props, geometry: props.__geometry || null },
+      capaId,
+      capaNombre: capa?.nombre || 'Capa',
+      color: props._feature_color || capa?.color || '#3B82F6',
+    });
+  }, [capasPersonalizadas]);
+
+  const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
+    abrirFichaDesdeFeature(capaId, featureId, props);
+    const esCapaSindical = /STASE|Sindicales/i.test(
+      capasPersonalizadas.find(c => c.id === capaId)?.nombre || ''
+    );
+    if (esCapaSindical) {
+      setFeatureSindicalSeleccionado({ capaId, featureId, props });
+    }
+    setFeatureEditando({
+      capaId,
+      featureId,
+      nombre: props._feature_nombre || featureId,
+      color: props._feature_color || capasPersonalizadas.find(c => c.id === capaId)?.color || '#3B82F6',
+      props,
+    });
+  }, [capasPersonalizadas]);
+
+  const cerrarFeatureEditando = useCallback(() => {
+    setFeatureEditando(null);
+  }, []);
+
+  const cerrarFeatureSindical = useCallback(() => {
+    setFeatureSindicalSeleccionado(null);
+  }, []);
 
   const seleccionarResultado = useCallback(async (r: ResultadoGlobal) => {
     setDetalle(null);
@@ -1202,229 +1259,212 @@ export default function MapaTerritorial() {
     );
   };
 
-  return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4 lg:flex-row">
-      <aside className="flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-sm lg:w-96">
-        <div className="shrink-0 space-y-2 p-4 pb-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-bold text-secondary-900">Herramientas del mapa</h2>
-              <p className="text-xs text-secondary-500">Activa las capas que quieres ver</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                onClick={activarTodas}
-                title="Ver todas las capas"
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
-              >
-                <Icon name="ver" size={14} /> Ver todo
-              </button>
-              <button
-                onClick={desactivarTodas}
-                title="Ocultar todas las capas"
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
-              >
-                <Icon name="ocultar" size={14} /> Limpiar
-              </button>
-              <button
-                onClick={prefs.reset}
-                title="Restablecer preferencias del mapa"
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
-              >
-                <Icon name="seguridad" size={14} />
-              </button>
-            </div>
-          </div>
+  // Arrastrar el panel de resumen
+  const iniciarDragResumen = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    dragRef.current = {
+      dragging: true,
+      startX: clientX,
+      startY: clientY,
+      initialX: resumenPos.x,
+      initialY: resumenPos.y,
+    };
+    e.preventDefault();
+  }, [resumenPos]);
 
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <BuscadorGlobal onSeleccionar={seleccionarResultado} />
-            </div>
+  useEffect(() => {
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      if (!dragRef.current?.dragging) return;
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const dx = clientX - dragRef.current.startX;
+      const dy = clientY - dragRef.current.startY;
+      setResumenPos(prev => {
+        const ancho = 320;
+        const alto = 240;
+        const x = Math.max(8, Math.min((window.innerWidth || 800) - ancho, dragRef.current!.initialX + dx));
+        const y = Math.max(8, Math.min((window.innerHeight || 600) - alto, dragRef.current!.initialY + dy));
+        return { x, y };
+      });
+    };
+    const onEnd = () => {
+      if (dragRef.current) dragRef.current.dragging = false;
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+  }, []);
 
-            <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 sm:flex">
-              {CAPAS_CONFIG.filter(c => activas[c.id]).map(c => {
-                const count = data[c.id]?.features?.length || 0;
-                return (
-                  <span
-                    key={c.id}
-                    className="inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-1 text-[10px] font-semibold text-white"
-                    style={{ backgroundColor: c.color }}
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
-                    <span className="truncate">{count} {c.nombre}</span>
-                  </span>
-                );
-              })}
-              {Object.keys(activas).filter(k => activas[k]).length === 0 && (
-                <span className="text-[10px] text-secondary-400">Ninguna capa activa</span>
-              )}
-            </div>
-          </div>
+  const capasExplorador = useMemo(() => {
+    return capasPersonalizadas
+      .filter(c => activas[c.id])
+      .map(c => ({ capa: c, data: data[c.id] }))
+      .filter((item): item is { capa: CapaMapa; data: GeoJSONCollection } => !!item.data?.features?.length);
+  }, [capasPersonalizadas, activas, data]);
+
+  const hayCapasCargando = useMemo(() => {
+    return Object.values(loadingCapas).some(Boolean);
+  }, [loadingCapas]);
+
+  const onTarjetaResumenClick = useCallback((capaId: string) => {
+    if (!activas[capaId]) {
+      setActivas(prev => ({ ...prev, [capaId]: true }));
+    }
+    const features = data[capaId]?.features;
+    if (features && features.length > 0) {
+      abrirExplorador(capaId, capasPersonalizadas.find(c => c.id === capaId)?.nombre, capasPersonalizadas.find(c => c.id === capaId)?.color);
+    }
+  }, [activas, data, capasPersonalizadas, abrirExplorador]);
+
+  const tarjetasResumen = useMemo(() => {
+    const t = [
+      { id: 'votantes', label: 'Votantes', icon: 'votantes', color: '#EF4444', capaId: 'votantes', count: data.votantes?.features?.length ?? 0 },
+      { id: 'apoyos', label: 'Apoyos', icon: 'apoyos', color: '#F59E0B', capaId: 'apoyos', count: data.apoyos?.features?.length ?? 0 },
+      { id: 'peticiones', label: 'Peticiones', icon: 'crm', color: '#06B6D4', capaId: 'peticiones', count: data.peticiones?.features?.length ?? 0 },
+      { id: 'eventos', label: 'Eventos', icon: 'eventos', color: '#D73216', capaId: 'eventos', count: data.eventos?.features?.length ?? 0 },
+      { id: 'lideres', label: 'Líderes', icon: 'lideres', color: '#383745', capaId: 'lideres', count: lideresConUbicacion.length },
+      { id: 'secciones', label: 'Secciones', icon: 'seguridad', color: '#8B5CF6', capaId: 'custom', count: stats.length },
+      { id: 'casillas', label: 'Casillas', icon: 'mapa', color: '#6366F1', capaId: 'custom', count: 0 },
+      { id: 'riesgo', label: 'Territorio en riesgo', icon: 'ocultar', color: '#EF4444', capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id]).length },
+      { id: 'propio', label: 'Territorio propio', icon: 'ver', color: '#22C55E', capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id] && data[c.id]?.features?.length).reduce((sum, c) => sum + (data[c.id]?.features?.length ?? 0), 0) },
+    ];
+    return t;
+  }, [data, lideresConUbicacion.length, stats.length, capasPersonalizadas, activas]);
+
+  const renderPanelCapas = () => (
+    <div className="space-y-3">
+      {/* Acciones globales */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={activarTodas}
+            title="Ver todas las capas"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
+          >
+            <Icon name="ver" size={14} /> Ver todo
+          </button>
+          <button
+            onClick={desactivarTodas}
+            title="Ocultar todas las capas"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
+          >
+            <Icon name="ocultar" size={14} /> Limpiar
+          </button>
+          <button
+            onClick={prefs.reset}
+            title="Restablecer preferencias del mapa"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-secondary-600 transition hover:bg-primary-50 hover:text-primary-700"
+          >
+            <Icon name="seguridad" size={14} />
+          </button>
         </div>
+      </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4 pt-0">
-          {/* Subir capa / KML — acceso rápido */}
-          <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600">
-                <Icon name="apoyos" size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-secondary-900">Subir KML / capa GIS</p>
-                <p className="text-xs text-secondary-600">
-                  Importa KML, GeoJSON o Shapefiles de Google Earth, QGIS o cualquier fuente.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setCapaSubir('custom')}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
-            >
-              <Icon name="apoyos" size={16} />
-              {capasPersonalizadas.length > 0 ? 'Subir más capas' : 'Subir mi primera capa'}
-            </button>
-            <p className="mt-2 text-center text-[10px] text-secondary-500">
-              Las capas nuevas se activan automáticamente en el mapa.
+      {/* Subir capa / KML — acceso rápido */}
+      <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600">
+            <Icon name="apoyos" size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-secondary-900">Subir KML / capa GIS</p>
+            <p className="text-xs text-secondary-600">
+              Importa KML, GeoJSON o Shapefiles de Google Earth, QGIS o cualquier fuente.
             </p>
           </div>
-
-          {/* Capas subidas */}
-          {capasPersonalizadas.length > 0 && renderGrupoColapsable(
-            'subidas',
-            'Capas subidas',
-            <span className="rounded bg-secondary-100 px-1.5 py-0.5 text-[10px] font-bold text-secondary-600">{capasPersonalizadas.length}</span>,
-            (
-              <div className="space-y-2">
-                {Object.entries(capasPorGrupo.grupos).map(([grupoNombre, capas]) => {
-                  const grupoId = `subidas-${grupoNombre}`;
-                  const expandido = gruposExpandidos[grupoId] ?? true;
-                  return (
-                    <div key={grupoNombre} className="rounded-lg border border-primary-100 bg-primary-50/50 overflow-hidden">
-                      <button
-                        onClick={() => toggleGrupo(grupoId)}
-                        className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left transition hover:bg-primary-100"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <Icon
-                            name="seguridad"
-                            size={12}
-                            className={`text-primary-600 transition-transform ${expandido ? 'rotate-90' : ''}`}
-                          />
-                          <p className="text-xs font-semibold text-primary-800">{grupoNombre}</p>
-                        </div>
-                        <span className="text-[10px] text-secondary-500">{capas.length} capa{capas.length > 1 ? 's' : ''}</span>
-                      </button>
-                      {expandido && <div className="space-y-2 p-2">{capas.map(c => renderCapaButton(c))}</div>}
-                    </div>
-                  );
-                })}
-
-                {capasPorGrupo.sinGrupo.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="px-1 text-xs font-semibold text-secondary-600">Sin grupo</p>
-                    {capasPorGrupo.sinGrupo.map(c => renderCapaButton(c))}
-                  </div>
-                )}
-              </div>
-            ),
-            true
-          )}
-
-          {/* Campaña */}
-          {renderGrupoColapsable(
-            'campania',
-            'Campaña',
-            <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-700">{CAPAS_CONFIG.filter(c => activas[c.id]).length}/{CAPAS_CONFIG.length}</span>,
-            CAPAS_CONFIG.map(capa => renderCapaItem(capa)),
-            true
-          )}
-
-          {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-xs text-red-700">
-              <p className="font-semibold">{modoDemo ? 'Modo demo activado' : 'Error del servidor'}</p>
-              <p>{error}</p>
-              {!modoDemo && (
-                <button
-                  onClick={() => cargarDatos(true)}
-                  className="mt-2 text-xs font-semibold underline hover:no-underline"
-                >
-                  Usar modo demo
-                </button>
-              )}
-            </div>
-          )}
-
         </div>
-      </aside>
+        <button
+          onClick={() => setCapaSubir('custom')}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
+        >
+          <Icon name="apoyos" size={16} />
+          {capasPersonalizadas.length > 0 ? 'Subir más capas' : 'Subir mi primera capa'}
+        </button>
+        <p className="mt-2 text-center text-[10px] text-secondary-500">
+          Las capas nuevas se activan automáticamente en el mapa.
+        </p>
+      </div>
 
-      <section className="relative min-h-[400px] flex-1 overflow-hidden rounded-xl bg-white shadow-sm">
-        {detalle && <FichaTerritorial detalle={detalle} onCerrar={cerrarFicha} />}
+      {/* Capas subidas */}
+      {capasPersonalizadas.length > 0 && renderGrupoColapsable(
+        'subidas',
+        'Capas subidas',
+        <span className="rounded bg-secondary-100 px-1.5 py-0.5 text-[10px] font-bold text-secondary-600">{capasPersonalizadas.length}</span>,
+        (
+          <div className="space-y-2">
+            {Object.entries(capasPorGrupo.grupos).map(([grupoNombre, capas]) => {
+              const grupoId = `subidas-${grupoNombre}`;
+              const expandido = gruposExpandidos[grupoId] ?? true;
+              return (
+                <div key={grupoNombre} className="rounded-lg border border-primary-100 bg-primary-50/50 overflow-hidden">
+                  <button
+                    onClick={() => toggleGrupo(grupoId)}
+                    className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left transition hover:bg-primary-100"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Icon
+                        name="seguridad"
+                        size={12}
+                        className={`text-primary-600 transition-transform ${expandido ? 'rotate-90' : ''}`}
+                      />
+                      <p className="text-xs font-semibold text-primary-800">{grupoNombre}</p>
+                    </div>
+                    <span className="text-[10px] text-secondary-500">{capas.length} capa{capas.length > 1 ? 's' : ''}</span>
+                  </button>
+                  {expandido && <div className="space-y-2 p-2">{capas.map(c => renderCapaButton(c))}</div>}
+                </div>
+              );
+            })}
 
-        {featureSindicalSeleccionado && (
-          <PanelSindicalFeature
-            feature={featureSindicalSeleccionado}
-            onCerrar={cerrarFeatureSindical}
-          />
-        )}
-
-        {featureEditando && (
-          <div className="absolute left-4 right-4 top-4 z-[600] mx-auto max-w-sm rounded-xl border border-secondary-200 bg-white p-4 shadow-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-secondary-900">Editar polígono</h3>
-              <button
-                onClick={cerrarFeatureEditando}
-                className="text-secondary-400 hover:text-secondary-600"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] font-semibold uppercase text-secondary-500">Nombre</label>
-                <input
-                  type="text"
-                  value={featureEditando.nombre}
-                  onChange={(e) => setFeatureEditando(prev => prev ? { ...prev, nombre: e.target.value } : null)}
-                  className="input w-full text-sm"
-                />
+            {capasPorGrupo.sinGrupo.length > 0 && (
+              <div className="space-y-2">
+                <p className="px-1 text-xs font-semibold text-secondary-600">Sin grupo</p>
+                {capasPorGrupo.sinGrupo.map(c => renderCapaButton(c))}
               </div>
-              <div className="flex items-center gap-3">
-                <label className="text-[10px] font-semibold uppercase text-secondary-500">Color</label>
-                <input
-                  type="color"
-                  value={featureEditando.color}
-                  onChange={(e) => setFeatureEditando(prev => prev ? { ...prev, color: e.target.value } : null)}
-                  className="h-8 w-16 cursor-pointer rounded border border-secondary-200"
-                />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={cerrarFeatureEditando}
-                  className="btn-secondary flex-1 py-1.5 text-xs"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={guardarFeature}
-                  disabled={guardandoFeature}
-                  className="btn-primary flex-1 py-1.5 text-xs disabled:opacity-60"
-                >
-                  {guardandoFeature ? 'Guardando...' : 'Guardar'}
-                </button>
-              </div>
-            </div>
+            )}
           </div>
-        )}
+        ),
+        true
+      )}
 
-        {cargandoDetalle && !detalle && (
-          <div className="absolute bottom-4 right-4 top-20 z-[500] flex w-[92vw] max-w-md items-center justify-center rounded-xl border border-secondary-200 bg-white/95 shadow-xl">
-            <div className="flex items-center gap-2 text-sm text-secondary-600">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-              Cargando detalle territorial...
-            </div>
-          </div>
-        )}
+      {/* Campaña */}
+      {renderGrupoColapsable(
+        'campania',
+        'Campaña',
+        <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-700">{CAPAS_CONFIG.filter(c => activas[c.id]).length}/{CAPAS_CONFIG.length}</span>,
+        CAPAS_CONFIG.map(capa => renderCapaItem(capa)),
+        true
+      )}
 
+      {error && (
+        <div className="rounded-lg bg-red-50 p-3 text-xs text-red-700">
+          <p className="font-semibold">{modoDemo ? 'Modo demo activado' : 'Error del servidor'}</p>
+          <p>{error}</p>
+          {!modoDemo && (
+            <button
+              onClick={() => cargarDatos(true)}
+              className="mt-2 text-xs font-semibold underline hover:no-underline"
+            >
+              Usar modo demo
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Mapa base full-bleed */}
+      <div className="absolute inset-0 z-0">
         <MapaLeaflet
           ref={mapRef}
           data={data}
@@ -1446,19 +1486,233 @@ export default function MapaTerritorial() {
           resultadoDestacado={resultadoDestacado}
           onBoundsChange={handleBoundsChange}
         />
+      </div>
 
-        <LeyendaMapa activas={activas} data={data} />
+      {/* Ficha territorial */}
+      {detalle && (
+        <div className="absolute bottom-4 right-4 top-24 z-[500] flex w-[92vw] max-w-md flex-col overflow-hidden rounded-xl border border-secondary-200 bg-white shadow-2xl">
+          <FichaTerritorial detalle={detalle} onCerrar={cerrarFicha} />
+        </div>
+      )}
 
-        {loading && (
-          <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center bg-white/60">
-            <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-              <span className="text-sm font-medium text-secondary-700">Cargando capas...</span>
+      {/* Panel sindical */}
+      {featureSindicalSeleccionado && (
+        <div className="absolute right-4 top-4 z-[650] w-[340px] max-w-[92vw]">
+          <PanelSindicalFeature
+            feature={featureSindicalSeleccionado}
+            onCerrar={cerrarFeatureSindical}
+          />
+        </div>
+      )}
+
+      {/* Editor de polígono */}
+      {featureEditando && (
+        <div className="absolute left-4 right-4 top-4 z-[600] mx-auto max-w-sm rounded-xl border border-secondary-200 bg-white p-4 shadow-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-secondary-900">Editar polígono</h3>
+            <button
+              onClick={cerrarFeatureEditando}
+              className="text-secondary-400 hover:text-secondary-600"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[10px] font-semibold uppercase text-secondary-500">Nombre</label>
+              <input
+                type="text"
+                value={featureEditando.nombre}
+                onChange={(e) => setFeatureEditando(prev => prev ? { ...prev, nombre: e.target.value } : null)}
+                className="input w-full text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-[10px] font-semibold uppercase text-secondary-500">Color</label>
+              <input
+                type="color"
+                value={featureEditando.color}
+                onChange={(e) => setFeatureEditando(prev => prev ? { ...prev, color: e.target.value } : null)}
+                className="h-8 w-16 cursor-pointer rounded border border-secondary-200"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={cerrarFeatureEditando}
+                className="btn-secondary flex-1 py-1.5 text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarFeature}
+                disabled={guardandoFeature}
+                className="btn-primary flex-1 py-1.5 text-xs disabled:opacity-60"
+              >
+                {guardandoFeature ? 'Guardando...' : 'Guardar'}
+              </button>
             </div>
           </div>
-        )}
-      </section>
+        </div>
+      )}
 
+      {/* Loader detalle territorial */}
+      {cargandoDetalle && !detalle && (
+        <div className="absolute bottom-4 right-4 top-20 z-[500] flex w-[92vw] max-w-md items-center justify-center rounded-xl border border-secondary-200 bg-white/95 shadow-xl">
+          <div className="flex items-center gap-2 text-sm text-secondary-600">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+            Cargando detalle territorial...
+          </div>
+        </div>
+      )}
+
+      {/* Resumen Territorial — arriba izquierda, arrastrable */}
+      {mostrarResumen && (
+        <div
+          className="absolute z-[600] w-80"
+          style={{ left: resumenPos.x, top: resumenPos.y }}
+        >
+          <div className="rounded-xl border border-secondary-200 bg-white p-3 shadow-xl">
+            <div
+              onMouseDown={iniciarDragResumen}
+              onTouchStart={iniciarDragResumen}
+              className="mb-2 flex cursor-grab items-center justify-between rounded-lg bg-secondary-50/70 px-2 py-1.5 active:cursor-grabbing"
+            >
+              <div className="flex items-center gap-2">
+                <LayoutGrid size={16} className="text-primary-600" />
+                <h3 className="text-sm font-bold text-secondary-900">Resumen Territorial</h3>
+              </div>
+              <button
+                onClick={() => setMostrarResumen(false)}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {tarjetasResumen.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => onTarjetaResumenClick(t.capaId)}
+                  className="flex flex-col items-center justify-center gap-1 rounded-lg border border-secondary-100 bg-secondary-50/50 p-2 text-center transition hover:border-primary-200 hover:bg-primary-50"
+                >
+                  <div
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-white"
+                    style={{ backgroundColor: t.color }}
+                  >
+                    <Icon name={t.icon as any} size={14} />
+                  </div>
+                  <p className="text-xs font-bold text-secondary-900">{t.count.toLocaleString()}</p>
+                  <p className="text-[9px] leading-tight text-secondary-500 line-clamp-2">{t.label}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Buscador global — arriba derecha */}
+      {mostrarBuscador && (
+        <div className="absolute right-4 top-4 z-[600] w-80 rounded-xl border border-secondary-200 bg-white p-3 shadow-xl">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-secondary-900">
+              <Search size={16} className="text-primary-600" />
+              <h3 className="text-sm font-bold">Buscar</h3>
+            </div>
+            <button
+              onClick={() => setMostrarBuscador(false)}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
+            >
+              ✕
+            </button>
+          </div>
+          <BuscadorGlobal onSeleccionar={seleccionarResultado} />
+        </div>
+      )}
+
+      {/* Chip de carga no bloqueante */}
+      {hayCapasCargando && (
+        <div className="absolute right-4 top-16 z-[700] flex items-center gap-2 rounded-full border border-secondary-200 bg-white px-3 py-1.5 text-xs font-medium text-secondary-700 shadow-lg">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+          Cargando capas...
+        </div>
+      )}
+
+      {/* Leyenda opcional */}
+      {mostrarLeyenda && (
+        <div className="pointer-events-none absolute bottom-24 right-4 z-[500] max-w-xs">
+          <LeyendaMapa activas={activas} data={data} personalizadas={capasPersonalizadas} />
+        </div>
+      )}
+
+      {/* Barra de herramientas flotante — abajo centro */}
+      <div className="absolute bottom-6 left-1/2 z-[700] flex -translate-x-1/2 items-center gap-2 rounded-full border border-secondary-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur">
+        <FAB
+          icon={<Search size={20} />}
+          label="Buscar"
+          activo={mostrarBuscador}
+          onClick={() => setMostrarBuscador(v => !v)}
+        />
+        <span className="h-6 w-px bg-secondary-200" />
+        <FAB
+          icon={<LayoutGrid size={20} />}
+          label="Resumen"
+          activo={mostrarResumen}
+          onClick={() => setMostrarResumen(v => !v)}
+        />
+        <span className="h-6 w-px bg-secondary-200" />
+        <FAB
+          icon={<Compass size={20} />}
+          label="Explorar"
+          activo={mostrarExplorador}
+          onClick={() => setMostrarExplorador(true)}
+        />
+        <span className="h-6 w-px bg-secondary-200" />
+        <FAB
+          icon={<Layers size={20} />}
+          label="Capas"
+          activo={mostrarPanelCapas}
+          onClick={() => setMostrarPanelCapas(v => !v)}
+        />
+        <span className="h-6 w-px bg-secondary-200" />
+        <FAB
+          icon={<Map size={20} />}
+          label="Leyenda"
+          activo={mostrarLeyenda}
+          onClick={() => setMostrarLeyenda(v => !v)}
+        />
+      </div>
+
+      {/* Panel de capas */}
+      <PanelFlotante
+        abierto={mostrarPanelCapas}
+        onCerrar={() => setMostrarPanelCapas(false)}
+        titulo="Capas del mapa"
+        icono="mapa"
+        ancho="lg"
+      >
+        {renderPanelCapas()}
+      </PanelFlotante>
+
+      {/* Explorador de elementos */}
+      <PanelFlotante
+        abierto={mostrarExplorador}
+        onCerrar={cerrarExplorador}
+        titulo="Explorar elementos"
+        icono="buscar"
+        ancho="md"
+        posicion="derecha"
+      >
+        <ExploradorCapa
+          capas={capasExplorador}
+          onSeleccionar={seleccionarElementoExplorador}
+          onCerrar={cerrarExplorador}
+        />
+      </PanelFlotante>
+
+      {/* Ficha de feature */}
+      <FichaFeature elemento={elementoFicha} onCerrar={() => setElementoFicha(null)} />
+
+      {/* Modales */}
       <SubirCapaModal
         abierto={!!capaSubir}
         onCerrar={() => setCapaSubir(null)}
@@ -1469,7 +1723,6 @@ export default function MapaTerritorial() {
               ids.forEach(id => { next[id] = true; });
               return next;
             });
-            // Mostrar el grupo de capas subidas para que el usuario vea las nuevas
             setGruposExpandidos(prev => ({ ...prev, subidas: true }));
           }
           cargarDatos();
@@ -1551,6 +1804,35 @@ export default function MapaTerritorial() {
         coordenadasIniciales={puntoInicial}
       />
     </div>
+  );
+}
+
+function FAB({
+  icon,
+  label,
+  activo,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  activo?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className={`group relative flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+        activo
+          ? 'bg-primary-600 text-white shadow-md'
+          : 'bg-white text-secondary-600 hover:bg-secondary-50 hover:text-primary-600'
+      }`}
+    >
+      {icon}
+      <span className="pointer-events-none absolute -top-9 left-1/2 z-[800] -translate-x-1/2 whitespace-nowrap rounded-md bg-secondary-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+        {label}
+      </span>
+    </button>
   );
 }
 

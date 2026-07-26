@@ -889,6 +889,33 @@ function CapaCasillas({ data, onEditar }: { data?: GeoJSONCollection; onEditar?:
         const electores = props.electores_esperados ? `${props.electores_esperados} electores` : '';
         const status = escaparHtml(props.status || 'sin_reportar');
         const id = props.id || '';
+        const historico = props.historico;
+        const historicoCount = props.historico_count || 0;
+
+        const labelsTipoEleccion: Record<string, string> = {
+          ayuntamiento: 'Ayuntamiento',
+          diputado_local: 'Diputado Local',
+          diputado_federal: 'Diputado Federal',
+          senador: 'Senador',
+          gobernador: 'Gobernador',
+          presidente_republica: 'Presidente',
+        };
+
+        const historicoHtml = historico
+          ? `
+            <div class="mt-2 rounded-md bg-amber-50 p-2 text-xs">
+              <p class="mb-1 flex items-center gap-1 font-semibold text-amber-800">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                Histórico ${historico.anio}
+              </p>
+              <p class="text-amber-900"><span class="font-medium">${labelsTipoEleccion[historico.tipo_eleccion] || historico.tipo_eleccion}:</span> Ganó <strong>${escaparHtml(historico.ganador)}</strong> con ${(historico.votos_ganador || 0).toLocaleString('es-MX')} votos</p>
+              ${historico.total_votos ? `<p class="text-amber-800/80 mt-0.5">Total casilla: ${(historico.total_votos || 0).toLocaleString('es-MX')} votos · Lista nominal: ${(historico.lista_nominal || 0).toLocaleString('es-MX')}</p>` : ''}
+              ${historicoCount > 1 ? `<p class="mt-1 text-[10px] text-amber-700">+${historicoCount - 1} elecciones más en ficha</p>` : ''}
+            </div>`
+          : historicoCount > 0
+          ? `<div class="mt-2 rounded-md bg-secondary-50 p-2 text-xs text-secondary-600">Hay ${historicoCount} resultados históricos en la ficha de esta casilla.</div>`
+          : '';
+
         const editarBtn = onEditar && id
           ? `<button
               id="casilla-edit-btn-${id}"
@@ -898,7 +925,7 @@ function CapaCasillas({ data, onEditar }: { data?: GeoJSONCollection; onEditar?:
             </button>`
           : '';
         l.bindPopup(`
-          <div class="min-w-[220px] font-sans">
+          <div class="min-w-[240px] max-w-[280px] font-sans">
             <p class="text-sm font-bold text-secondary-900">Casilla ${tipo}${numero ? ` ${numero}` : ''}</p>
             <p class="text-[10px] uppercase tracking-wide text-secondary-500 mb-2">Sección ${seccion} • ${status}</p>
             <div class="text-xs text-secondary-700 space-y-1">
@@ -907,6 +934,7 @@ function CapaCasillas({ data, onEditar }: { data?: GeoJSONCollection; onEditar?:
               ${referencia ? `<p><span class="font-semibold">Ref:</span> ${referencia}</p>` : ''}
               ${electores ? `<p><span class="font-semibold">${electores}</span></p>` : ''}
             </div>
+            ${historicoHtml}
             ${editarBtn}
           </div>
         `);

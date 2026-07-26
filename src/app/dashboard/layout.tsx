@@ -164,7 +164,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <main className="pt-16">
         {pathname === '/dashboard/mapa' ? (
-          <div className="h-[calc(100vh-4rem)] overflow-hidden">{children}</div>
+          <div className="fixed inset-x-0 top-16 h-[calc(100vh-4rem)] overflow-hidden">{children}</div>
         ) : (
           <div className="p-4 md:p-6">{children}</div>
         )}

@@ -6,6 +6,7 @@ import { SECCIONES, permisosPorRol, Seccion } from '@/lib/permisos';
 import {
   Squares2X2Icon,
   UsersIcon,
+  UserGroupIcon,
   ChatBubbleLeftRightIcon,
   CalendarDaysIcon,
   ClipboardDocumentListIcon,
@@ -73,6 +74,7 @@ const ICONO_POR_SECCION: Record<string, React.ComponentType<{ className?: string
   // Módulos avanzados (comparten iconos de operación)
   boletines: DocumentTextIcon,
   llamadas: ChatBubbleLeftRightIcon,
+  opositores: UserGroupIcon,
 };
 
 export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loading }: UsuarioFormProps) {

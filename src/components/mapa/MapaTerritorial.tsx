@@ -538,7 +538,6 @@ export default function MapaTerritorial() {
     zonaFiltro,
     conSinCoordenadas,
     topN,
-    data,
     mapBounds,
   ]);
 

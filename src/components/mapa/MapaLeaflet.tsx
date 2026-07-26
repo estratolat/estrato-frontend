@@ -534,103 +534,139 @@ function CapaEventos({ data }: { data: any }) {
   return null;
 }
 
+function colorPorScore(score = 0) {
+  return score >= 80 ? '#16A34A' : score >= 50 ? '#F59E0B' : '#EF4444';
+}
+
+function popupLider(l: Lider): string {
+  const nombre = escaparHtml(l.votante?.nombre || 'Líder');
+  const seccion = l.votante?.seccion_electoral || 'Sin sección';
+  const colonia = l.votante?.colonia || 'Sin colonia';
+  const score = l.score ?? 0;
+  const alcance = l.alcance_estimado ?? 0;
+  const esPadre = !l.lider_padre_id;
+  return `
+    <div class="min-w-[200px] font-sans">
+      <p class="text-sm font-bold text-secondary-900">${nombre}</p>
+      <p class="text-[10px] uppercase tracking-wide text-secondary-500 mb-2">${esPadre ? 'Líder principal' : 'Estructura'} • Score ${score}</p>
+      <div class="space-y-1 text-xs text-secondary-700">
+        <div><span class="font-semibold">Sección:</span> ${seccion}</div>
+        <div><span class="font-semibold">Colonia:</span> ${colonia}</div>
+        <div><span class="font-semibold">Alcance estimado:</span> ${alcance}</div>
+      </div>
+    </div>
+  `;
+}
+
 function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
   const map = useMap();
-  const clusterRef = useRef<any>(null);
-  const layersRef = useRef<L.Layer[]>([]);
-
-  const crearIconoLider = useCallback((score: number, esPadre: boolean) => {
-    const color = score >= 80 ? '#16A34A' : score >= 50 ? '#F59E0B' : '#EF4444';
-    const size = esPadre ? 28 : 20;
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="8" r="5" />
-        <path d="M2 21v-2a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v2" />
-      </svg>
-    `;
-    return L.divIcon({
-      html: svg,
-      className: 'leader-marker',
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
-    });
-  }, []);
-
-  const popupLider = useCallback((l: Lider): string => {
-    const nombre = escaparHtml(l.votante?.nombre || 'Líder');
-    const seccion = l.votante?.seccion_electoral || 'Sin sección';
-    const colonia = l.votante?.colonia || 'Sin colonia';
-    const score = l.score ?? 0;
-    const alcance = l.alcance_estimado ?? 0;
-    const esPadre = !l.lider_padre_id;
-    return `
-      <div class="min-w-[200px] font-sans">
-        <p class="text-sm font-bold text-secondary-900">${nombre}</p>
-        <p class="text-[10px] uppercase tracking-wide text-secondary-500 mb-2">${esPadre ? 'Líder principal' : 'Estructura'} • Score ${score}</p>
-        <div class="space-y-1 text-xs text-secondary-700">
-          <div><span class="font-semibold">Sección:</span> ${seccion}</div>
-          <div><span class="font-semibold">Colonia:</span> ${colonia}</div>
-          <div><span class="font-semibold">Alcance estimado:</span> ${alcance}</div>
-        </div>
-      </div>
-    `;
-  }, []);
+  const layerRef = useRef<L.Layer | null>(null);
 
   useEffect(() => {
     // Limpiar capa anterior
-    if (clusterRef.current) {
-      clusterRef.current.removeFrom(map);
-      clusterRef.current = null;
+    if (layerRef.current) {
+      try { layerRef.current.removeFrom(map); } catch {}
+      layerRef.current = null;
     }
-    layersRef.current.forEach((layer) => layer.removeFrom(map));
-    layersRef.current = [];
 
     const conCoords = lideres.filter(
       (l) =>
         l.votante?.coordenadas &&
         typeof l.votante.coordenadas.lat === 'number' &&
-        typeof l.votante.coordenadas.lng === 'number'
+        typeof l.votante.coordenadas.lng === 'number' &&
+        !isNaN(l.votante.coordenadas.lat) &&
+        !isNaN(l.votante.coordenadas.lng)
     );
-    if (conCoords.length === 0) return;
 
-    if (modo === 'solo_puntos' || modo === 'pines') {
+    if (conCoords.length === 0) {
+      console.log('[CapaLideres] Sin líderes con coordenadas válidas');
+      return;
+    }
+
+    console.log('[CapaLideres] Renderizando', conCoords.length, 'líderes modo', modo);
+
+    let layer: L.Layer | null = null;
+
+    if (modo === 'heatmap') {
+      const points = conCoords.map((l) => [
+        l.votante!.coordenadas!.lat,
+        l.votante!.coordenadas!.lng,
+        Math.max(0.3, Math.min(1, (l.alcance_estimado || 50) / 100)),
+      ]);
+      try {
+        layer = (L as any).heatLayer(points, {
+          radius: 25,
+          blur: 15,
+          maxZoom: 17,
+          minOpacity: 0.35,
+          gradient: { 0.3: '#22C55E', 0.6: '#F59E0B', 0.9: '#EF4444' },
+        });
+      } catch (e) {
+        console.warn('[CapaLideres] heatLayer no disponible, fallback a círculos', e);
+        modo = 'circulos';
+      }
+    }
+
+    if (modo === 'circulos') {
+      const featureGroup = L.featureGroup();
       conCoords.forEach((l) => {
-        const marker = L.marker(
-          [l.votante!.coordenadas!.lat, l.votante!.coordenadas!.lng],
-          { icon: crearIconoLider(l.score ?? 0, !l.lider_padre_id) }
-        );
-        marker.bindPopup(popupLider(l));
-        marker.addTo(map);
-        layersRef.current.push(marker);
+        const radio = Math.max(40, Math.min(250, (l.alcance_estimado || 50) * 2.5));
+        const color = colorPorScore(l.score ?? 0);
+        const circle = L.circle([l.votante!.coordenadas!.lat, l.votante!.coordenadas!.lng], {
+          radius: radio,
+          color,
+          fillColor: color,
+          fillOpacity: 0.3,
+          weight: 2,
+        });
+        circle.bindPopup(popupLider(l));
+        featureGroup.addLayer(circle);
       });
-    } else if (modo === 'circulos' || modo === 'heatmap') {
+      layer = featureGroup;
+    }
+
+    if (modo === 'pines' || modo === 'solo_puntos' || !layer) {
+      const featureGroup = L.featureGroup();
       conCoords.forEach((l) => {
-        const radio = Math.max(30, Math.min(200, (l.alcance_estimado || 50) * 2));
-        const circle = L.circle(
+        const color = colorPorScore(l.score ?? 0);
+        const esPadre = !l.lider_padre_id;
+        const radio = modo === 'solo_puntos' ? 5 : esPadre ? 10 : 7;
+        const marker = L.circleMarker(
           [l.votante!.coordenadas!.lat, l.votante!.coordenadas!.lng],
           {
             radius: radio,
-            color: l.score >= 80 ? '#16A34A' : l.score >= 50 ? '#F59E0B' : '#EF4444',
-            fillColor: l.score >= 80 ? '#16A34A' : l.score >= 50 ? '#F59E0B' : '#EF4444',
-            fillOpacity: modo === 'heatmap' ? 0.25 : 0.35,
-            weight: modo === 'heatmap' ? 0 : 2,
+            fillColor: color,
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9,
           }
         );
-        circle.bindPopup(popupLider(l));
-        circle.addTo(map);
-        layersRef.current.push(circle);
+        marker.bindPopup(popupLider(l));
+        featureGroup.addLayer(marker);
       });
+      layer = featureGroup;
+    }
+
+    if (layer) {
+      layer.addTo(map);
+      layerRef.current = layer;
+
+      // Ajustar vista solo la primera vez que aparecen líderes, sin forzar constantemente
+      const bounds = (layer as any).getBounds?.();
+      if (bounds?.isValid?.()) {
+        registerProgrammaticMove(800);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
+      }
     }
 
     return () => {
-      if (clusterRef.current) {
-        clusterRef.current.removeFrom(map);
-        clusterRef.current = null;
+      if (layerRef.current) {
+        try { layerRef.current.removeFrom(map); } catch {}
+        layerRef.current = null;
       }
-      layersRef.current.forEach((layer) => layer.removeFrom(map));
-      layersRef.current = [];
     };
-  }, [lideres, modo, map, crearIconoLider, popupLider]);
+  }, [lideres, modo, map]);
 
   return null;
 }

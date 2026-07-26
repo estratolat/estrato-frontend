@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Search, X, MapPin, ChevronRight } from 'lucide-react';
 import { mapaApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
 import type { ResultadoGlobal, TipoResultadoGlobal } from '@/types/mapa';
 
+export interface BuscadorGlobalRef {
+  enfocarCasillas: () => void;
+}
+
 interface Props {
   onSeleccionar: (resultado: ResultadoGlobal) => void;
+  filtroInicial?: string;
 }
 
 const ETIQUETAS_TIPO: Record<TipoResultadoGlobal | string, { label: string; color: string }> = {
   capa: { label: 'Capa', color: '#D73216' },
   capa_feature: { label: 'Polígono', color: '#3B82F6' },
+  casilla: { label: 'Casilla', color: '#DB2777' },
 };
 
 function etiquetaTipo(tipo: string) {
@@ -23,17 +29,31 @@ const FILTROS: { key: string; label: string }[] = [
   { key: 'todos', label: 'Todas' },
   { key: 'capa', label: 'Capas' },
   { key: 'capa_feature', label: 'Polígonos' },
+  { key: 'casilla', label: 'Casillas' },
 ];
 
-export default function BuscadorGlobal({ onSeleccionar }: Props) {
+export default forwardRef<BuscadorGlobalRef, Props>(function BuscadorGlobal({ onSeleccionar, filtroInicial }, ref) {
   const [q, setQ] = useState('');
-  const [tipoFiltro, setTipoFiltro] = useState('todos');
+  const [tipoFiltro, setTipoFiltro] = useState(filtroInicial || 'todos');
   const [resultados, setResultados] = useState<ResultadoGlobal[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refInput = useRef<HTMLInputElement>(null);
   const refWrapper = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    enfocarCasillas: () => {
+      setQ('');
+      setTipoFiltro('casilla');
+      setResultados([]);
+      setAbierto(false);
+      setError(null);
+      setTimeout(() => {
+        refInput.current?.focus();
+      }, 50);
+    },
+  }));
 
   useEffect(() => {
     function onClickFuera(e: MouseEvent) {
@@ -87,7 +107,7 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
   };
 
   return (
-    <div ref={refWrapper} className="relative w-full">
+    <div ref={refWrapper} className="relative w-full" data-filtro={tipoFiltro}>
       <div className="relative flex items-center">
         <span className="pointer-events-none absolute left-3 flex items-center text-secondary-400">
           <Search size={18} />
@@ -187,6 +207,7 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
                         {r.seccion ? ` • Sección ${r.seccion}` : ''}
                         {r.clave ? ` • Clave ${r.clave}` : ''}
                         {r.capaNombre ? ` • ${r.capaNombre}` : ''}
+                        {r.descripcion ? ` • ${r.descripcion}` : ''}
                       </p>
                     </div>
                     <ChevronRight size={16} className="shrink-0 text-secondary-300" />
@@ -202,4 +223,4 @@ export default function BuscadorGlobal({ onSeleccionar }: Props) {
       )}
     </div>
   );
-}
+});

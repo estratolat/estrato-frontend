@@ -84,10 +84,12 @@ interface Props {
   modoLideres?: 'pines' | 'circulos' | 'heatmap' | 'solo_puntos';
   puntoSeleccionado?: { lat: number; lng: number } | null;
   onSeleccionarCoordenada?: (lat: number, lng: number) => void;
-  onAccionPunto?: (tipo: 'apoyo' | 'evento' | 'lider', lat: number, lng: number) => void;
+  onAccionPunto?: (tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante', lat: number, lng: number) => void;
   onCerrarPunto?: () => void;
+  casillaUbicando?: { id: string; seccion: string; numero?: string; nombre: string } | null;
   onEditarLider?: (lider: Lider) => void;
   onEditarEvento?: (props: Record<string, any>) => void;
+  onDibujoListo?: (geojson: GeoJSONCollection) => void;
   filtrosApoyos?: Record<string, boolean>;
   seleccion?: { geometry: any; properties?: any; tipo?: string; nombre?: string } | null;
   onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
@@ -100,7 +102,7 @@ const highlightRef: { layer: L.GeoJSON | null; timer: any } = { layer: null, tim
 let pendingHighlight: { capaId: string; featureId: string; intentos: number } | null = null;
 
 export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
-  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange },
+  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, onDibujoListo, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange, casillaUbicando },
   ref
 ) {
   const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
@@ -130,7 +132,8 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
       <ControlRecargar onRecargar={onRecargar} />
       <GuardarCentro />
       {onBoundsChange && <ManejadorBounds onBoundsChange={onBoundsChange} />}
-      {onSeleccionarCoordenada && <DetectorClicMapa onSeleccionar={onSeleccionarCoordenada} />}
+      {onSeleccionarCoordenada && !casillaUbicando && <DetectorClicMapa onSeleccionar={onSeleccionarCoordenada} />}
+      {casillaUbicando && <UbicarCasillaEnMapa casilla={casillaUbicando} onConfirmar={onSeleccionarCoordenada} onCancelar={onCerrarPunto} />}
 
       <ManejadorResultadoDestacado resultado={resultadoDestacado} capasGeoJSONRef={capasGeoJSONRef} />
 
@@ -154,9 +157,13 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
         <CapaEventos data={data.eventos} onEditar={onEditarEvento} />
       )}
 
+      {activas.casillas && data.casillas && (
+        <CapaCasillas data={data.casillas} onEditar={(props) => window.open(`/dashboard/casillas/${props.id}`, '_blank')} />
+      )}
+
       {activas.lideres && <CapaLideres lideres={lideres} modo={modoLideres} onEditar={onEditarLider} />}
 
-      {activas.custom && <CapaDibujo />}
+      {activas.custom && onDibujoListo && <CapaDibujo onDibujoListo={onDibujoListo} />}
 
       {personalizadas.map(capa => (
         activas[capa.id] && data[capa.id] && (
@@ -370,7 +377,7 @@ function ManejadorResultadoDestacado({
     }
 
     // Intentar resaltar feature dentro de la capa padre
-    if (resultado.tipo === 'capa_feature' && resultado.capaId && resultado.featureId) {
+    if ((resultado.tipo === 'capa_feature' && resultado.capaId && resultado.featureId) || resultado.tipo === 'casilla') {
       const intentarResaltar = () => {
         try {
           const geoLayer = capasGeoJSONRef.current?.get(resultado.capaId!);
@@ -381,6 +388,9 @@ function ManejadorResultadoDestacado({
           const layers = geoLayer.getLayers() as L.Layer[];
           const target = layers.find((l: any) => {
             const p = l.feature?.properties || {};
+            if (resultado.tipo === 'casilla') {
+              return String(p.id) === String(resultado.id).replace('casilla-', '');
+            }
             return String(p._feature_id) === String(resultado.featureId);
           }) as L.Layer | undefined;
 
@@ -473,6 +483,85 @@ function DetectorClicMapa({ onSeleccionar }: { onSeleccionar: (lat: number, lng:
     },
   });
   return null;
+}
+
+function UbicarCasillaEnMapa({
+  casilla,
+  onConfirmar,
+  onCancelar,
+}: {
+  casilla: { id: string; seccion: string; numero?: string; nombre: string };
+  onConfirmar?: (lat: number, lng: number) => void;
+  onCancelar?: () => void;
+}) {
+  const map = useMap();
+  const markerRef = useRef<L.Marker | null>(null);
+  const [latLng, setLatLng] = useState<L.LatLng | null>(null);
+
+  useEffect(() => {
+    const center = map.getCenter();
+    const marker = L.marker(center, {
+      draggable: true,
+      icon: L.divIcon({
+        className: 'custom-pin-ubicar',
+        html: `<div style="width:28px;height:28px;border-radius:50%;background:#F59E0B;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;">??</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      }),
+    }).addTo(map);
+    markerRef.current = marker;
+    setLatLng(center);
+
+    marker.on('dragend', () => {
+      setLatLng(marker.getLatLng());
+    });
+
+    const handleClick = (e: L.LeafletMouseEvent) => {
+      marker.setLatLng(e.latlng);
+      setLatLng(e.latlng);
+    };
+    map.on('click', handleClick);
+
+    return () => {
+      map.off('click', handleClick);
+      marker.remove();
+      markerRef.current = null;
+    };
+  }, [map]);
+
+  const confirmar = () => {
+    if (!latLng || !onConfirmar) return;
+    onConfirmar(latLng.lat, latLng.lng);
+  };
+
+  const cancelar = () => {
+    if (onCancelar) onCancelar();
+  };
+
+  return (
+    <div className="absolute bottom-6 left-1/2 z-[750] flex -translate-x-1/2 flex-col items-center gap-2 rounded-xl border border-amber-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur">
+      <p className="text-center text-sm font-semibold text-secondary-900">
+        Ubicando: <span className="text-amber-700">{casilla.nombre}</span>
+      </p>
+      <p className="max-w-xs text-center text-xs text-secondary-500">
+        Arrastra el pin naranja o toca en el mapa. Luego confirma para guardar la coordenada.
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={confirmar}
+          className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700"
+        >
+          Guardar ubicación
+        </button>
+        <button
+          onClick={cancelar}
+          className="rounded-lg bg-secondary-100 px-3 py-1.5 text-xs font-semibold text-secondary-700 hover:bg-secondary-200"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function ManejadorBounds({
@@ -765,8 +854,280 @@ function CapaEventos({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: 
   return null;
 }
 
-function CapaDibujo() {
+function CapaCasillas({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: (props: Record<string, any>) => void }) {
+  const map = useMap();
+  const layerRef = useRef<L.GeoJSON | null>(null);
+
+  useEffect(() => {
+    if (layerRef.current) {
+      try { layerRef.current.removeFrom(map); } catch {}
+      layerRef.current = null;
+    }
+    if (!data?.features?.length) return;
+
+    const colorCapa = COLORES_CAPA.casillas;
+
+    const layer = L.geoJSON(data, {
+      pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 7,
+          fillColor: colorCapa,
+          color: '#ffffff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.9,
+        });
+      },
+      onEachFeature: (feature, l) => {
+        const props = feature?.properties || {};
+        const seccion = escaparHtml(props.seccion || '');
+        const tipo = escaparHtml(props.tipo || '');
+        const numero = escaparHtml(props.numero || '');
+        const ubicacion = escaparHtml(props.ubicacion || 'Sin ubicación');
+        const direccion = escaparHtml(props.direccion || 'Sin dirección');
+        const referencia = escaparHtml(props.referencia || '');
+        const electores = props.electores_esperados ? `${props.electores_esperados} electores` : '';
+        const status = escaparHtml(props.status || 'sin_reportar');
+        const id = props.id || '';
+        const editarBtn = onEditar && id
+          ? `<button
+              id="casilla-edit-btn-${id}"
+              class="mt-2 w-full rounded-md bg-primary-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-primary-700"
+            >
+              Editar casilla
+            </button>`
+          : '';
+        l.bindPopup(`
+          <div class="min-w-[220px] font-sans">
+            <p class="text-sm font-bold text-secondary-900">Casilla ${tipo}${numero ? ` ${numero}` : ''}</p>
+            <p class="text-[10px] uppercase tracking-wide text-secondary-500 mb-2">Sección ${seccion} • ${status}</p>
+            <div class="text-xs text-secondary-700 space-y-1">
+              <p><span class="font-semibold">Lugar:</span> ${ubicacion}</p>
+              <p><span class="font-semibold">Dirección:</span> ${direccion}</p>
+              ${referencia ? `<p><span class="font-semibold">Ref:</span> ${referencia}</p>` : ''}
+              ${electores ? `<p><span class="font-semibold">${electores}</span></p>` : ''}
+            </div>
+            ${editarBtn}
+          </div>
+        `);
+      },
+    });
+
+    layer.addTo(map);
+    layerRef.current = layer;
+
+    if (onEditar) {
+      const attach = () => {
+        data.features.forEach((f: any) => {
+          const props = f.properties || {};
+          const id = props.id || '';
+          const btn = document.getElementById(`casilla-edit-btn-${id}`);
+          if (btn) {
+            btn.onclick = () => onEditar(props);
+          }
+        });
+      };
+      layer.on('popupopen', attach);
+    }
+
+    return () => {
+      if (layerRef.current) {
+        try { layerRef.current.removeFrom(map); } catch {}
+        layerRef.current = null;
+      }
+    };
+  }, [data, map, onEditar]);
+
   return null;
+}
+
+function CapaDibujo({ onDibujoListo }: { onDibujoListo: (geojson: GeoJSONCollection) => void }) {
+  const map = useMap();
+  const drawnItemsRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
+  const controlRef = useRef<L.Control.Draw | null>(null);
+  const [count, setCount] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const drawnItems = drawnItemsRef.current;
+    drawnItems.addTo(map);
+
+    const drawControl = new L.Control.Draw({
+      position: 'topright',
+      draw: {
+        polyline: {
+          shapeOptions: { color: COLORES_CAPA.custom, weight: 4 },
+        },
+        polygon: {
+          allowIntersection: false,
+          showArea: true,
+          shapeOptions: { color: COLORES_CAPA.custom, weight: 2 },
+        },
+        rectangle: {
+          shapeOptions: { color: COLORES_CAPA.custom, weight: 2 },
+        },
+        circle: false,
+        circlemarker: false,
+        marker: {
+          icon: new L.Icon.Default(),
+        },
+      },
+      edit: {
+        featureGroup: drawnItems,
+      },
+    });
+    map.addControl(drawControl);
+    controlRef.current = drawControl;
+
+    const handleCreated = (e: any) => {
+      const layer = e.layer;
+      layer.feature = {
+        type: 'Feature',
+        geometry: (layer as any).toGeoJSON?.()?.geometry || null,
+        properties: {},
+      };
+      drawnItems.addLayer(layer);
+      setCount(drawnItems.getLayers().length);
+
+      // Popup editable para asignar nombre y descripción a la forma
+      const popupContent = document.createElement('div');
+      popupContent.className = 'w-56 p-1';
+      popupContent.innerHTML = `
+        <div class="mb-2 flex items-center gap-2">
+          <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary-50 text-primary-600">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-secondary-900">Etiquetar forma</p>
+            <p class="text-[10px] text-secondary-500">Nombre y descripción</p>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <input type="text" id="nombre-dibujo" placeholder="Ej. Colonia Centro" class="input w-full text-xs py-1.5" />
+          <textarea id="desc-dibujo" placeholder="Descripción opcional" class="input w-full min-h-[60px] text-xs py-1.5"></textarea>
+          <button id="btn-guardar-dibujo" class="w-full rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700">
+            Guardar
+          </button>
+        </div>
+      `;
+
+      const inputNombre = popupContent.querySelector('#nombre-dibujo') as HTMLInputElement;
+      const inputDesc = popupContent.querySelector('#desc-dibujo') as HTMLTextAreaElement;
+      const btnGuardar = popupContent.querySelector('#btn-guardar-dibujo') as HTMLButtonElement;
+
+      btnGuardar.addEventListener('click', () => {
+        const nombre = inputNombre.value.trim();
+        const descripcion = inputDesc.value.trim();
+        if (layer.feature) {
+          layer.feature.properties = {
+            ...(layer.feature.properties || {}),
+            _feature_nombre: nombre || 'Sin nombre',
+            _feature_descripcion: descripcion,
+            nombre: nombre || 'Sin nombre',
+            descripcion,
+          };
+        }
+        layer.closePopup();
+      });
+
+      layer.bindPopup(popupContent, { closeButton: false, className: 'rounded-2xl' });
+      layer.openPopup();
+    };
+
+    const handleEdited = () => setCount(drawnItems.getLayers().length);
+    const handleDeleted = () => setCount(drawnItems.getLayers().length);
+
+    map.on(L.Draw.Event.CREATED, handleCreated);
+    map.on(L.Draw.Event.EDITED, handleEdited);
+    map.on(L.Draw.Event.DELETED, handleDeleted);
+
+    return () => {
+      map.off(L.Draw.Event.CREATED, handleCreated);
+      map.off(L.Draw.Event.EDITED, handleEdited);
+      map.off(L.Draw.Event.DELETED, handleDeleted);
+      map.removeControl(drawControl);
+      drawnItems.removeFrom(map);
+      drawnItems.clearLayers();
+    };
+  }, [map]);
+
+  const handleGuardar = useCallback(() => {
+    const features: any[] = [];
+    drawnItemsRef.current.eachLayer((layer: any) => {
+      let geojson: any;
+      if (typeof layer.toGeoJSON === 'function') {
+        geojson = layer.toGeoJSON();
+      } else if (typeof layer.getLatLng === 'function') {
+        const ll = layer.getLatLng();
+        geojson = {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [ll.lng, ll.lat] },
+          properties: {},
+        };
+      }
+      if (geojson) {
+        const props = layer.feature?.properties || {};
+        geojson.properties = {
+          ...geojson.properties,
+          ...props,
+        };
+        features.push(geojson);
+      }
+    });
+    if (features.length === 0) return;
+    onDibujoListo({ type: 'FeatureCollection', features });
+    drawnItemsRef.current.clearLayers();
+    setCount(0);
+  }, [onDibujoListo]);
+
+  const handleCancelar = useCallback(() => {
+    drawnItemsRef.current.clearLayers();
+    setCount(0);
+  }, []);
+
+  const toggleToolbar = useCallback(() => {
+    setVisible((v) => !v);
+    const container = controlRef.current?.getContainer();
+    if (container) {
+      container.style.display = visible ? 'none' : 'block';
+    }
+  }, [visible]);
+
+  return (
+    <div className="absolute bottom-6 left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-2 rounded-xl border border-secondary-200 bg-white p-2 shadow-lg">
+      <button
+        type="button"
+        onClick={toggleToolbar}
+        className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-secondary-700 transition hover:bg-secondary-100"
+        title={visible ? 'Ocultar herramientas de dibujo' : 'Mostrar herramientas de dibujo'}
+      >
+        <Icon name={visible ? 'ocultar' : 'ver'} size={14} />
+        {visible ? 'Ocultar' : 'Dibujar'}
+      </button>
+      <div className="h-5 w-px bg-secondary-200" />
+      <span className="text-xs text-secondary-500">
+        {count === 0 ? 'Dibuja en el mapa' : `${count} forma${count === 1 ? '' : 's'}`}
+      </span>
+      <button
+        type="button"
+        onClick={handleGuardar}
+        disabled={count === 0}
+        className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Guardar
+      </button>
+      <button
+        type="button"
+        onClick={handleCancelar}
+        disabled={count === 0}
+        className="rounded-lg px-2 py-1.5 text-xs font-semibold text-secondary-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Limpiar
+      </button>
+    </div>
+  );
 }
 
 interface CapaPersonalizadaProps {
@@ -972,7 +1333,7 @@ function MarcadorPuntoSeleccionado({
 }: {
   lat: number;
   lng: number;
-  onAccion: (tipo: 'apoyo' | 'evento' | 'lider', lat: number, lng: number) => void;
+  onAccion: (tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante', lat: number, lng: number) => void;
   onCerrar: () => void;
 }) {
   const opciones = [
@@ -985,10 +1346,24 @@ function MarcadorPuntoSeleccionado({
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
         </svg>
       ),
-      color: '#F59E0B',
+      color: COLORES_CAPA.apoyos,
       bg: 'bg-amber-50',
       hover: 'hover:bg-amber-100',
       text: 'text-amber-700',
+    },
+    {
+      id: 'peticion',
+      label: 'Petición',
+      sub: 'Solicitud ciudadana',
+      icono: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+        </svg>
+      ),
+      color: COLORES_CAPA.peticiones,
+      bg: 'bg-sky-50',
+      hover: 'hover:bg-sky-100',
+      text: 'text-sky-700',
     },
     {
       id: 'evento',
@@ -999,7 +1374,7 @@ function MarcadorPuntoSeleccionado({
           <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" />
         </svg>
       ),
-      color: '#D73216',
+      color: COLORES_CAPA.eventos,
       bg: 'bg-red-50',
       hover: 'hover:bg-red-100',
       text: 'text-red-700',
@@ -1013,10 +1388,24 @@ function MarcadorPuntoSeleccionado({
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
         </svg>
       ),
-      color: '#16A34A',
+      color: COLORES_CAPA.lideres,
       bg: 'bg-green-50',
       hover: 'hover:bg-green-100',
       text: 'text-green-700',
+    },
+    {
+      id: 'votante',
+      label: 'Votante',
+      sub: 'Simpatizante',
+      icono: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+        </svg>
+      ),
+      color: COLORES_CAPA.votantes,
+      bg: 'bg-red-50',
+      hover: 'hover:bg-red-100',
+      text: 'text-red-700',
     },
   ] as const;
 
@@ -1036,17 +1425,31 @@ function MarcadorPuntoSeleccionado({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            {opciones.map((op) => (
-              <button
-                key={op.id}
-                onClick={() => onAccion(op.id as any, lat, lng)}
-                className={`flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition`}
-              >
-                <span style={{ color: op.color }}>{op.icono}</span>
-                <span className={`text-[11px] font-semibold ${op.text}`}>{op.label}</span>
-              </button>
-            ))}
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              {opciones.slice(0, 3).map((op) => (
+                <button
+                  key={op.id}
+                  onClick={() => onAccion(op.id as any, lat, lng)}
+                  className={`flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition`}
+                >
+                  <span style={{ color: op.color }}>{op.icono}</span>
+                  <span className={`text-[11px] font-semibold ${op.text}`}>{op.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2 px-4">
+              {opciones.slice(3).map((op) => (
+                <button
+                  key={op.id}
+                  onClick={() => onAccion(op.id as any, lat, lng)}
+                  className={`flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition`}
+                >
+                  <span style={{ color: op.color }}>{op.icono}</span>
+                  <span className={`text-[11px] font-semibold ${op.text}`}>{op.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <button

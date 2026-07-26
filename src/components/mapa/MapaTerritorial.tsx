@@ -6,7 +6,7 @@ import { Search, LayoutGrid, Compass, Layers, Map, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { MapaData, CapaMapa, MapaPrefs, ResultadoGlobal, DetalleTerritorial, GeoJSONCollection } from '@/types/mapa';
 import { Lider, Zona } from '@/types';
-import { mapaApi, lideresApi, zonasApi } from '@/lib/api';
+import { mapaApi, lideresApi, zonasApi, casillasApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
 import { Icon } from '@/components/ui/Icon';
 import { useMapaPrefs } from '@/hooks/useMapaPrefs';
@@ -20,6 +20,9 @@ import EditarEstilosCapaModal from './EditarEstilosCapaModal';
 import NuevoLiderModal from './NuevoLiderModal';
 import NuevoEventoModal from './NuevoEventoModal';
 import NuevoApoyoModal from './NuevoApoyoModal';
+import NuevaPeticionModal from './NuevaPeticionModal';
+import NuevoVotanteModal from './NuevoVotanteModal';
+import GuardarDibujoModal from './GuardarDibujoModal';
 import BuscadorGlobal from './BuscadorGlobal';
 import FichaTerritorial from './FichaTerritorial';
 import FichaFeature from './FichaFeature';
@@ -27,6 +30,8 @@ import ExploradorCapa, { ElementoCapa } from './ExploradorCapa';
 import PanelFlotante from './PanelFlotante';
 import LeyendaMapa from './LeyendaMapa';
 import type { MapaLeafletRef } from './MapaLeaflet';
+import type { BuscadorGlobalRef } from './BuscadorGlobal';
+import BuscadorCasillasInline from './BuscadorCasillasInline';
 
 const MapaLeaflet = dynamic(() => import('./MapaLeaflet').then(m => m.default), {
   ssr: false,
@@ -89,6 +94,14 @@ const CAPAS_CONFIG: {
     funcional: true,
   },
   {
+    id: 'casillas',
+    nombre: 'Casillas',
+    icono: 'mapa',
+    descripcion: 'Puestos de votación geocodificados',
+    color: COLORES_CAPA.casillas,
+    funcional: true,
+  },
+  {
     id: 'lideres',
     nombre: 'Líderes',
     icono: 'lideres',
@@ -143,8 +156,11 @@ export default function MapaTerritorial() {
   const [guardandoFeature, setGuardandoFeature] = useState(false);
   const [modalIneSecciones, setModalIneSecciones] = useState(false);
   const [modalExcel, setModalExcel] = useState(false);
-  const [modalActivo, setModalActivo] = useState<'lider' | 'evento' | 'apoyo' | null>(null);
+  const [modalActivo, setModalActivo] = useState<'lider' | 'evento' | 'apoyo' | 'peticion' | 'votante' | null>(null);
   const [puntoInicial, setPuntoInicial] = useState<{ lat: number; lng: number } | null>(null);
+  const [modoDibujo, setModoDibujo] = useState(false);
+  const [dibujoGeojson, setDibujoGeojson] = useState<GeoJSONCollection | null>(null);
+  const [modalGuardarDibujo, setModalGuardarDibujo] = useState(false);
   const [liderEditando, setLiderEditando] = useState<Lider | null>(null);
   const [eventoEditando, setEventoEditando] = useState<Record<string, any> | null>(null);
   const [capasExpandidas, setCapasExpandidas] = useState<Record<string, boolean>>(prefs.capasExpandidas);
@@ -177,11 +193,17 @@ export default function MapaTerritorial() {
   const [error, setError] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
   const mapRef = useRef<MapaLeafletRef | null>(null);
+  const buscadorRef = useRef<BuscadorGlobalRef | null>(null);
   const debounceBoundsRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
+  const [casillaUbicando, setCasillaUbicando] = useState<{ id: string; seccion: string; numero?: string; nombre: string } | null>(null);
+
+  // Visibilidad de herramientas flotantes
+
   // Visibilidad de herramientas flotantes
   const [mostrarBuscador, setMostrarBuscador] = useState(true);
+  const [filtroBuscador, setFiltroBuscador] = useState<string>('todos');
   const [mostrarResumen, setMostrarResumen] = useState(true);
   const [mostrarExplorador, setMostrarExplorador] = useState(false);
   const [mostrarPanelCapas, setMostrarPanelCapas] = useState(false);
@@ -267,7 +289,23 @@ export default function MapaTerritorial() {
     }, 400);
   }, []);
 
-  const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo', coords?: { lat: number; lng: number } | null, registro?: any) => {
+  const activarModoDibujo = useCallback(() => {
+    setModoDibujo(true);
+    setActivas(prev => ({ ...prev, custom: true }));
+  }, []);
+
+  const desactivarModoDibujo = useCallback(() => {
+    setModoDibujo(false);
+    setDibujoGeojson(null);
+    setModalGuardarDibujo(false);
+  }, []);
+
+  const handleDibujoListo = useCallback((geojson: GeoJSONCollection) => {
+    setDibujoGeojson(geojson);
+    setModalGuardarDibujo(true);
+  }, []);
+
+  const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo' | 'peticion' | 'votante', coords?: { lat: number; lng: number } | null, registro?: any) => {
     setPuntoInicial(coords || null);
     if (tipo === 'lider') setLiderEditando(registro || null);
     if (tipo === 'evento') setEventoEditando(registro || null);
@@ -378,6 +416,19 @@ export default function MapaTerritorial() {
     setDetalle(null);
     setSeleccion({ geometry: r.geometry, tipo: r.tipo, nombre: r.nombre });
 
+    // Casilla: navegar al formulario si no tiene geometría; si tiene, activar capa y resaltar
+    if (r.tipo === 'casilla') {
+      if (!r.geometry && r.url) {
+        window.open(r.url, '_blank');
+        return;
+      }
+      setActivas((prev) => ({ ...prev, casillas: true }));
+      await asegurarCapaCargada('casillas', r.id.replace('casilla-', ''), r.geometry);
+      setResultadoDestacado(r);
+      setCargandoDetalle(false);
+      return;
+    }
+
     // Activar la capa padre y asegurar que esté cargada
     const idCapa = r.tipo === 'capa_feature' ? r.capaId : r.tipo === 'capa' ? r.id : undefined;
     if (idCapa) {
@@ -416,6 +467,18 @@ export default function MapaTerritorial() {
   }, [asegurarCapaCargada]);
 
   const [loadingCapas, setLoadingCapas] = useState<Record<string, boolean>>({});
+
+  const guardarCoordenadaCasilla = useCallback(async (lat: number, lng: number) => {
+    if (!casillaUbicando) return;
+    try {
+      await casillasApi.update(casillaUbicando.id, { coordenadas: { lat, lng } });
+      alert(`Casilla ${casillaUbicando.nombre} ubicada en ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      setCasillaUbicando(null);
+      cargarDatos();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Error al guardar coordenadas');
+    }
+  }, [casillaUbicando]);
 
   const cargarDatos = useCallback(async (forzarDemo = false) => {
     setLoading(true);
@@ -601,18 +664,40 @@ export default function MapaTerritorial() {
     }
   }, [featureEditando, capasPersonalizadas]);
 
+  const handleExitoDibujo = useCallback((capaIds?: string[]) => {
+    setModalGuardarDibujo(false);
+    setDibujoGeojson(null);
+    setModoDibujo(false);
+    if (capaIds?.length) {
+      setActivas(prev => {
+        const next: Record<string, boolean> = { ...prev, custom: true };
+        capaIds.forEach(id => { next[id] = true; });
+        return next;
+      });
+    }
+    cargarDatos();
+  }, [cargarDatos]);
+
   useEffect(() => {
     // No cargar capas geográficas hasta tener bounds del mapa; evita traer TODO el país.
     if (!mapBounds) return;
     cargarDatos();
   }, [cargarDatos, mapBounds]);
 
-  const onExitoGuardado = useCallback((tipo?: 'lider' | 'evento' | 'apoyo', id?: string, lat?: number, lng?: number) => {
+  const onExitoGuardado = useCallback((tipo?: 'lider' | 'evento' | 'apoyo' | 'peticion' | 'votante', id?: string, lat?: number, lng?: number) => {
     cerrarModal();
     setPuntoInicial(null);
 
     if (tipo === 'apoyo' && !activas.apoyos) {
       setActivas(prev => ({ ...prev, apoyos: true }));
+    }
+
+    if (tipo === 'peticion' && !activas.peticiones) {
+      setActivas(prev => ({ ...prev, peticiones: true }));
+    }
+
+    if (tipo === 'votante' && !activas.votantes) {
+      setActivas(prev => ({ ...prev, votantes: true }));
     }
 
     // Recargar datos y asegurar que el tipo de apoyo recién creado esté visible
@@ -859,6 +944,10 @@ export default function MapaTerritorial() {
         { id: 'nuevo', label: 'Agregar líder', icono: 'lideres', accion: () => abrirModal('lider'), primario: true },
         { id: 'lista', label: 'Ver líderes', icono: 'seguridad', accion: () => router.push('/dashboard/lideres') },
       );
+    } else if (capa.id === 'casillas') {
+      herramientas.push(
+        { id: 'lista', label: 'Ver casillas', icono: 'seguridad', accion: () => router.push('/dashboard/casillas') },
+      );
     } else if (capa.id === 'custom') {
       herramientas.push(
         { id: 'subir', label: 'Subir capa', icono: 'apoyos', accion: () => setCapaSubir(capa.id), primario: true },
@@ -931,6 +1020,7 @@ export default function MapaTerritorial() {
 
             {capa.id === 'lideres' && renderPanelLideres()}
             {capa.id === 'apoyos' && renderFiltrosApoyos()}
+            {capa.id === 'casillas' && <BuscadorCasillasInline onSeleccionar={seleccionarResultado} onUbicar={(c) => setCasillaUbicando({ id: c.id, seccion: c.seccion, numero: c.numero || undefined, nombre: `Sección ${c.seccion} • ${c.tipo}${c.numero ? ` ${c.numero}` : ''}` })} />}
           </div>
         )}
       </div>
@@ -1339,9 +1429,9 @@ export default function MapaTerritorial() {
       { id: 'apoyos', label: 'Apoyos', icon: 'apoyos', color: COLORES_CAPA.apoyos, capaId: 'apoyos', count: data.apoyos?.features?.length ?? 0 },
       { id: 'peticiones', label: 'Peticiones', icon: 'crm', color: COLORES_CAPA.peticiones, capaId: 'peticiones', count: data.peticiones?.features?.length ?? 0 },
       { id: 'eventos', label: 'Eventos', icon: 'eventos', color: COLORES_CAPA.eventos, capaId: 'eventos', count: data.eventos?.features?.length ?? 0 },
+      { id: 'casillas', label: 'Casillas', icon: 'mapa', color: COLORES_CAPA.casillas, capaId: 'casillas', count: data.casillas?.features?.length ?? 0 },
       { id: 'lideres', label: 'Líderes', icon: 'lideres', color: COLORES_CAPA.lideres, capaId: 'lideres', count: lideresConUbicacion.length },
       { id: 'secciones', label: 'Secciones', icon: 'seguridad', color: COLORES_CAPA.secciones, capaId: 'custom', count: stats.length },
-      { id: 'casillas', label: 'Casillas', icon: 'mapa', color: COLORES_CAPA.casillas, capaId: 'custom', count: 0 },
       { id: 'riesgo', label: 'Territorio en riesgo', icon: 'ocultar', color: COLORES_CAPA.riesgo, capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id]).length },
       { id: 'propio', label: 'Territorio propio', icon: 'ver', color: COLORES_CAPA.propio, capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id] && data[c.id]?.features?.length).reduce((sum, c) => sum + (data[c.id]?.features?.length ?? 0), 0) },
     ];
@@ -1397,8 +1487,22 @@ export default function MapaTerritorial() {
           <Icon name="apoyos" size={16} />
           {capasPersonalizadas.length > 0 ? 'Subir más capas' : 'Subir mi primera capa'}
         </button>
+        <button
+          type="button"
+          onClick={modoDibujo ? desactivarModoDibujo : activarModoDibujo}
+          className={`mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold shadow-sm transition ${
+            modoDibujo
+              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+              : 'bg-white text-secondary-700 border border-secondary-300 hover:bg-secondary-50'
+          }`}
+        >
+          <Icon name={modoDibujo ? 'ocultar' : 'mapa'} size={16} />
+          {modoDibujo ? 'Salir del dibujo' : 'Dibujar a mano'}
+        </button>
         <p className="mt-2 text-center text-[10px] text-secondary-500">
-          Las capas nuevas se activan automáticamente en el mapa.
+          {modoDibujo
+            ? 'Usa las herramientas del mapa y guarda tu dibujo como capa.'
+            : 'Las capas nuevas se activan automáticamente en el mapa.'}
         </p>
       </div>
 
@@ -1484,14 +1588,26 @@ export default function MapaTerritorial() {
           modoLideres={modoLideres}
           filtrosApoyos={filtrosApoyos}
           puntoSeleccionado={puntoInicial}
-          onSeleccionarCoordenada={(lat, lng) => setPuntoInicial({ lat, lng })}
+          onSeleccionarCoordenada={(lat, lng) => {
+            if (casillaUbicando) {
+              guardarCoordenadaCasilla(lat, lng);
+              return;
+            }
+            setPuntoInicial({ lat, lng });
+          }}
           onAccionPunto={(tipo, lat, lng) => {
+            if (casillaUbicando) {
+              guardarCoordenadaCasilla(lat, lng);
+              return;
+            }
             setPuntoInicial({ lat, lng });
             abrirModal(tipo, { lat, lng });
           }}
           onCerrarPunto={() => setPuntoInicial(null)}
+          casillaUbicando={casillaUbicando}
           onEditarLider={(l) => abrirModal('lider', l.votante?.coordenadas || null, l)}
           onEditarEvento={(props) => abrirModal('evento', props.coordenadas || null, props)}
+          onDibujoListo={modoDibujo ? handleDibujoListo : undefined}
           seleccion={seleccion}
           onFeatureClick={handleFeatureClick}
           resultadoDestacado={resultadoDestacado}
@@ -1636,7 +1752,7 @@ export default function MapaTerritorial() {
               ✕
             </button>
           </div>
-          <BuscadorGlobal onSeleccionar={seleccionarResultado} />
+          <BuscadorGlobal ref={buscadorRef} onSeleccionar={seleccionarResultado} filtroInicial={filtroBuscador} />
         </div>
       )}
 
@@ -1815,6 +1931,31 @@ export default function MapaTerritorial() {
         onCerrar={cerrarModal}
         onExito={(id, lat, lng) => onExitoGuardado('apoyo', id, lat, lng)}
         coordenadasIniciales={puntoInicial}
+      />
+
+      <NuevaPeticionModal
+        abierto={modalActivo === 'peticion'}
+        onCerrar={cerrarModal}
+        onExito={(id, lat, lng) => onExitoGuardado('peticion', id, lat, lng)}
+        coordenadasIniciales={puntoInicial}
+      />
+
+      <NuevoVotanteModal
+        abierto={modalActivo === 'votante'}
+        onCerrar={cerrarModal}
+        onExito={(id, lat, lng) => onExitoGuardado('votante', id, lat, lng)}
+        coordenadasIniciales={puntoInicial}
+      />
+
+      <GuardarDibujoModal
+        abierto={modalGuardarDibujo}
+        onCerrar={() => {
+          setModalGuardarDibujo(false);
+          setDibujoGeojson(null);
+        }}
+        onExito={handleExitoDibujo}
+        geojson={dibujoGeojson}
+        secciones={secciones}
       />
     </div>
   );

@@ -204,8 +204,13 @@ export const uploadsApi = {
 // === API de Peticiones ===
 export const peticionesApi = {
   getAll: (filters?: any) => api.get('/peticiones', { params: filters }),
+  getOne: (id: string) => api.get(`/peticiones/${id}`),
   create: (data: any) => api.post('/peticiones', data),
-  updateEstatus: (id: string, estatus: string) => api.patch(`/peticiones/${id}/estatus`, { estatus }),
+  update: (id: string, data: any) => api.patch(`/peticiones/${id}`, data),
+  updateEstatus: (id: string, estatus: string, comentario?: string) =>
+    api.patch(`/peticiones/${id}/estatus`, { estatus, comentario }),
+  addEvidencia: (id: string, data: any) => api.post(`/peticiones/${id}/evidencias`, data),
+  delete: (id: string) => api.delete(`/peticiones/${id}`),
 };
 
 // === API de Candidato ===

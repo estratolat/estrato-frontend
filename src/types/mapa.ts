@@ -46,6 +46,7 @@ export interface MapaData {
   recorridos?: GeoJSONCollection;
   lideres?: GeoJSONCollection;
   zonas?: GeoJSONCollection;
+  casillas?: GeoJSONCollection;
   [key: string]: GeoJSONCollection | undefined;
 }
 
@@ -55,6 +56,7 @@ export type CapaActiva =
   | 'apoyos'
   | 'peticiones'
   | 'eventos'
+  | 'casillas'
   | 'lideres'
   | 'custom';
 
@@ -68,7 +70,7 @@ export interface SeccionStats {
   color?: string;
 }
 
-export type TipoResultadoGlobal = 'capa' | 'capa_feature';
+export type TipoResultadoGlobal = 'capa' | 'capa_feature' | 'casilla';
 
 export interface ResultadoGlobal {
   id: string;
@@ -87,6 +89,7 @@ export interface ResultadoGlobal {
   color?: string;
   bbox?: [number, number, number, number];
   geometry?: any;
+  url?: string;
 }
 
 export interface ItemTerritorial {

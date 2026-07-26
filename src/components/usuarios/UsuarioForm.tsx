@@ -2,8 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { usersApi } from '@/lib/api';
-import { SECCIONES, permisosPorRol, labelSeccion } from '@/lib/permisos';
-import { Icon } from '@/components/ui/Icon';
+import { SECCIONES, permisosPorRol, Seccion } from '@/lib/permisos';
+import {
+  Squares2X2Icon,
+  UsersIcon,
+  ChatBubbleLeftRightIcon,
+  CalendarDaysIcon,
+  ClipboardDocumentListIcon,
+  MapPinIcon,
+  EyeIcon,
+  MapIcon,
+  ChartBarSquareIcon,
+  SparklesIcon,
+  ArrowTrendingUpIcon,
+  DocumentTextIcon,
+  UserIcon,
+  KeyIcon,
+  ShieldCheckIcon,
+  DevicePhoneMobileIcon,
+  ClipboardDocumentCheckIcon,
+} from '@heroicons/react/24/solid';
 
 interface Zona {
   id: string;
@@ -11,7 +29,7 @@ interface Zona {
 }
 
 interface PermisosSchema {
-  secciones: { id: string; label: string; icon: string }[];
+  secciones: { id: string; label: string; icon: string; color?: string }[];
   roles: string[];
   defaults: Record<string, string[]>;
 }
@@ -31,6 +49,30 @@ const ROLES_LABELS: Record<string, string> = {
   coord_zona: 'Coordinador de Zona',
   brigadista: 'Brigadista',
   cm: 'Community Manager',
+  encargado_peticiones: 'Encargado de Peticiones',
+};
+
+const ICONO_POR_SECCION: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  dashboard: Squares2X2Icon,
+  votantes: UsersIcon,
+  crm: ChatBubbleLeftRightIcon,
+  peticiones: ClipboardDocumentCheckIcon,
+  eventos: CalendarDaysIcon,
+  encuestas: ClipboardDocumentListIcon,
+  casillas: MapPinIcon,
+  monitoreo: EyeIcon,
+  mapa: MapIcon,
+  historico_electoral: ChartBarSquareIcon,
+  inteligencia_electoral: SparklesIcon,
+  proyeccion: ArrowTrendingUpIcon,
+  ficha_seccional: DocumentTextIcon,
+  candidato: UserIcon,
+  usuarios: KeyIcon,
+  admin: ShieldCheckIcon,
+  app_brigada: DevicePhoneMobileIcon,
+  // Módulos avanzados (comparten iconos de operación)
+  boletines: DocumentTextIcon,
+  llamadas: ChatBubbleLeftRightIcon,
 };
 
 export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loading }: UsuarioFormProps) {
@@ -228,34 +270,60 @@ export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loadin
           >
             Restaurar defaults del rol
           </button>
-        </div>        <p className="mb-4 text-sm text-secondary-500">
+        </div>
+        <p className="mb-4 text-sm text-secondary-500">
           Activa las secciones del dashboard a las que este usuario podrá acceder. También afecta si puede entrar a la App de Brigada.
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(schema?.secciones || SECCIONES).map((seccion) => {
+          {(schema?.secciones || SECCIONES).map((seccion: Seccion) => {
             const active = form.permisos.includes(seccion.id);
+            const IconoSeccion = ICONO_POR_SECCION[seccion.id];
+            const color = seccion.color || SECCIONES.find((s) => s.id === seccion.id)?.color || '#64748B';
             return (
               <button
                 key={seccion.id}
                 type="button"
                 onClick={() => togglePermiso(seccion.id)}
-                className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${
+                className={`group relative flex items-center gap-3 rounded-xl border p-3 text-left transition ${
                   active
-                    ? 'border-primary-300 bg-primary-50 text-primary-800'
-                    : 'border-secondary-200 bg-white text-secondary-600 hover:bg-secondary-50'
+                    ? 'shadow-md'
+                    : 'border-secondary-200 bg-white text-secondary-500 hover:bg-secondary-50'
                 }`}
+                style={active ? { backgroundColor: `${color}10`, borderColor: `${color}40` } : undefined}
               >
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                    active ? 'bg-primary-100' : 'bg-secondary-100'
-                  }`}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition"
+                  style={{ backgroundColor: active ? `${color}20` : '#F1F5F9' }}
                 >
-                  <Icon name={seccion.icon as any} size={18} className={active ? 'text-primary-600' : 'text-secondary-500'} />
+                  {IconoSeccion ? (
+                    <IconoSeccion
+                      className="h-5 w-5 transition"
+                      style={{ color: active ? color : '#94A3B8' }}
+                    />
+                  ) : (
+                    <span className="text-secondary-500">•</span>
+                  )}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{seccion.label}</p>
-                  <p className="text-xs opacity-75">{active ? 'Permitido' : 'Bloqueado'}</p>
+                  <p className={`text-sm font-semibold ${active ? 'text-secondary-900' : 'text-secondary-600'}`}>
+                    {seccion.label}
+                  </p>
+                  <p className="text-xs" style={{ color: active ? color : '#94A3B8' }}>
+                    {active ? '✓ Permitido' : 'Bloqueado'}
+                  </p>
                 </div>
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
+                    active ? 'border-transparent text-white' : 'border-secondary-300 bg-white'
+                  }`}
+                  style={{ backgroundColor: active ? color : undefined }}
+                >
+                  {active && (
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </span>
               </button>
             );
           })}

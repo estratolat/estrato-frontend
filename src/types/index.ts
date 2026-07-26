@@ -12,7 +12,7 @@ export interface Tenant {
   created_at: string;
 }
 
-export type UserRole = 'owner' | 'candidato' | 'coord_general' | 'coord_zona' | 'brigadista' | 'cm';
+export type UserRole = 'owner' | 'candidato' | 'coord_general' | 'coord_zona' | 'brigadista' | 'cm' | 'encargado_peticiones';
 
 export interface User {
   id: string;

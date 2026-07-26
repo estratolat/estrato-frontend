@@ -15,6 +15,7 @@ const ROLES_LABELS: Record<string, string> = {
   coord_zona: 'Coord. Zona',
   brigadista: 'Brigadista',
   cm: 'CM',
+  encargado_peticiones: 'Encargado Peticiones',
 };
 
 const ROLES_COLORS: Record<string, string> = {
@@ -24,6 +25,7 @@ const ROLES_COLORS: Record<string, string> = {
   coord_zona: 'bg-cyan-100 text-cyan-700',
   brigadista: 'bg-orange-100 text-orange-700',
   cm: 'bg-pink-100 text-pink-700',
+  encargado_peticiones: 'bg-amber-100 text-amber-700',
 };
 
 export default function UsuariosPage() {

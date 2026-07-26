@@ -11,6 +11,7 @@ export type UserRole =
   | 'coord_zona'
   | 'brigadista'
   | 'cm'
+  | 'encargado_peticiones'
   | 'superadmin';
 
 export interface AuthUser {

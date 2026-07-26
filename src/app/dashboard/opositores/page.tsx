@@ -14,7 +14,17 @@ import {
   TrophyIcon,
   StarIcon,
 } from '@heroicons/react/24/solid';
-import { Facebook, Link as LinkIcon } from 'lucide-react';
+import {
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Globe,
+  Music2,
+  Link as LinkIcon,
+  PlusIcon as PlusIconLucide,
+  TrashIcon as TrashIconLucide,
+} from 'lucide-react';
 
 interface RedSocial {
   red: string;
@@ -40,6 +50,20 @@ const NIVELES: Record<number, { label: string; color: string; badge: string }> =
   2: { label: 'Segundo lugar', color: '#EA580C', badge: 'bg-orange-100 text-orange-700' },
   3: { label: 'Tercer lugar', color: '#D97706', badge: 'bg-amber-100 text-amber-700' },
 };
+
+const REDES_SOPORTADAS = [
+  { id: 'facebook', label: 'Facebook', icon: Facebook, color: '#1877F2' },
+  { id: 'instagram', label: 'Instagram', icon: Instagram, color: '#E4405F' },
+  { id: 'tiktok', label: 'TikTok', icon: Music2, color: '#000000' },
+  { id: 'x', label: 'X / Twitter', icon: Twitter, color: '#0F1419' },
+  { id: 'youtube', label: 'YouTube', icon: Youtube, color: '#FF0000' },
+  { id: 'web', label: 'Sitio web', icon: Globe, color: '#2563EB' },
+  { id: 'otro', label: 'Otro', icon: LinkIcon, color: '#64748B' },
+];
+
+function iconoRed(id: string) {
+  return REDES_SOPORTADAS.find((r) => r.id === id) || REDES_SOPORTADAS[REDES_SOPORTADAS.length - 1];
+}
 
 function escaparHtml(str: string) {
   return str
@@ -84,7 +108,7 @@ export default function OpositoresPage() {
     partido: '',
     foto_url: '',
     nivel_rivalidad: 1,
-    facebook_url: '',
+    redes_sociales: [] as RedSocial[],
     notas: '',
   });
 
@@ -117,7 +141,7 @@ export default function OpositoresPage() {
       partido: '',
       foto_url: '',
       nivel_rivalidad: 1,
-      facebook_url: '',
+      redes_sociales: [],
       notas: '',
     });
     setModalOpen(true);
@@ -125,13 +149,12 @@ export default function OpositoresPage() {
 
   const abrirEditar = (op: Opositor) => {
     setEditando(op);
-    const fb = op.redes_sociales?.find((r) => r.red === 'facebook')?.url || '';
     setForm({
       nombre: op.nombre,
       partido: op.partido || '',
       foto_url: op.foto_url || '',
       nivel_rivalidad: op.nivel_rivalidad,
-      facebook_url: fb,
+      redes_sociales: op.redes_sociales?.length ? [...op.redes_sociales] : [],
       notas: op.notas || '',
     });
     setModalOpen(true);
@@ -145,9 +168,9 @@ export default function OpositoresPage() {
         partido: form.partido.trim() || undefined,
         foto_url: form.foto_url.trim() || undefined,
         nivel_rivalidad: Number(form.nivel_rivalidad),
-        redes_sociales: form.facebook_url.trim()
-          ? [{ red: 'facebook', url: form.facebook_url.trim() }]
-          : [],
+        redes_sociales: form.redes_sociales
+          .map((r) => ({ red: r.red.trim(), url: r.url?.trim() }))
+          .filter((r) => r.red && r.url),
         notas: form.notas.trim() || undefined,
       };
 
@@ -184,6 +207,28 @@ export default function OpositoresPage() {
 
   const feedIzq = urlFacebookFeed(retador?.redes_sociales?.find((r) => r.red === 'facebook')?.url);
   const feedDer = urlFacebookFeed(segundo?.redes_sociales?.find((r) => r.red === 'facebook')?.url);
+
+  const actualizarRed = (index: number, campo: 'red' | 'url', valor: string) => {
+    setForm((f) => {
+      const next = [...f.redes_sociales];
+      next[index] = { ...next[index], [campo]: valor };
+      return { ...f, redes_sociales: next };
+    });
+  };
+
+  const agregarRed = () => {
+    setForm((f) => ({
+      ...f,
+      redes_sociales: [...f.redes_sociales, { red: 'otro', url: '' }],
+    }));
+  };
+
+  const eliminarRed = (index: number) => {
+    setForm((f) => ({
+      ...f,
+      redes_sociales: f.redes_sociales.filter((_, i) => i !== index),
+    }));
+  };
 
   if (authLoading || loading) {
     return (
@@ -235,6 +280,7 @@ export default function OpositoresPage() {
         {opositores.map((op) => {
           const nivel = NIVELES[op.nivel_rivalidad] || NIVELES[1];
           const fb = op.redes_sociales?.find((r) => r.red === 'facebook')?.url;
+          const otrasRedes = op.redes_sociales?.filter((r) => r.url?.trim()) || [];
           return (
             <div
               key={op.id}
@@ -289,15 +335,26 @@ export default function OpositoresPage() {
                   {op.partido && (
                     <p className="text-sm text-secondary-600">{op.partido}</p>
                   )}
-                  {fb && (
-                    <a
-                      href={fb}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#1877F2] hover:underline"
-                    >
-                      <Facebook className="h-3.5 w-3.5" /> Facebook
-                    </a>
+                  {otrasRedes.length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {otrasRedes.map((r, idx) => {
+                        const meta = iconoRed(r.red);
+                        const Icon = meta.icon;
+                        return (
+                          <a
+                            key={`${r.red}-${idx}`}
+                            href={r.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={meta.label}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition hover:opacity-80"
+                            style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
+                          >
+                            <Icon className="h-3.5 w-3.5" /> {meta.label}
+                          </a>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -461,16 +518,56 @@ export default function OpositoresPage() {
               </div>
 
               <div>
-                <label className="label">Facebook (URL del perfil o página)</label>
-                <div className="relative">
-                  <Facebook className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1877F2]" />
-                  <input
-                    type="url"
-                    className="input w-full pl-9"
-                    value={form.facebook_url}
-                    onChange={(e) => setForm((f) => ({ ...f, facebook_url: e.target.value }))}
-                    placeholder="https://facebook.com/nombredepagina"
-                  />
+                <label className="label">Redes sociales</label>
+                <p className="mb-2 text-xs text-secondary-500">
+                  Agrega Facebook, Instagram, TikTok, X, YouTube, sitio web u otra liga. La de Facebook se usará para el feed embebido.
+                </p>
+                <div className="space-y-2">
+                  {form.redes_sociales.map((r, index) => {
+                    const meta = iconoRed(r.red);
+                    const Icon = meta.icon;
+                    return (
+                      <div key={index} className="flex items-center gap-2">
+                        <select
+                          className="input shrink-0 w-[140px]"
+                          value={r.red}
+                          onChange={(e) => actualizarRed(index, 'red', e.target.value)}
+                        >
+                          {REDES_SOPORTADAS.map((red) => (
+                            <option key={red.id} value={red.id}>{red.label}</option>
+                          ))}
+                        </select>
+                        <div className="relative flex-1">
+                          <Icon
+                            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: meta.color }}
+                          />
+                          <input
+                            type="url"
+                            className="input w-full pl-9"
+                            value={r.url}
+                            onChange={(e) => actualizarRed(index, 'url', e.target.value)}
+                            placeholder={`https://${r.red === 'web' ? 'sitio.com' : r.red + '.com/usuario'}`}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => eliminarRed(index)}
+                          className="rounded-md p-2 text-secondary-400 hover:bg-red-50 hover:text-red-600"
+                          title="Eliminar red"
+                        >
+                          <TrashIconLucide className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={agregarRed}
+                    className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-primary-600 transition hover:bg-primary-50"
+                  >
+                    <PlusIconLucide className="h-3.5 w-3.5" /> Agregar red social
+                  </button>
                 </div>
               </div>
 

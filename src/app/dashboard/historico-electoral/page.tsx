@@ -22,6 +22,10 @@ import {
   LayoutDashboard,
   Users,
   Vote,
+  TrendingUp,
+  Award,
+  Target,
+  Percent,
 } from 'lucide-react';
 
 // Tipos
@@ -1495,12 +1499,115 @@ export default function HistoricoElectoralPage() {
     );
   };
 
+  // Cálculo de KPIs estratégicos del dashboard
+  const kpis = useMemo(() => {
+    const agrupados = resumen?.agrupados || [];
+    const historicos = agrupados.length;
+
+    // Determinar actor principal global del proyecto
+    const principales = agrupados
+      .filter((g) => g.tipo_historico === 'principal' && g.partido_principal)
+      .map((g) => g.partido_principal as string);
+    const conteoPrincipal = new Map<string, number>();
+    resultados.forEach((r) => {
+      if (r.partido_principal) {
+        conteoPrincipal.set(r.partido_principal, (conteoPrincipal.get(r.partido_principal) || 0) + 1);
+      }
+    });
+    const actorPrincipal =
+      principales[0] ||
+      (conteoPrincipal.size > 0
+        ? Array.from(conteoPrincipal.entries()).sort((a, b) => b[1] - a[1])[0][0]
+        : null);
+
+    // Participación promedio (simple de casillas con dato)
+    const casillasConParticipacion = resultados.filter(
+      (r) => typeof r.participacion_pct === 'number' && r.participacion_pct >= 0
+    );
+    const participacionPromedio =
+      casillasConParticipacion.length > 0
+        ? casillasConParticipacion.reduce((acc, r) => acc + r.participacion_pct!, 0) /
+          casillasConParticipacion.length
+        : 0;
+
+    // Métricas por sección
+    const secciones = new Map<
+      string,
+      { actores: Map<string, number>; total_votos: number; actorPrincipalVotos: number }
+    >();
+
+    let votosActorPrincipal = 0;
+    const actoresUnicos = new Set<string>();
+
+    resultados.forEach((r) => {
+      const desglose = r.desglose_partidos || [];
+      desglose.forEach((d) => {
+        actoresUnicos.add(d.partido);
+        if (!secciones.has(r.seccion)) {
+          secciones.set(r.seccion, { actores: new Map(), total_votos: 0, actorPrincipalVotos: 0 });
+        }
+        const sec = secciones.get(r.seccion)!;
+        const v = d.votos || 0;
+        sec.actores.set(d.partido, (sec.actores.get(d.partido) || 0) + v);
+        sec.total_votos += v;
+        if (actorPrincipal && d.partido === actorPrincipal) {
+          votosActorPrincipal += v;
+          sec.actorPrincipalVotos += v;
+        }
+      });
+
+      // Si no hay desglose pero hay ganador, aún contamos su voto para el total seccional
+      if (desglose.length === 0 && r.total_votos) {
+        if (!secciones.has(r.seccion)) {
+          secciones.set(r.seccion, { actores: new Map(), total_votos: 0, actorPrincipalVotos: 0 });
+        }
+        secciones.get(r.seccion)!.total_votos += r.total_votos;
+      }
+    });
+
+    let seccionesGanadas = 0;
+    let margenAcumulado = 0;
+    let seccionesConMargen = 0;
+    let diferenciaVsGanador = 0;
+
+    secciones.forEach((sec) => {
+      const ordenados = Array.from(sec.actores.entries()).sort((a, b) => b[1] - a[1]);
+      const ganador = ordenados[0];
+      const segundo = ordenados[1];
+
+      if (ganador) {
+        if (actorPrincipal && ganador[0] === actorPrincipal) {
+          seccionesGanadas++;
+        }
+        if (segundo) {
+          const margen =
+            sec.total_votos > 0 ? ((ganador[1] - segundo[1]) / sec.total_votos) * 100 : 0;
+          margenAcumulado += margen;
+          seccionesConMargen++;
+        }
+        if (actorPrincipal) {
+          diferenciaVsGanador += ganador[1] - sec.actorPrincipalVotos;
+        }
+      }
+    });
+
+    const margenPromedio = seccionesConMargen > 0 ? margenAcumulado / seccionesConMargen : 0;
+
+    return {
+      historicos,
+      participacionPromedio,
+      actorPrincipal,
+      votosActorPrincipal,
+      seccionesGanadas,
+      margenPromedio,
+      actoresDistintos: actoresUnicos.size,
+      diferenciaVsGanador,
+      totalSecciones: secciones.size,
+    };
+  }, [resumen, resultados]);
+
   const renderDashboard = () => {
     const agrupados = resumen?.agrupados || [];
-    const totalHistoricos = agrupados.length;
-    const totalCasillas = agrupados.reduce((acc, g) => acc + (g.casillas || 0), 0);
-    const totalSecciones = agrupados.reduce((acc, g) => acc + (g.secciones || 0), 0);
-    const totalVotos = agrupados.reduce((acc, g) => acc + (g.total_votos || 0), 0);
 
     return (
       <div className="space-y-6">
@@ -1508,31 +1615,52 @@ export default function HistoricoElectoralPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             title="Históricos cargados"
-            value={totalHistoricos.toLocaleString()}
+            value={kpis.historicos.toLocaleString()}
             subtitle="Agrupados por tipo, elección y año"
             icon={BarChart3}
             color="text-primary-600"
           />
           <KpiCard
-            title="Total de casillas"
-            value={totalCasillas.toLocaleString()}
-            subtitle="Suma de todas las casillas cargadas"
-            icon={MapPin}
+            title="Participación promedio"
+            value={`${kpis.participacionPromedio.toFixed(2)}%`}
+            subtitle="Promedio de casillas con dato"
+            icon={Percent}
             color="text-blue-600"
           />
           <KpiCard
-            title="Total de secciones"
-            value={totalSecciones.toLocaleString()}
-            subtitle="Secciones únicas cubiertas"
-            icon={Users}
+            title="Votos del actor principal"
+            value={kpis.votosActorPrincipal.toLocaleString()}
+            subtitle={kpis.actorPrincipal ? `Actor: ${kpis.actorPrincipal}` : 'Sin actor principal definido'}
+            icon={Target}
             color="text-green-600"
           />
           <KpiCard
-            title="Total de votos"
-            value={totalVotos.toLocaleString()}
-            subtitle="Votos contabilizados en históricos"
-            icon={Vote}
+            title="Secciones ganadas"
+            value={kpis.seccionesGanadas.toLocaleString()}
+            subtitle={kpis.totalSecciones > 0 ? `De ${kpis.totalSecciones} secciones cargadas` : 'Sin secciones'}
+            icon={Award}
             color="text-purple-600"
+          />
+          <KpiCard
+            title="Margen promedio de victoria"
+            value={`${kpis.margenPromedio.toFixed(2)}%`}
+            subtitle="Diferencia ganador vs segundo lugar"
+            icon={TrendingUp}
+            color="text-amber-600"
+          />
+          <KpiCard
+            title="Actores distintos"
+            value={kpis.actoresDistintos.toLocaleString()}
+            subtitle="Partidos / coaliciones registrados"
+            icon={Users}
+            color="text-cyan-600"
+          />
+          <KpiCard
+            title="Diferencia actor vs ganador"
+            value={kpis.diferenciaVsGanador.toLocaleString()}
+            subtitle={kpis.actorPrincipal ? `Votos: ganador − ${kpis.actorPrincipal}` : 'Sin actor principal'}
+            icon={Vote}
+            color="text-rose-600"
           />
         </div>
 

@@ -53,6 +53,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/proyeccion', icon: ArrowTrendingUpIcon, label: 'Proyección', color: '#0F766E', permiso: 'proyeccion', grupo: 'inteligencia' },
   { href: '/dashboard/ficha-seccional', icon: DocumentTextIcon, label: 'Ficha Seccional', color: '#C2410C', permiso: 'ficha_seccional', grupo: 'inteligencia' },
   { href: '/dashboard/opositores', icon: UserGroupIcon, label: 'Opositores', color: '#DC2626', permiso: 'opositores', grupo: 'inteligencia' },
+  { href: '/dashboard/boletines', icon: DocumentTextIcon, label: 'Boletines IA', color: '#0369A1', permiso: 'boletines', grupo: 'inteligencia' },
 
   // Configuración del proyecto
   { href: '/dashboard/candidato', icon: UserIcon, label: 'Candidato', color: '#BE185D', permiso: 'candidato', grupo: 'configuracion' },
@@ -63,7 +64,6 @@ const MENU_ITEMS: MenuItem[] = [
   ...(HABILITAR_MODULOS_AVANZADOS
     ? [
         { href: '/dashboard/llamadas', icon: ChatBubbleLeftRightIcon, label: 'Llamadas', color: '#9F1239', permiso: 'llamadas', grupo: 'avanzados' } as MenuItem,
-        { href: '/dashboard/boletines', icon: DocumentTextIcon, label: 'Boletines IA', color: '#0369A1', permiso: 'boletines', grupo: 'avanzados' } as MenuItem,
       ]
     : []),
 

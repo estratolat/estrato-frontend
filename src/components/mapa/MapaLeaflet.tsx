@@ -748,32 +748,86 @@ function MarcadorPuntoSeleccionado({
   onAccion: (tipo: 'apoyo' | 'evento' | 'lider', lat: number, lng: number) => void;
   onCerrar: () => void;
 }) {
+  const opciones = [
+    {
+      id: 'apoyo',
+      label: 'Apoyo',
+      sub: 'Entrega / beneficio',
+      icono: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+        </svg>
+      ),
+      color: '#F59E0B',
+      bg: 'bg-amber-50',
+      hover: 'hover:bg-amber-100',
+      text: 'text-amber-700',
+    },
+    {
+      id: 'evento',
+      label: 'Evento',
+      sub: 'Reunión / mitin',
+      icono: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" />
+        </svg>
+      ),
+      color: '#D73216',
+      bg: 'bg-red-50',
+      hover: 'hover:bg-red-100',
+      text: 'text-red-700',
+    },
+    {
+      id: 'lider',
+      label: 'Líder',
+      sub: 'Estructura territorial',
+      icono: (
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+        </svg>
+      ),
+      color: '#16A34A',
+      bg: 'bg-green-50',
+      hover: 'hover:bg-green-100',
+      text: 'text-green-700',
+    },
+  ] as const;
+
   return (
     <Marker position={[lat, lng]}>
-      <Popup>
-        <div className="space-y-2">
-          <p className="text-sm font-semibold">¿Qué quieres registrar aquí?</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => onAccion('apoyo', lat, lng)}
-              className="rounded bg-primary-600 px-2 py-1 text-xs text-white"
-            >
-              Apoyo
-            </button>
-            <button
-              onClick={() => onAccion('evento', lat, lng)}
-              className="rounded bg-secondary-600 px-2 py-1 text-xs text-white"
-            >
-              Evento
-            </button>
-            <button
-              onClick={() => onAccion('lider', lat, lng)}
-              className="rounded bg-green-600 px-2 py-1 text-xs text-white"
-            >
-              Líder
-            </button>
+      <Popup closeButton={false} className="rounded-2xl">
+        <div className="w-64 p-1">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-secondary-900">¿Qué registrar aquí?</p>
+              <p className="text-[10px] text-secondary-500">Selecciona el tipo de registro</p>
+            </div>
           </div>
-          <button onClick={onCerrar} className="text-xs text-secondary-500 underline">Cerrar</button>
+
+          <div className="grid grid-cols-3 gap-2">
+            {opciones.map((op) => (
+              <button
+                key={op.id}
+                onClick={() => onAccion(op.id as any, lat, lng)}
+                className={`flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition`}
+              >
+                <span style={{ color: op.color }}>{op.icono}</span>
+                <span className={`text-[11px] font-semibold ${op.text}`}>{op.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={onCerrar}
+            className="mt-3 w-full rounded-lg py-1.5 text-xs font-medium text-secondary-500 transition hover:bg-secondary-50"
+          >
+            Cancelar
+          </button>
         </div>
       </Popup>
     </Marker>

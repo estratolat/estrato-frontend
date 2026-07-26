@@ -1598,11 +1598,7 @@ export default function HistoricoElectoralPage() {
       participacionPromedio,
       actorPrincipal,
       votosActorPrincipal,
-      seccionesGanadas,
       margenPromedio,
-      actoresDistintos: actoresUnicos.size,
-      diferenciaVsGanador,
-      totalSecciones: secciones.size,
     };
   }, [resumen, resultados]);
 
@@ -1611,56 +1607,35 @@ export default function HistoricoElectoralPage() {
 
     return (
       <div className="space-y-6">
-        {/* KPIs globales */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* KPIs globales — una sola fila compacta */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KpiCard
             title="Históricos cargados"
             value={kpis.historicos.toLocaleString()}
-            subtitle="Agrupados por tipo, elección y año"
+            subtitle="Por tipo, elección y año"
             icon={BarChart3}
             color="text-primary-600"
           />
           <KpiCard
             title="Participación promedio"
             value={`${kpis.participacionPromedio.toFixed(2)}%`}
-            subtitle="Promedio de casillas con dato"
+            subtitle="Casillas con dato"
             icon={Percent}
             color="text-blue-600"
           />
           <KpiCard
-            title="Votos del actor principal"
+            title="Votos actor principal"
             value={kpis.votosActorPrincipal.toLocaleString()}
-            subtitle={kpis.actorPrincipal ? `Actor: ${kpis.actorPrincipal}` : 'Sin actor principal definido'}
+            subtitle={kpis.actorPrincipal || 'Sin actor principal'}
             icon={Target}
             color="text-green-600"
           />
           <KpiCard
-            title="Secciones ganadas"
-            value={kpis.seccionesGanadas.toLocaleString()}
-            subtitle={kpis.totalSecciones > 0 ? `De ${kpis.totalSecciones} secciones cargadas` : 'Sin secciones'}
-            icon={Award}
-            color="text-purple-600"
-          />
-          <KpiCard
-            title="Margen promedio de victoria"
+            title="Margen promedio"
             value={`${kpis.margenPromedio.toFixed(2)}%`}
-            subtitle="Diferencia ganador vs segundo lugar"
+            subtitle="Ganador vs 2° lugar"
             icon={TrendingUp}
             color="text-amber-600"
-          />
-          <KpiCard
-            title="Actores distintos"
-            value={kpis.actoresDistintos.toLocaleString()}
-            subtitle="Partidos / coaliciones registrados"
-            icon={Users}
-            color="text-cyan-600"
-          />
-          <KpiCard
-            title="Diferencia actor vs ganador"
-            value={kpis.diferenciaVsGanador.toLocaleString()}
-            subtitle={kpis.actorPrincipal ? `Votos: ganador − ${kpis.actorPrincipal}` : 'Sin actor principal'}
-            icon={Vote}
-            color="text-rose-600"
           />
         </div>
 
@@ -1999,14 +1974,14 @@ function KpiCard({
   color?: string;
 }) {
   return (
-    <div className="rounded-lg border border-secondary-200 bg-white p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-secondary-500">{title}</p>
-          <p className="mt-1 text-2xl font-bold text-secondary-900">{value}</p>
-          {subtitle && <p className="mt-1 text-xs text-secondary-500">{subtitle}</p>}
+    <div className="rounded-lg border border-secondary-200 bg-white p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium text-secondary-500">{title}</p>
+          <p className="text-xl font-bold text-secondary-900 sm:text-2xl">{value}</p>
+          {subtitle && <p className="truncate text-xs text-secondary-500">{subtitle}</p>}
         </div>
-        {IconComp && <IconComp size={22} className={color} />}
+        {IconComp && <IconComp size={32} className={`shrink-0 ${color}`} />}
       </div>
     </div>
   );

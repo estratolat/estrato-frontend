@@ -27,6 +27,7 @@ export default function CandidatoPage() {
     nombre: '',
     nombre_publico: '',
     cargo: '',
+    email: '',
     foto_url: '',
     redes_sociales: [] as { red: string; url?: string }[],
     biografia: '',
@@ -95,6 +96,7 @@ export default function CandidatoPage() {
           nombre: data.nombre || '',
           nombre_publico: data.nombre_publico || '',
           cargo: data.cargo || '',
+          email: data.email || '',
           foto_url: data.foto_url || '',
           redes_sociales: Array.isArray(data.redes_sociales) ? [...data.redes_sociales] : [],
           biografia: data.biografia || '',
@@ -211,6 +213,16 @@ export default function CandidatoPage() {
                   value={form.cargo}
                   onChange={(e) => handleChange('cargo', e.target.value)}
                   placeholder="Ej. Presidenta Municipal, Diputada Local..."
+                />
+              </div>
+              <div>
+                <label className="label">Correo electrónico</label>
+                <input
+                  type="email"
+                  className="input w-full"
+                  value={form.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  placeholder="contacto@candidato.com"
                 />
               </div>
               <div>
@@ -350,74 +362,248 @@ export default function CandidatoPage() {
           </div>        </div>
 
         <div className="space-y-6">
-          <FichaCandidato perfil={perfil} />
+          <FichaCandidato
+            perfil={perfil}
+            form={form}
+            setForm={setForm}
+            onGuardar={guardar}
+            saving={saving}
+            REDES_SOPORTADAS={REDES_SOPORTADAS}
+            iconoRed={iconoRed}
+            actualizarRed={actualizarRed}
+            agregarRed={agregarRed}
+            eliminarRed={eliminarRed}
+          />
           <HuellaPanel perfil={perfil} />
         </div>
       </div>
     </div>
   );
+}
 
-function FichaCandidato({ perfil }: { perfil: any }) {
-  const iniciales = (perfil?.nombre || 'C')
+function FichaCandidato({
+  perfil,
+  form,
+  setForm,
+  onGuardar,
+  saving,
+  REDES_SOPORTADAS,
+  iconoRed,
+  actualizarRed,
+  agregarRed,
+  eliminarRed,
+}: {
+  perfil: any;
+  form: any;
+  setForm: any;
+  onGuardar: () => void;
+  saving: boolean;
+  REDES_SOPORTADAS: any[];
+  iconoRed: (id: string) => any;
+  actualizarRed: (index: number, campo: 'red' | 'url', valor: string) => void;
+  agregarRed: () => void;
+  eliminarRed: (index: number) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const iniciales = (perfil?.nombre || form.nombre || 'C')
     .split(' ')
     .map((n: string) => n[0])
     .slice(0, 2)
     .join('')
     .toUpperCase();
 
-  const redes = Array.isArray(perfil?.redes_sociales) ? perfil.redes_sociales.filter((r: any) => r?.url?.trim()) : [];
+  const redes = Array.isArray(form?.redes_sociales) ? form.redes_sociales.filter((r: any) => r?.url?.trim()) : [];
 
   return (
     <div className="rounded-xl border border-secondary-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <h4 className="font-bold text-secondary-800">Ficha del candidato</h4>
+        <button
+          type="button"
+          onClick={() => editando ? setEditando(false) : setEditando(true)}
+          className="text-sm font-medium text-primary-600 hover:text-primary-700"
+        >
+          {editando ? 'Cancelar' : 'Editar ficha'}
+        </button>
+      </div>
+
       <div className="flex flex-col items-center text-center">
         <div className="mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-primary-100 bg-secondary-100 text-secondary-400">
-          {perfil?.foto_url ? (
+          {(form?.foto_url || perfil?.foto_url) ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={perfil.foto_url} alt={perfil.nombre || 'Candidato'} className="h-full w-full object-cover" />
+            <img src={form.foto_url || perfil?.foto_url} alt={form.nombre || perfil?.nombre || 'Candidato'} className="h-full w-full object-cover" />
           ) : (
             <span className="text-3xl font-bold">{iniciales}</span>
           )}
         </div>
 
-        <h3 className="text-xl font-bold text-secondary-900">
-          {perfil?.nombre_publico || perfil?.nombre || 'Candidato'}
-        </h3>
-        {(perfil?.nombre_publico && perfil?.nombre) && (
-          <p className="text-sm text-secondary-500">{perfil.nombre}</p>
-        )}
-        {perfil?.cargo && (
-          <p className="mt-1 inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
-            {perfil.cargo}
-          </p>
+        {editando ? (
+          <div className="w-full space-y-3">
+            <div className="text-left">
+              <label className="label">Nombre</label>
+              <input
+                type="text"
+                className="input w-full"
+                value={form.nombre}
+                onChange={(e) => setForm((f: any) => ({ ...f, nombre: e.target.value }))}
+                placeholder="Nombre completo"
+              />
+            </div>
+            <div className="text-left">
+              <label className="label">Nombre público</label>
+              <input
+                type="text"
+                className="input w-full"
+                value={form.nombre_publico}
+                onChange={(e) => setForm((f: any) => ({ ...f, nombre_publico: e.target.value }))}
+                placeholder="Alias"
+              />
+            </div>
+            <div className="text-left">
+              <label className="label">Cargo</label>
+              <input
+                type="text"
+                className="input w-full"
+                value={form.cargo}
+                onChange={(e) => setForm((f: any) => ({ ...f, cargo: e.target.value }))}
+                placeholder="Cargo que busca"
+              />
+            </div>
+            <div className="text-left">
+              <label className="label">Correo electrónico</label>
+              <input
+                type="email"
+                className="input w-full"
+                value={form.email}
+                onChange={(e) => setForm((f: any) => ({ ...f, email: e.target.value }))}
+                placeholder="contacto@candidato.com"
+              />
+            </div>
+            <div className="text-left">
+              <label className="label">Fotografía (URL o base64)</label>
+              <input
+                type="text"
+                className="input w-full"
+                value={form.foto_url}
+                onChange={(e) => setForm((f: any) => ({ ...f, foto_url: e.target.value }))}
+                placeholder="https://..."
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <h3 className="text-xl font-bold text-secondary-900">
+              {perfil?.nombre_publico || perfil?.nombre || 'Candidato'}
+            </h3>
+            {(perfil?.nombre_publico && perfil?.nombre) && (
+              <p className="text-sm text-secondary-500">{perfil.nombre}</p>
+            )}
+            {perfil?.cargo && (
+              <p className="mt-1 inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
+                {perfil.cargo}
+              </p>
+            )}
+            {perfil?.email && (
+              <a
+                href={`mailto:${perfil.email}`}
+                className="mt-2 text-xs text-secondary-500 hover:text-primary-600"
+              >
+                {perfil.email}
+              </a>
+            )}
+          </>
         )}
       </div>
 
-      {redes.length > 0 && (
-        <div className="mt-5 border-t border-secondary-100 pt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-500">Redes sociales</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {redes.map((r: any, idx: number) => {
-              const meta = REDES_SOPORTADAS.find((x) => x.id === r.red) || REDES_SOPORTADAS[REDES_SOPORTADAS.length - 1];
+      <div className="mt-5 border-t border-secondary-100 pt-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-500">Redes sociales</p>
+        {editando ? (
+          <div className="space-y-2">
+            {form.redes_sociales.map((r: any, index: number) => {
+              const meta = iconoRed(r.red);
               const Icon = meta.icon;
               return (
-                <a
-                  key={`${r.red}-${idx}`}
-                  href={r.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={meta.label}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition hover:opacity-80"
-                  style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
-                >
-                  <Icon className="h-4 w-4" /> {meta.label}
-                </a>
+                <div key={index} className="flex items-center gap-2">
+                  <select
+                    className="input shrink-0 w-[130px] text-xs"
+                    value={r.red}
+                    onChange={(e) => actualizarRed(index, 'red', e.target.value)}
+                  >
+                    {REDES_SOPORTADAS.map((red) => (
+                      <option key={red.id} value={red.id}>{red.label}</option>
+                    ))}
+                  </select>
+                  <div className="relative flex-1">
+                    <Icon className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: meta.color }} />
+                    <input
+                      type="url"
+                      className="input w-full pl-7 text-xs"
+                      value={r.url}
+                      onChange={(e) => actualizarRed(index, 'url', e.target.value)}
+                      placeholder={`https://${r.red === 'web' ? 'sitio.com' : r.red + '.com/usuario'}`}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => eliminarRed(index)}
+                    className="rounded-md p-1.5 text-secondary-400 hover:bg-red-50 hover:text-red-600"
+                    title="Eliminar red"
+                  >
+                    <TrashIconLucide className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               );
             })}
+            <button
+              type="button"
+              onClick={agregarRed}
+              className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-primary-600 transition hover:bg-primary-50"
+            >
+              <PlusIconLucide className="h-3.5 w-3.5" /> Agregar red
+            </button>
           </div>
+        ) : (
+          redes.length > 0 ? (
+            <div className="flex flex-wrap justify-center gap-2">
+              {redes.map((r: any, idx: number) => {
+                const meta = REDES_SOPORTADAS.find((x) => x.id === r.red) || REDES_SOPORTADAS[REDES_SOPORTADAS.length - 1];
+                const Icon = meta.icon;
+                return (
+                  <a
+                    key={`${r.red}-${idx}`}
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={meta.label}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition hover:opacity-80"
+                    style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
+                  >
+                    <Icon className="h-4 w-4" /> {meta.label}
+                  </a>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-center text-xs text-secondary-400">Sin redes sociales</p>
+          )
+        )}
+      </div>
+
+      {editando && (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              onGuardar();
+              setEditando(false);
+            }}
+            disabled={saving}
+            className="btn-primary px-4 py-2 text-sm disabled:opacity-60"
+          >
+            {saving ? 'Guardando...' : 'Guardar ficha'}
+          </button>
         </div>
       )}
     </div>
   );
-}
-
 }

@@ -35,36 +35,36 @@ const HABILITAR_MODULOS_AVANZADOS = false;
 
 const MENU_ITEMS: MenuItem[] = [
   // Operación diaria
-  { href: '/dashboard', icon: Squares2X2Icon, label: 'Dashboard', color: '#D73216', permiso: 'dashboard', grupo: 'operacion' },
-  { href: '/dashboard/votantes', icon: UsersIcon, label: 'Votantes', color: '#3B82F6', permiso: 'votantes', grupo: 'operacion' },
-  { href: '/dashboard/crm', icon: ChatBubbleLeftRightIcon, label: 'CRM', color: '#25D366', permiso: 'crm', grupo: 'operacion' },
-  { href: '/dashboard/eventos', icon: CalendarDaysIcon, label: 'Eventos', color: '#F59E0B', permiso: 'eventos', grupo: 'operacion' },
-  { href: '/dashboard/encuestas', icon: ClipboardDocumentListIcon, label: 'Encuestas', color: '#10B981', permiso: 'encuestas', grupo: 'operacion' },
-  { href: '/dashboard/casillas', icon: MapPinIcon, label: 'Casillas', color: '#6366F1', permiso: 'casillas', grupo: 'operacion' },
-  { href: '/dashboard/monitoreo', icon: EyeIcon, label: 'Monitoreo', color: '#F43F5E', permiso: 'monitoreo', grupo: 'operacion' },
+  { href: '/dashboard', icon: Squares2X2Icon, label: 'Dashboard', color: '#B91C1C', permiso: 'dashboard', grupo: 'operacion' },
+  { href: '/dashboard/votantes', icon: UsersIcon, label: 'Votantes', color: '#2563EB', permiso: 'votantes', grupo: 'operacion' },
+  { href: '/dashboard/crm', icon: ChatBubbleLeftRightIcon, label: 'CRM', color: '#16A34A', permiso: 'crm', grupo: 'operacion' },
+  { href: '/dashboard/eventos', icon: CalendarDaysIcon, label: 'Eventos', color: '#7C3AED', permiso: 'eventos', grupo: 'operacion' },
+  { href: '/dashboard/encuestas', icon: ClipboardDocumentListIcon, label: 'Encuestas', color: '#D97706', permiso: 'encuestas', grupo: 'operacion' },
+  { href: '/dashboard/casillas', icon: MapPinIcon, label: 'Casillas', color: '#DB2777', permiso: 'casillas', grupo: 'operacion' },
+  { href: '/dashboard/monitoreo', icon: EyeIcon, label: 'Monitoreo', color: '#0891B2', permiso: 'monitoreo', grupo: 'operacion' },
 
   // Territorio e inteligencia
-  { href: '/dashboard/mapa', icon: MapIcon, label: 'Mapa Territorial', color: '#8B5CF6', permiso: 'mapa', grupo: 'inteligencia' },
-  { href: '/dashboard/historico-electoral', icon: ChartBarSquareIcon, label: 'Histórico Electoral', color: '#F59E0B', permiso: 'historico_electoral', grupo: 'inteligencia' },
-  { href: '/dashboard/inteligencia-electoral', icon: SparklesIcon, label: 'Inteligencia Electoral', color: '#7C3AED', permiso: 'inteligencia_electoral', grupo: 'inteligencia' },
-  { href: '/dashboard/proyeccion', icon: ArrowTrendingUpIcon, label: 'Proyección', color: '#8B5CF6', permiso: 'proyeccion', grupo: 'inteligencia' },
-  { href: '/dashboard/ficha-seccional', icon: DocumentTextIcon, label: 'Ficha Seccional', color: '#06B6D4', permiso: 'ficha_seccional', grupo: 'inteligencia' },
+  { href: '/dashboard/mapa', icon: MapIcon, label: 'Mapa Territorial', color: '#EA580C', permiso: 'mapa', grupo: 'inteligencia' },
+  { href: '/dashboard/historico-electoral', icon: ChartBarSquareIcon, label: 'Histórico Electoral', color: '#4338CA', permiso: 'historico_electoral', grupo: 'inteligencia' },
+  { href: '/dashboard/inteligencia-electoral', icon: SparklesIcon, label: 'Inteligencia Electoral', color: '#9333EA', permiso: 'inteligencia_electoral', grupo: 'inteligencia' },
+  { href: '/dashboard/proyeccion', icon: ArrowTrendingUpIcon, label: 'Proyección', color: '#0F766E', permiso: 'proyeccion', grupo: 'inteligencia' },
+  { href: '/dashboard/ficha-seccional', icon: DocumentTextIcon, label: 'Ficha Seccional', color: '#C2410C', permiso: 'ficha_seccional', grupo: 'inteligencia' },
 
   // Configuración del proyecto
-  { href: '/dashboard/candidato', icon: UserIcon, label: 'Candidato', color: '#D73216', permiso: 'candidato', grupo: 'configuracion' },
-  { href: '/dashboard/usuarios', icon: KeyIcon, label: 'Accesos', color: '#64748B', permiso: 'usuarios', grupo: 'configuracion' },
-  { href: '/dashboard/admin', icon: ShieldCheckIcon, label: 'Admin', color: '#7C3AED', permiso: 'admin', grupo: 'configuracion' },
+  { href: '/dashboard/candidato', icon: UserIcon, label: 'Candidato', color: '#BE185D', permiso: 'candidato', grupo: 'configuracion' },
+  { href: '/dashboard/usuarios', icon: KeyIcon, label: 'Accesos', color: '#475569', permiso: 'usuarios', grupo: 'configuracion' },
+  { href: '/dashboard/admin', icon: ShieldCheckIcon, label: 'Admin', color: '#1E40AF', permiso: 'admin', grupo: 'configuracion' },
 
   // Módulos avanzados desactivados por defecto
   ...(HABILITAR_MODULOS_AVANZADOS
     ? [
-        { href: '/dashboard/llamadas', icon: ChatBubbleLeftRightIcon, label: 'Llamadas', color: '#EC4899', permiso: 'llamadas', grupo: 'avanzados' } as MenuItem,
-        { href: '/dashboard/boletines', icon: DocumentTextIcon, label: 'Boletines IA', color: '#06B6D4', permiso: 'boletines', grupo: 'avanzados' } as MenuItem,
+        { href: '/dashboard/llamadas', icon: ChatBubbleLeftRightIcon, label: 'Llamadas', color: '#9F1239', permiso: 'llamadas', grupo: 'avanzados' } as MenuItem,
+        { href: '/dashboard/boletines', icon: DocumentTextIcon, label: 'Boletines IA', color: '#0369A1', permiso: 'boletines', grupo: 'avanzados' } as MenuItem,
       ]
     : []),
 
   // App brigada (link externo)
-  { href: '/brigada/login', icon: DevicePhoneMobileIcon, label: 'App Brigada', color: '#D73216', permiso: 'app_brigada', externo: true, grupo: 'brigada' },
+  { href: '/brigada/login', icon: DevicePhoneMobileIcon, label: 'App Brigada', color: '#000000', permiso: 'app_brigada', externo: true, grupo: 'brigada' },
 ];
 
 export default function DashboardLayout({

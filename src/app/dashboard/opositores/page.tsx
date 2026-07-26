@@ -204,9 +204,14 @@ export default function OpositoresPage() {
     () => opositores.find((o) => o.nivel_rivalidad === 2) || opositores[1],
     [opositores]
   );
+  const tercero = useMemo(
+    () => opositores.find((o) => o.nivel_rivalidad === 3) || opositores[2],
+    [opositores]
+  );
 
-  const feedIzq = urlFacebookFeed(retador?.redes_sociales?.find((r) => r.red === 'facebook')?.url);
-  const feedDer = urlFacebookFeed(segundo?.redes_sociales?.find((r) => r.red === 'facebook')?.url);
+  const feed1 = urlFacebookFeed(retador?.redes_sociales?.find((r) => r.red === 'facebook')?.url);
+  const feed2 = urlFacebookFeed(segundo?.redes_sociales?.find((r) => r.red === 'facebook')?.url);
+  const feed3 = urlFacebookFeed(tercero?.redes_sociales?.find((r) => r.red === 'facebook')?.url);
 
   const actualizarRed = (index: number, campo: 'red' | 'url', valor: string) => {
     setForm((f) => {
@@ -383,69 +388,32 @@ export default function OpositoresPage() {
         })}
       </div>
 
-      {/* Feeds de Facebook en dos columnas */}
-      {(retador || segundo) && (
-        <div className="grid gap-6 lg:grid-cols-2">
+      {/* Feeds de Facebook: solo los 3 primeros lugares */}
+      {(retador || segundo || tercero) && (
+        <div className="grid gap-6 lg:grid-cols-3">
           {retador && (
-            <div className="rounded-xl border border-secondary-200 bg-white p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-bold text-secondary-900">
-                  Feed de {retador.nombre}
-                </h3>
-                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                  Retador principal
-                </span>
-              </div>
-              {feedIzq ? (
-                <iframe
-                  src={feedIzq}
-                  width="100%"
-                  height="700"
-                  style={{ border: 'none', overflow: 'hidden' }}
-                  scrolling="no"
-                  frameBorder="0"
-                  allowFullScreen
-                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                  title={`Facebook ${retador.nombre}`}
-                />
-              ) : (
-                <div className="flex h-64 flex-col items-center justify-center rounded-lg bg-secondary-50 text-secondary-500">
-                  <Facebook className="mb-2 h-8 w-8 text-secondary-300" />
-                  <p className="text-sm">Sin URL de Facebook configurada</p>
-                </div>
-              )}
-            </div>
+            <FeedBox
+              opositor={retador}
+              feed={feed1}
+              etiqueta="Retador principal"
+              colorClase="bg-red-100 text-red-700"
+            />
           )}
-
           {segundo && (
-            <div className="rounded-xl border border-secondary-200 bg-white p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-bold text-secondary-900">
-                  Feed de {segundo.nombre}
-                </h3>
-                <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-                  Segundo lugar
-                </span>
-              </div>
-              {feedDer ? (
-                <iframe
-                  src={feedDer}
-                  width="100%"
-                  height="700"
-                  style={{ border: 'none', overflow: 'hidden' }}
-                  scrolling="no"
-                  frameBorder="0"
-                  allowFullScreen
-                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                  title={`Facebook ${segundo.nombre}`}
-                />
-              ) : (
-                <div className="flex h-64 flex-col items-center justify-center rounded-lg bg-secondary-50 text-secondary-500">
-                  <Facebook className="mb-2 h-8 w-8 text-secondary-300" />
-                  <p className="text-sm">Sin URL de Facebook configurada</p>
-                </div>
-              )}
-            </div>
+            <FeedBox
+              opositor={segundo}
+              feed={feed2}
+              etiqueta="Segundo lugar"
+              colorClase="bg-orange-100 text-orange-700"
+            />
+          )}
+          {tercero && (
+            <FeedBox
+              opositor={tercero}
+              feed={feed3}
+              etiqueta="Tercer lugar"
+              colorClase="bg-amber-100 text-amber-700"
+            />
           )}
         </div>
       )}
@@ -599,4 +567,44 @@ export default function OpositoresPage() {
       )}
     </div>
   );
+
+function FeedBox({
+  opositor,
+  feed,
+  etiqueta,
+  colorClase,
+}: {
+  opositor: Opositor;
+  feed: string | null;
+  etiqueta: string;
+  colorClase: string;
+}) {
+  return (
+    <div className="rounded-xl border border-secondary-200 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-bold text-secondary-900">Feed de {opositor.nombre}</h3>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorClase}`}>{etiqueta}</span>
+      </div>
+      {feed ? (
+        <iframe
+          src={feed}
+          width="100%"
+          height="700"
+          style={{ border: 'none', overflow: 'hidden' }}
+          scrolling="no"
+          frameBorder="0"
+          allowFullScreen
+          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          title={`Facebook ${opositor.nombre}`}
+        />
+      ) : (
+        <div className="flex h-64 flex-col items-center justify-center rounded-lg bg-secondary-50 text-secondary-500">
+          <Facebook className="mb-2 h-8 w-8 text-secondary-300" />
+          <p className="text-sm">Sin URL de Facebook configurada</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 }

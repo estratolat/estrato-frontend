@@ -29,6 +29,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 import { MapaData, ResultadoGlobal, GeoJSONCollection } from '@/types/mapa';
+import { COLORES_CAPA } from './colores-capa';
 import { Lider } from '@/types';
 import { Icon } from '@/components/ui/Icon';
 import { errorToString } from '@/lib/error-utils';
@@ -525,7 +526,7 @@ function CapaPeticiones({ data }: { data: any }) {
 }
 
 function colorPorScore(score = 0) {
-  return score >= 80 ? '#16A34A' : score >= 50 ? '#F59E0B' : '#EF4444';
+  return score >= 80 ? '#059669' : score >= 50 ? '#D97706' : '#DC2626';
 }
 
 function popupLider(l: Lider, onEditar?: (lider: Lider) => void): string {
@@ -606,15 +607,16 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
       }
     }
 
+    const colorCapa = COLORES_CAPA.lideres;
+
     if (modo === 'circulos') {
       const featureGroup = L.featureGroup();
       conCoords.forEach((l) => {
         const radio = Math.max(40, Math.min(250, (l.alcance_estimado || 50) * 2.5));
-        const color = colorPorScore(l.score ?? 0);
         const circle = L.circle([l.votante!.coordenadas!.lat, l.votante!.coordenadas!.lng], {
           radius: radio,
-          color,
-          fillColor: color,
+          color: colorCapa,
+          fillColor: colorCapa,
           fillOpacity: 0.3,
           weight: 2,
         });
@@ -627,14 +629,13 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
     if (modo === 'pines' || modo === 'solo_puntos' || !layer) {
       const featureGroup = L.featureGroup();
       conCoords.forEach((l) => {
-        const color = colorPorScore(l.score ?? 0);
         const esPadre = !l.lider_padre_id;
         const radio = modo === 'solo_puntos' ? 5 : esPadre ? 10 : 7;
         const marker = L.circleMarker(
           [l.votante!.coordenadas!.lat, l.votante!.coordenadas!.lng],
           {
             radius: radio,
-            fillColor: color,
+            fillColor: colorCapa,
             color: '#fff',
             weight: 2,
             opacity: 1,
@@ -686,10 +687,11 @@ function CapaEventos({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: 
     }
     if (!data?.features?.length) return;
 
-    const colorPorStatus: Record<string, string> = {
-      programado: '#3B82F6',
+    const colorCapa = COLORES_CAPA.eventos;
+    const colorBordePorStatus: Record<string, string> = {
+      programado: '#ffffff',
       en_curso: '#22C55E',
-      finalizado: '#6B7280',
+      finalizado: '#9CA3AF',
       cancelado: '#EF4444',
     };
 
@@ -698,9 +700,9 @@ function CapaEventos({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: 
         const status = feature?.properties?.status || 'programado';
         return L.circleMarker(latlng, {
           radius: 8,
-          fillColor: colorPorStatus[status] || '#3B82F6',
-          color: '#fff',
-          weight: 2,
+          fillColor: colorCapa,
+          color: colorBordePorStatus[status] || '#ffffff',
+          weight: status === 'programado' ? 2 : 3,
           opacity: 1,
           fillOpacity: 0.9,
         });

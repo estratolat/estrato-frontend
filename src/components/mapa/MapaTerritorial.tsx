@@ -11,6 +11,7 @@ import { errorToString } from '@/lib/error-utils';
 import { Icon } from '@/components/ui/Icon';
 import { useMapaPrefs } from '@/hooks/useMapaPrefs';
 import { shouldIgnoreMoveEnd } from './mapa-move-utils';
+import { COLORES_CAPA } from './colores-capa';
 import SubirCapaModal from './SubirCapaModal';
 import ImportarSeccionesIneModal from './ImportarSeccionesIneModal';
 import ImportarSeccionesExcelModal from './ImportarSeccionesExcelModal';
@@ -52,7 +53,7 @@ const CAPAS_CONFIG: {
     nombre: 'Votantes / Simpatizantes',
     icono: 'votantes',
     descripcion: 'Votantes registrados con ubicación desde brigada',
-    color: '#EF4444',
+    color: COLORES_CAPA.votantes,
     funcional: true,
   },
   {
@@ -60,7 +61,7 @@ const CAPAS_CONFIG: {
     nombre: 'Recorridos',
     icono: 'mapa',
     descripcion: 'Rutas caminadas por brigadas',
-    color: '#D73216',
+    color: COLORES_CAPA.recorridos,
     funcional: false,
   },
   {
@@ -68,7 +69,7 @@ const CAPAS_CONFIG: {
     nombre: 'Apoyos',
     icono: 'apoyos',
     descripcion: 'Entregas registradas desde brigada',
-    color: '#F59E0B',
+    color: COLORES_CAPA.apoyos,
     funcional: true,
   },
   {
@@ -76,7 +77,7 @@ const CAPAS_CONFIG: {
     nombre: 'Peticiones',
     icono: 'crm',
     descripcion: 'Solicitudes ciudadanas georreferenciadas',
-    color: '#06B6D4',
+    color: COLORES_CAPA.peticiones,
     funcional: true,
   },
   {
@@ -84,7 +85,7 @@ const CAPAS_CONFIG: {
     nombre: 'Eventos',
     icono: 'eventos',
     descripcion: 'Mítines y reuniones programadas',
-    color: '#D73216',
+    color: COLORES_CAPA.eventos,
     funcional: true,
   },
   {
@@ -92,7 +93,7 @@ const CAPAS_CONFIG: {
     nombre: 'Líderes',
     icono: 'lideres',
     descripcion: 'Líderes territoriales e influencia',
-    color: '#383745',
+    color: COLORES_CAPA.lideres,
     funcional: true,
   },
   {
@@ -100,7 +101,7 @@ const CAPAS_CONFIG: {
     nombre: 'Territorio personalizado',
     icono: 'seguridad',
     descripcion: 'Capas subidas o dibujadas a mano',
-    color: '#8B5CF6',
+    color: COLORES_CAPA.custom,
     funcional: true,
   },
 ];
@@ -1334,15 +1335,15 @@ export default function MapaTerritorial() {
 
   const tarjetasResumen = useMemo(() => {
     const t = [
-      { id: 'votantes', label: 'Votantes', icon: 'votantes', color: '#EF4444', capaId: 'votantes', count: data.votantes?.features?.length ?? 0 },
-      { id: 'apoyos', label: 'Apoyos', icon: 'apoyos', color: '#F59E0B', capaId: 'apoyos', count: data.apoyos?.features?.length ?? 0 },
-      { id: 'peticiones', label: 'Peticiones', icon: 'crm', color: '#06B6D4', capaId: 'peticiones', count: data.peticiones?.features?.length ?? 0 },
-      { id: 'eventos', label: 'Eventos', icon: 'eventos', color: '#D73216', capaId: 'eventos', count: data.eventos?.features?.length ?? 0 },
-      { id: 'lideres', label: 'Líderes', icon: 'lideres', color: '#383745', capaId: 'lideres', count: lideresConUbicacion.length },
-      { id: 'secciones', label: 'Secciones', icon: 'seguridad', color: '#8B5CF6', capaId: 'custom', count: stats.length },
-      { id: 'casillas', label: 'Casillas', icon: 'mapa', color: '#6366F1', capaId: 'custom', count: 0 },
-      { id: 'riesgo', label: 'Territorio en riesgo', icon: 'ocultar', color: '#EF4444', capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id]).length },
-      { id: 'propio', label: 'Territorio propio', icon: 'ver', color: '#22C55E', capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id] && data[c.id]?.features?.length).reduce((sum, c) => sum + (data[c.id]?.features?.length ?? 0), 0) },
+      { id: 'votantes', label: 'Votantes', icon: 'votantes', color: COLORES_CAPA.votantes, capaId: 'votantes', count: data.votantes?.features?.length ?? 0 },
+      { id: 'apoyos', label: 'Apoyos', icon: 'apoyos', color: COLORES_CAPA.apoyos, capaId: 'apoyos', count: data.apoyos?.features?.length ?? 0 },
+      { id: 'peticiones', label: 'Peticiones', icon: 'crm', color: COLORES_CAPA.peticiones, capaId: 'peticiones', count: data.peticiones?.features?.length ?? 0 },
+      { id: 'eventos', label: 'Eventos', icon: 'eventos', color: COLORES_CAPA.eventos, capaId: 'eventos', count: data.eventos?.features?.length ?? 0 },
+      { id: 'lideres', label: 'Líderes', icon: 'lideres', color: COLORES_CAPA.lideres, capaId: 'lideres', count: lideresConUbicacion.length },
+      { id: 'secciones', label: 'Secciones', icon: 'seguridad', color: COLORES_CAPA.secciones, capaId: 'custom', count: stats.length },
+      { id: 'casillas', label: 'Casillas', icon: 'mapa', color: COLORES_CAPA.casillas, capaId: 'custom', count: 0 },
+      { id: 'riesgo', label: 'Territorio en riesgo', icon: 'ocultar', color: COLORES_CAPA.riesgo, capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id]).length },
+      { id: 'propio', label: 'Territorio propio', icon: 'ver', color: COLORES_CAPA.propio, capaId: 'custom', count: capasPersonalizadas.filter(c => activas[c.id] && data[c.id]?.features?.length).reduce((sum, c) => sum + (data[c.id]?.features?.length ?? 0), 0) },
     ];
     return t;
   }, [data, lideresConUbicacion.length, stats.length, capasPersonalizadas, activas]);

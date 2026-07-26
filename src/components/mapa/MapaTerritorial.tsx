@@ -144,6 +144,8 @@ export default function MapaTerritorial() {
   const [modalExcel, setModalExcel] = useState(false);
   const [modalActivo, setModalActivo] = useState<'lider' | 'evento' | 'apoyo' | null>(null);
   const [puntoInicial, setPuntoInicial] = useState<{ lat: number; lng: number } | null>(null);
+  const [liderEditando, setLiderEditando] = useState<Lider | null>(null);
+  const [eventoEditando, setEventoEditando] = useState<Record<string, any> | null>(null);
   const [capasExpandidas, setCapasExpandidas] = useState<Record<string, boolean>>(prefs.capasExpandidas);
   const [gruposExpandidos, setGruposExpandidos] = useState<Record<string, boolean>>(prefs.gruposExpandidos);
   const [capasPersonalizadas, setCapasPersonalizadas] = useState<CapaMapa[]>([]);
@@ -264,14 +266,18 @@ export default function MapaTerritorial() {
     }, 400);
   }, []);
 
-  const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo', coords?: { lat: number; lng: number } | null) => {
+  const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo', coords?: { lat: number; lng: number } | null, registro?: any) => {
     setPuntoInicial(coords || null);
+    if (tipo === 'lider') setLiderEditando(registro || null);
+    if (tipo === 'evento') setEventoEditando(registro || null);
     setModalActivo(tipo);
   }, []);
 
   const cerrarModal = useCallback(() => {
     setModalActivo(null);
     setPuntoInicial(null);
+    setLiderEditando(null);
+    setEventoEditando(null);
   }, []);
 
   const cerrarFicha = useCallback(() => {
@@ -1483,6 +1489,8 @@ export default function MapaTerritorial() {
             abrirModal(tipo, { lat, lng });
           }}
           onCerrarPunto={() => setPuntoInicial(null)}
+          onEditarLider={(l) => abrirModal('lider', l.votante?.coordenadas || null, l)}
+          onEditarEvento={(props) => abrirModal('evento', props.coordenadas || null, props)}
           seleccion={seleccion}
           onFeatureClick={handleFeatureClick}
           resultadoDestacado={resultadoDestacado}
@@ -1790,6 +1798,7 @@ export default function MapaTerritorial() {
         onCerrar={cerrarModal}
         onExito={(id, lat, lng) => onExitoGuardado('lider', id, lat, lng)}
         coordenadasIniciales={puntoInicial}
+        liderEditando={liderEditando}
       />
 
       <NuevoEventoModal
@@ -1797,6 +1806,7 @@ export default function MapaTerritorial() {
         onCerrar={cerrarModal}
         onExito={(id, lat, lng) => onExitoGuardado('evento', id, lat, lng)}
         coordenadasIniciales={puntoInicial}
+        eventoEditando={eventoEditando}
       />
 
       <NuevoApoyoModal

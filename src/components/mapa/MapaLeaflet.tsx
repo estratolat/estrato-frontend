@@ -85,6 +85,8 @@ interface Props {
   onSeleccionarCoordenada?: (lat: number, lng: number) => void;
   onAccionPunto?: (tipo: 'apoyo' | 'evento' | 'lider', lat: number, lng: number) => void;
   onCerrarPunto?: () => void;
+  onEditarLider?: (lider: Lider) => void;
+  onEditarEvento?: (props: Record<string, any>) => void;
   filtrosApoyos?: Record<string, boolean>;
   seleccion?: { geometry: any; properties?: any; tipo?: string; nombre?: string } | null;
   onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
@@ -97,7 +99,7 @@ const highlightRef: { layer: L.GeoJSON | null; timer: any } = { layer: null, tim
 let pendingHighlight: { capaId: string; featureId: string; intentos: number } | null = null;
 
 export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
-  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange },
+  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange },
   ref
 ) {
   const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
@@ -148,10 +150,10 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
       )}
 
       {activas.eventos && data.eventos && (
-        <CapaEventos data={data.eventos} />
+        <CapaEventos data={data.eventos} onEditar={onEditarEvento} />
       )}
 
-      {activas.lideres && <CapaLideres lideres={lideres} modo={modoLideres} />}
+      {activas.lideres && <CapaLideres lideres={lideres} modo={modoLideres} onEditar={onEditarLider} />}
 
       {activas.custom && <CapaDibujo />}
 
@@ -526,13 +528,21 @@ function colorPorScore(score = 0) {
   return score >= 80 ? '#16A34A' : score >= 50 ? '#F59E0B' : '#EF4444';
 }
 
-function popupLider(l: Lider): string {
+function popupLider(l: Lider, onEditar?: (lider: Lider) => void): string {
   const nombre = escaparHtml(l.votante?.nombre || 'Líder');
   const seccion = l.votante?.seccion_electoral || 'Sin sección';
   const colonia = l.votante?.colonia || 'Sin colonia';
   const score = l.score ?? 0;
   const alcance = l.alcance_estimado ?? 0;
   const esPadre = !l.lider_padre_id;
+  const editarBtn = onEditar
+    ? `<button
+        id="lider-edit-btn-${l.id}"
+        class="mt-2 w-full rounded-md bg-primary-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-primary-700"
+      >
+        Editar líder
+      </button>`
+    : '';
   return `
     <div class="min-w-[200px] font-sans">
       <p class="text-sm font-bold text-secondary-900">${nombre}</p>
@@ -542,11 +552,12 @@ function popupLider(l: Lider): string {
         <div><span class="font-semibold">Colonia:</span> ${colonia}</div>
         <div><span class="font-semibold">Alcance estimado:</span> ${alcance}</div>
       </div>
+      ${editarBtn}
     </div>
   `;
 }
 
-function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
+function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: string; onEditar?: (lider: Lider) => void }) {
   const map = useMap();
   const layerRef = useRef<L.Layer | null>(null);
 
@@ -607,7 +618,7 @@ function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
           fillOpacity: 0.3,
           weight: 2,
         });
-        circle.bindPopup(popupLider(l));
+        circle.bindPopup(popupLider(l, onEditar));
         featureGroup.addLayer(circle);
       });
       layer = featureGroup;
@@ -630,7 +641,7 @@ function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
             fillOpacity: 0.9,
           }
         );
-        marker.bindPopup(popupLider(l));
+        marker.bindPopup(popupLider(l, onEditar));
         featureGroup.addLayer(marker);
       });
       layer = featureGroup;
@@ -639,6 +650,18 @@ function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
     if (layer) {
       layer.addTo(map);
       layerRef.current = layer;
+
+      if (onEditar) {
+        const attach = () => {
+          conCoords.forEach((l) => {
+            const btn = document.getElementById(`lider-edit-btn-${l.id}`);
+            if (btn) {
+              btn.onclick = () => onEditar(l);
+            }
+          });
+        };
+        layer.on('popupopen', attach);
+      }
     }
 
     return () => {
@@ -647,12 +670,12 @@ function CapaLideres({ lideres, modo }: { lideres: Lider[]; modo?: string }) {
         layerRef.current = null;
       }
     };
-  }, [lideres, modo, map]);
+  }, [lideres, modo, map, onEditar]);
 
   return null;
 }
 
-function CapaEventos({ data }: { data?: GeoJSONCollection }) {
+function CapaEventos({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: (props: Record<string, any>) => void }) {
   const map = useMap();
   const layerRef = useRef<L.GeoJSON | null>(null);
 
@@ -663,11 +686,19 @@ function CapaEventos({ data }: { data?: GeoJSONCollection }) {
     }
     if (!data?.features?.length) return;
 
+    const colorPorStatus: Record<string, string> = {
+      programado: '#3B82F6',
+      en_curso: '#22C55E',
+      finalizado: '#6B7280',
+      cancelado: '#EF4444',
+    };
+
     const layer = L.geoJSON(data, {
-      pointToLayer: (_feature, latlng) => {
+      pointToLayer: (feature, latlng) => {
+        const status = feature?.properties?.status || 'programado';
         return L.circleMarker(latlng, {
           radius: 8,
-          fillColor: '#D73216',
+          fillColor: colorPorStatus[status] || '#3B82F6',
           color: '#fff',
           weight: 2,
           opacity: 1,
@@ -676,12 +707,21 @@ function CapaEventos({ data }: { data?: GeoJSONCollection }) {
       },
       onEachFeature: (feature, l) => {
         const props = feature?.properties || {};
+        const id = props.id || props._feature_id || '';
         const nombre = escaparHtml(props.nombre || props.titulo || 'Evento');
         const direccion = escaparHtml(props.direccion || 'Sin dirección');
         const fecha = props.fecha_inicio
           ? format(new Date(props.fecha_inicio), "d 'de' MMMM, h:mm a", { locale: es })
           : 'Sin fecha';
         const status = props.status || 'programado';
+        const editarBtn = onEditar
+          ? `<button
+              id="evento-edit-btn-${id}"
+              class="mt-2 w-full rounded-md bg-primary-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-primary-700"
+            >
+              Editar evento
+            </button>`
+          : '';
         l.bindPopup(`
           <div class="min-w-[200px] font-sans">
             <p class="text-sm font-bold text-secondary-900">${nombre}</p>
@@ -689,6 +729,7 @@ function CapaEventos({ data }: { data?: GeoJSONCollection }) {
             <div class="text-xs text-secondary-700">
               <span class="font-semibold">Dirección:</span> ${direccion}
             </div>
+            ${editarBtn}
           </div>
         `);
       },
@@ -697,13 +738,27 @@ function CapaEventos({ data }: { data?: GeoJSONCollection }) {
     layer.addTo(map);
     layerRef.current = layer;
 
+    if (onEditar) {
+      const attach = () => {
+        data.features.forEach((f: any) => {
+          const props = f.properties || {};
+          const id = props.id || props._feature_id || '';
+          const btn = document.getElementById(`evento-edit-btn-${id}`);
+          if (btn) {
+            btn.onclick = () => onEditar(props);
+          }
+        });
+      };
+      layer.on('popupopen', attach);
+    }
+
     return () => {
       if (layerRef.current) {
         try { layerRef.current.removeFrom(map); } catch {}
         layerRef.current = null;
       }
     };
-  }, [data, map]);
+  }, [data, map, onEditar]);
 
   return null;
 }

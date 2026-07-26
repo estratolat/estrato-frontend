@@ -10,9 +10,10 @@ interface Props {
   onCerrar: () => void;
   onExito: (id: string, lat?: number, lng?: number) => void;
   coordenadasIniciales?: { lat: number; lng: number } | null;
+  liderEditando?: Lider | null;
 }
 
-export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenadasIniciales }: Props) {
+export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenadasIniciales, liderEditando }: Props) {
   const [tenantId, setTenantId] = useState('');
   const [lideres, setLideres] = useState<Lider[]>([]);
   const [form, setForm] = useState({
@@ -35,16 +36,44 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
     loadLideres();
     setError(null);
 
-    if (coordenadasIniciales) {
+    if (liderEditando) {
+      const c = liderEditando.votante?.coordenadas;
+      setForm({
+        nombre: liderEditando.votante?.nombre || '',
+        telefono: liderEditando.votante?.telefono || '',
+        seccion_electoral: liderEditando.votante?.seccion_electoral || '',
+        colonia: liderEditando.votante?.colonia || '',
+        lider_padre_id: liderEditando.lider_padre_id || '',
+        alcance_estimado: String(liderEditando.alcance_estimado || 100),
+        lat: c && typeof c.lat === 'number' ? c.lat.toFixed(6) : '',
+        lng: c && typeof c.lng === 'number' ? c.lng.toFixed(6) : '',
+      });
+    } else if (coordenadasIniciales) {
       setForm((f) => ({
         ...f,
+        nombre: '',
+        telefono: '',
+        seccion_electoral: '',
+        colonia: '',
+        lider_padre_id: '',
+        alcance_estimado: '100',
         lat: coordenadasIniciales.lat.toFixed(6),
         lng: coordenadasIniciales.lng.toFixed(6),
       }));
     } else {
-      setForm((f) => ({ ...f, lat: '', lng: '' }));
+      setForm((f) => ({
+        ...f,
+        nombre: '',
+        telefono: '',
+        seccion_electoral: '',
+        colonia: '',
+        lider_padre_id: '',
+        alcance_estimado: '100',
+        lat: '',
+        lng: '',
+      }));
     }
-  }, [abierto, coordenadasIniciales]);
+  }, [abierto, coordenadasIniciales, liderEditando]);
 
   const loadLideres = async () => {
     try {
@@ -61,8 +90,8 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
       colonia: '',
       lider_padre_id: '',
       alcance_estimado: '100',
-      lat: coordenadasIniciales?.lat.toFixed(6) || '',
-      lng: coordenadasIniciales?.lng.toFixed(6) || '',
+      lat: (!liderEditando && coordenadasIniciales?.lat.toFixed(6)) || '',
+      lng: (!liderEditando && coordenadasIniciales?.lng.toFixed(6)) || '',
     });
     setError(null);
   };
@@ -107,6 +136,29 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         votanteData.coordenadas = { lat: parseFloat(form.lat), lng: parseFloat(form.lng) };
       }
 
+      const coordenadas = form.lat && form.lng
+        ? { lat: parseFloat(form.lat), lng: parseFloat(form.lng) }
+        : undefined;
+
+      if (liderEditando) {
+        const votanteId = liderEditando.votante_id;
+        const votanteUpdate = {
+          ...votanteData,
+          coordenadas,
+        };
+        await votantesApi.update(votanteId, votanteUpdate);
+
+        const liderUpdate: any = {
+          alcance_estimado: parseInt(form.alcance_estimado, 10) || 100,
+        };
+        if (form.lider_padre_id) liderUpdate.lider_padre_id = form.lider_padre_id;
+        else liderUpdate.lider_padre_id = null;
+        const liderRes = await lideresApi.update(liderEditando.id, liderUpdate);
+        reset();
+        onExito(liderEditando.id, coordenadas?.lat, coordenadas?.lng);
+        return;
+      }
+
       const votanteRes = await votantesApi.create(votanteData);
       const votanteId = votanteRes.data?.id;
       if (!votanteId) throw new Error('No se pudo crear el votante base.');
@@ -121,7 +173,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
 
       const liderRes = await lideresApi.create(liderData);
       reset();
-      onExito(liderRes.data?.id, votanteData.coordenadas?.lat, votanteData.coordenadas?.lng);
+      onExito(liderRes.data?.id, coordenadas?.lat, coordenadas?.lng);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Error al crear líder');
     } finally {
@@ -135,7 +187,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
       <div className="relative z-[10000] w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-secondary-900">Nuevo líder territorial</h2>
+          <h2 className="text-lg font-bold text-secondary-900">{liderEditando ? 'Editar líder territorial' : 'Nuevo líder territorial'}</h2>
           <button
             onClick={onCerrar}
             className="rounded-full p-1 text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
@@ -271,7 +323,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
               disabled={loading || !form.lat || !form.lng}
               className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Guardando...' : 'Guardar líder'}
+              {loading ? 'Guardando...' : liderEditando ? 'Guardar cambios' : 'Guardar líder'}
             </button>
           </div>
         </form>

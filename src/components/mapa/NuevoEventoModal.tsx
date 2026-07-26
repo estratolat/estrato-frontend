@@ -10,9 +10,10 @@ interface Props {
   onCerrar: () => void;
   onExito: (id: string, lat?: number, lng?: number) => void;
   coordenadasIniciales?: { lat: number; lng: number } | null;
+  eventoEditando?: Record<string, any> | null;
 }
 
-export default function NuevoEventoModal({ abierto, onCerrar, onExito, coordenadasIniciales }: Props) {
+export default function NuevoEventoModal({ abierto, onCerrar, onExito, coordenadasIniciales, eventoEditando }: Props) {
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -38,27 +39,50 @@ export default function NuevoEventoModal({ abierto, onCerrar, onExito, coordenad
     setError(null);
     loadCatalogos();
 
-    const ahora = new Date();
-    const inicio = new Date(ahora.getTime() + 60 * 60 * 1000);
-    const fin = new Date(ahora.getTime() + 3 * 60 * 60 * 1000);
-
-    setFormData((prev) => ({
-      ...prev,
-      nombre: '',
-      descripcion: '',
-      direccion: '',
-      fecha_inicio: toDatetimeLocal(inicio),
-      fecha_fin: toDatetimeLocal(fin),
-      asistentes_estimados: '',
-      status: 'programado',
-      zona_id: '',
-      tematica: '',
-      lider_id: '',
-      generar_ficha: false,
-      lat: coordenadasIniciales?.lat.toFixed(6) || '',
-      lng: coordenadasIniciales?.lng.toFixed(6) || '',
-    }));
-  }, [abierto, coordenadasIniciales]);
+    if (eventoEditando) {
+      const c = eventoEditando.coordenadas;
+      setFormData({
+        nombre: eventoEditando.nombre || '',
+        descripcion: eventoEditando.descripcion || '',
+        direccion: eventoEditando.direccion || '',
+        lat: c && typeof c.lat === 'number' ? String(c.lat) : '',
+        lng: c && typeof c.lng === 'number' ? String(c.lng) : '',
+        fecha_inicio: eventoEditando.fecha_inicio
+          ? toDatetimeLocal(new Date(eventoEditando.fecha_inicio))
+          : '',
+        fecha_fin: eventoEditando.fecha_fin
+          ? toDatetimeLocal(new Date(eventoEditando.fecha_fin))
+          : '',
+        asistentes_estimados: eventoEditando.asistentes_estimados != null
+          ? String(eventoEditando.asistentes_estimados)
+          : '',
+        status: eventoEditando.status || 'programado',
+        zona_id: eventoEditando.zona_id || '',
+        tematica: eventoEditando.tematica || '',
+        lider_id: eventoEditando.lider_id || '',
+        generar_ficha: !!eventoEditando.generar_ficha,
+      });
+    } else {
+      const ahora = new Date();
+      const inicio = new Date(ahora.getTime() + 60 * 60 * 1000);
+      const fin = new Date(ahora.getTime() + 3 * 60 * 60 * 1000);
+      setFormData({
+        nombre: '',
+        descripcion: '',
+        direccion: '',
+        lat: coordenadasIniciales?.lat.toFixed(6) || '',
+        lng: coordenadasIniciales?.lng.toFixed(6) || '',
+        fecha_inicio: toDatetimeLocal(inicio),
+        fecha_fin: toDatetimeLocal(fin),
+        asistentes_estimados: '',
+        status: 'programado',
+        zona_id: '',
+        tematica: '',
+        lider_id: '',
+        generar_ficha: false,
+      });
+    }
+  }, [abierto, coordenadasIniciales, eventoEditando]);
 
   const loadCatalogos = async () => {
     try {
@@ -108,8 +132,13 @@ export default function NuevoEventoModal({ abierto, onCerrar, onExito, coordenad
         payload.coordenadas = { lat: parseFloat(formData.lat), lng: parseFloat(formData.lng) };
       }
 
-      const res = await eventosApi.create(payload);
-      onExito(res.data?.id, payload.coordenadas?.lat, payload.coordenadas?.lng);
+      if (eventoEditando?.id) {
+        const res = await eventosApi.update(eventoEditando.id, payload);
+        onExito(eventoEditando.id, payload.coordenadas?.lat, payload.coordenadas?.lng);
+      } else {
+        const res = await eventosApi.create(payload);
+        onExito(res.data?.id, payload.coordenadas?.lat, payload.coordenadas?.lng);
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear evento');
     } finally {
@@ -123,7 +152,7 @@ export default function NuevoEventoModal({ abierto, onCerrar, onExito, coordenad
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
       <div className="relative z-[10000] w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-secondary-900">Nuevo evento / mitin</h2>
+          <h2 className="text-lg font-bold text-secondary-900">{eventoEditando ? 'Editar evento / mitin' : 'Nuevo evento / mitin'}</h2>
           <button
             onClick={onCerrar}
             className="rounded-full p-1 text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
@@ -321,7 +350,7 @@ export default function NuevoEventoModal({ abierto, onCerrar, onExito, coordenad
               Cancelar
             </button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Guardando...' : 'Guardar evento'}
+              {loading ? 'Guardando...' : eventoEditando ? 'Guardar cambios' : 'Guardar evento'}
             </button>
           </div>
         </form>

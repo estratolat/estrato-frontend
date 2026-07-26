@@ -27,6 +27,7 @@ export default function CandidatoPage() {
     nombre: '',
     nombre_publico: '',
     cargo: '',
+    territorio: '',
     email: '',
     foto_url: '',
     redes_sociales: [] as { red: string; url?: string }[],
@@ -96,6 +97,7 @@ export default function CandidatoPage() {
           nombre: data.nombre || '',
           nombre_publico: data.nombre_publico || '',
           cargo: data.cargo || '',
+          territorio: data.territorio || '',
           email: data.email || '',
           foto_url: data.foto_url || '',
           redes_sociales: Array.isArray(data.redes_sociales) ? [...data.redes_sociales] : [],
@@ -360,7 +362,17 @@ function FichaCandidato({
                 className="input w-full"
                 value={form.cargo}
                 onChange={(e) => setForm((f: any) => ({ ...f, cargo: e.target.value }))}
-                placeholder="Cargo que busca"
+                placeholder="Ej. Presidenta municipal, Diputado local, Senador..."
+              />
+            </div>
+            <div className="text-left">
+              <label className="label">Territorio que representa</label>
+              <input
+                type="text"
+                className="input w-full"
+                value={form.territorio}
+                onChange={(e) => setForm((f: any) => ({ ...f, territorio: e.target.value }))}
+                placeholder="Ej. Dolores Hidalgo, Guanajuato, México"
               />
             </div>
             <div className="text-left">
@@ -395,6 +407,11 @@ function FichaCandidato({
             {perfil?.cargo && (
               <p className="mt-1 inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
                 {perfil.cargo}
+              </p>
+            )}
+            {perfil?.territorio && (
+              <p className="mt-1 text-xs text-secondary-500">
+                {perfil.territorio}
               </p>
             )}
             {perfil?.email && (

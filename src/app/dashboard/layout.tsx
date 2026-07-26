@@ -4,47 +4,67 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Icon, IconName } from '@/components/ui/Icon';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/hooks/useAuth';
 import { puedeAcceder } from '@/lib/permisos';
+import {
+  Squares2X2Icon,
+  UsersIcon,
+  ChatBubbleLeftRightIcon,
+  CalendarDaysIcon,
+  ClipboardDocumentListIcon,
+  MapPinIcon,
+  EyeIcon,
+  MapIcon,
+  ChartBarSquareIcon,
+  SparklesIcon,
+  ArrowTrendingUpIcon,
+  DocumentTextIcon,
+  UserIcon,
+  KeyIcon,
+  ShieldCheckIcon,
+  DevicePhoneMobileIcon,
+} from '@heroicons/react/24/solid';
 
-type MenuItem = { href: string; icon: IconName; label: string; color: string; permiso: string; externo?: boolean; grupo: string };
+type IconComponent = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+
+type MenuItem = { href: string; icon: IconComponent; label: string; color: string; permiso: string; externo?: boolean; grupo: string };
 
 // Flag para activar módulos avanzados/poco usados. Cambiar a true si se retoman.
 const HABILITAR_MODULOS_AVANZADOS = false;
 
 const MENU_ITEMS: MenuItem[] = [
   // Operación diaria
-  { href: '/dashboard', icon: 'dashboard', label: 'Dashboard', color: '#D73216', permiso: 'dashboard', grupo: 'operacion' },
-  { href: '/dashboard/votantes', icon: 'votantes', label: 'Votantes', color: '#3B82F6', permiso: 'votantes', grupo: 'operacion' },
-  { href: '/dashboard/crm', icon: 'crm', label: 'CRM', color: '#25D366', permiso: 'crm', grupo: 'operacion' },
-  { href: '/dashboard/eventos', icon: 'eventos', label: 'Eventos', color: '#F59E0B', permiso: 'eventos', grupo: 'operacion' },
-  { href: '/dashboard/encuestas', icon: 'crm', label: 'Encuestas', color: '#10B981', permiso: 'encuestas', grupo: 'operacion' },
-  { href: '/dashboard/casillas', icon: 'mapa', label: 'Casillas', color: '#6366F1', permiso: 'casillas', grupo: 'operacion' },
-  { href: '/dashboard/monitoreo', icon: 'dashboard', label: 'Monitoreo', color: '#F43F5E', permiso: 'monitoreo', grupo: 'operacion' },
+  { href: '/dashboard', icon: Squares2X2Icon, label: 'Dashboard', color: '#D73216', permiso: 'dashboard', grupo: 'operacion' },
+  { href: '/dashboard/votantes', icon: UsersIcon, label: 'Votantes', color: '#3B82F6', permiso: 'votantes', grupo: 'operacion' },
+  { href: '/dashboard/crm', icon: ChatBubbleLeftRightIcon, label: 'CRM', color: '#25D366', permiso: 'crm', grupo: 'operacion' },
+  { href: '/dashboard/eventos', icon: CalendarDaysIcon, label: 'Eventos', color: '#F59E0B', permiso: 'eventos', grupo: 'operacion' },
+  { href: '/dashboard/encuestas', icon: ClipboardDocumentListIcon, label: 'Encuestas', color: '#10B981', permiso: 'encuestas', grupo: 'operacion' },
+  { href: '/dashboard/casillas', icon: MapPinIcon, label: 'Casillas', color: '#6366F1', permiso: 'casillas', grupo: 'operacion' },
+  { href: '/dashboard/monitoreo', icon: EyeIcon, label: 'Monitoreo', color: '#F43F5E', permiso: 'monitoreo', grupo: 'operacion' },
 
   // Territorio e inteligencia
-  { href: '/dashboard/mapa', icon: 'mapa', label: 'Mapa Territorial', color: '#8B5CF6', permiso: 'mapa', grupo: 'inteligencia' },
-  { href: '/dashboard/historico-electoral', icon: 'historico', label: 'Histórico Electoral', color: '#F59E0B', permiso: 'historico_electoral', grupo: 'inteligencia' },
-  { href: '/dashboard/inteligencia-electoral', icon: 'ia', label: 'Inteligencia Electoral', color: '#7C3AED', permiso: 'inteligencia_electoral', grupo: 'inteligencia' },
-  { href: '/dashboard/proyeccion', icon: 'historico', label: 'Proyección', color: '#8B5CF6', permiso: 'proyeccion', grupo: 'inteligencia' },
-  { href: '/dashboard/ficha-seccional', icon: 'votantes', label: 'Ficha Seccional', color: '#06B6D4', permiso: 'ficha_seccional', grupo: 'inteligencia' },
+  { href: '/dashboard/mapa', icon: MapIcon, label: 'Mapa Territorial', color: '#8B5CF6', permiso: 'mapa', grupo: 'inteligencia' },
+  { href: '/dashboard/historico-electoral', icon: ChartBarSquareIcon, label: 'Histórico Electoral', color: '#F59E0B', permiso: 'historico_electoral', grupo: 'inteligencia' },
+  { href: '/dashboard/inteligencia-electoral', icon: SparklesIcon, label: 'Inteligencia Electoral', color: '#7C3AED', permiso: 'inteligencia_electoral', grupo: 'inteligencia' },
+  { href: '/dashboard/proyeccion', icon: ArrowTrendingUpIcon, label: 'Proyección', color: '#8B5CF6', permiso: 'proyeccion', grupo: 'inteligencia' },
+  { href: '/dashboard/ficha-seccional', icon: DocumentTextIcon, label: 'Ficha Seccional', color: '#06B6D4', permiso: 'ficha_seccional', grupo: 'inteligencia' },
 
   // Configuración del proyecto
-  { href: '/dashboard/candidato', icon: 'user', label: 'Candidato', color: '#D73216', permiso: 'candidato', grupo: 'configuracion' },
-  { href: '/dashboard/usuarios', icon: 'seguridad', label: 'Accesos', color: '#64748B', permiso: 'usuarios', grupo: 'configuracion' },
-  { href: '/dashboard/admin', icon: 'seguridad', label: 'Admin', color: '#7C3AED', permiso: 'admin', grupo: 'configuracion' },
+  { href: '/dashboard/candidato', icon: UserIcon, label: 'Candidato', color: '#D73216', permiso: 'candidato', grupo: 'configuracion' },
+  { href: '/dashboard/usuarios', icon: KeyIcon, label: 'Accesos', color: '#64748B', permiso: 'usuarios', grupo: 'configuracion' },
+  { href: '/dashboard/admin', icon: ShieldCheckIcon, label: 'Admin', color: '#7C3AED', permiso: 'admin', grupo: 'configuracion' },
 
   // Módulos avanzados desactivados por defecto
   ...(HABILITAR_MODULOS_AVANZADOS
     ? [
-        { href: '/dashboard/llamadas', icon: 'llamadas', label: 'Llamadas', color: '#EC4899', permiso: 'llamadas', grupo: 'avanzados' } as MenuItem,
-        { href: '/dashboard/boletines', icon: 'boletines', label: 'Boletines IA', color: '#06B6D4', permiso: 'boletines', grupo: 'avanzados' } as MenuItem,
+        { href: '/dashboard/llamadas', icon: ChatBubbleLeftRightIcon, label: 'Llamadas', color: '#EC4899', permiso: 'llamadas', grupo: 'avanzados' } as MenuItem,
+        { href: '/dashboard/boletines', icon: DocumentTextIcon, label: 'Boletines IA', color: '#06B6D4', permiso: 'boletines', grupo: 'avanzados' } as MenuItem,
       ]
     : []),
 
   // App brigada (link externo)
-  { href: '/brigada/login', icon: 'app', label: 'App Brigada', color: '#D73216', permiso: 'app_brigada', externo: true, grupo: 'brigada' },
+  { href: '/brigada/login', icon: DevicePhoneMobileIcon, label: 'App Brigada', color: '#D73216', permiso: 'app_brigada', externo: true, grupo: 'brigada' },
 ];
 
 export default function DashboardLayout({
@@ -162,25 +182,24 @@ function NavIcon({
   externo,
 }: {
   href: string;
-  icon: IconName;
+  icon: IconComponent;
   label: string;
   color: string;
   active: boolean;
   externo?: boolean;
 }) {
+  const IconComp = icon;
   const classes = `group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all ${
     active ? 'bg-secondary-100' : 'hover:bg-secondary-50'
   }`;
   const content = (
     <>
-      <Icon
-        name={icon}
-        size={22}
+      <IconComp
+        className="h-6 w-6 transition-transform duration-200 group-hover:scale-110"
         style={{ color }}
-        className="transition-transform duration-200 group-hover:scale-110"
       />
 
-      {/* Tooltip */}
+      {/* Tooltip único (sin title nativo duplicado) */}
       <span
         className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-secondary-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
         style={{ zIndex: 60 }}
@@ -193,14 +212,14 @@ function NavIcon({
 
   if (externo) {
     return (
-      <a href={href} className={classes} title={label} target="_blank" rel="noopener noreferrer">
+      <a href={href} className={classes} target="_blank" rel="noopener noreferrer">
         {content}
       </a>
     );
   }
 
   return (
-    <Link href={href} className={classes} title={label}>
+    <Link href={href} className={classes}>
       {content}
     </Link>
   );

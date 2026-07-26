@@ -104,17 +104,6 @@ export const votantesApi = {
   importar: (votantes: any[]) => api.post('/votantes/importar', { votantes }),
 };
 
-// === API de Eventos ===
-export const eventosApi = {
-  getAll: (filters?: any) => api.get('/eventos', { params: filters }),
-  getOne: (id: string) => api.get(`/eventos/${id}`),
-  create: (data: any) => api.post('/eventos', data),
-  update: (id: string, data: any) => api.patch(`/eventos/${id}`, data),
-  registrarAsistencia: (eventoId: string, data: any) =>
-    api.post(`/eventos/${eventoId}/asistencias`, data),
-  eliminarAsistencia: (eventoId: string, votanteId: string) =>
-    api.delete(`/eventos/${eventoId}/asistencias/${votanteId}`),
-};
 
 // === API de Auth ===
 export const authApi = {
@@ -140,6 +129,18 @@ export const apoyosApi = {
   getAll: (filters?: any) => api.get('/apoyos', { params: filters }),
   create: (data: any) => api.post('/apoyos', data),
   getStats: () => api.get('/apoyos/stats'),
+};
+
+export const eventosApi = {
+  getAll: (filters?: any) => api.get('/eventos', { params: filters }),
+  getProximos: () => api.get('/eventos/proximos'),
+  getOne: (id: string) => api.get(`/eventos/${id}`),
+  create: (data: any) => api.post('/eventos', data),
+  update: (id: string, data: any) => api.patch(`/eventos/${id}`, data),
+  registrarAsistencia: (eventoId: string, data: any) =>
+    api.post(`/eventos/${eventoId}/asistencias`, data),
+  eliminarAsistencia: (eventoId: string, votanteId: string) =>
+    api.delete(`/eventos/${eventoId}/asistencias/${votanteId}`),
 };
 
 // === API de Zonas ===

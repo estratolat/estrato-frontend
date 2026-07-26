@@ -39,6 +39,8 @@ interface Opositor {
   foto_url?: string;
   nivel_rivalidad: number;
   redes_sociales?: RedSocial[];
+  descripcion?: string;
+  ficha_negativa?: string;
   notas?: string;
   activo: boolean;
   created_at: string;
@@ -109,6 +111,8 @@ export default function OpositoresPage() {
     foto_url: '',
     nivel_rivalidad: 1,
     redes_sociales: [] as RedSocial[],
+    descripcion: '',
+    ficha_negativa: '',
     notas: '',
   });
 
@@ -142,6 +146,8 @@ export default function OpositoresPage() {
       foto_url: '',
       nivel_rivalidad: 1,
       redes_sociales: [],
+      descripcion: '',
+      ficha_negativa: '',
       notas: '',
     });
     setModalOpen(true);
@@ -155,6 +161,8 @@ export default function OpositoresPage() {
       foto_url: op.foto_url || '',
       nivel_rivalidad: op.nivel_rivalidad,
       redes_sociales: op.redes_sociales?.length ? [...op.redes_sociales] : [],
+      descripcion: op.descripcion || '',
+      ficha_negativa: op.ficha_negativa || '',
       notas: op.notas || '',
     });
     setModalOpen(true);
@@ -171,6 +179,8 @@ export default function OpositoresPage() {
         redes_sociales: form.redes_sociales
           .map((r) => ({ red: r.red.trim(), url: r.url?.trim() }))
           .filter((r) => r.red && r.url),
+        descripcion: form.descripcion.trim() || undefined,
+        ficha_negativa: form.ficha_negativa.trim() || undefined,
         notas: form.notas.trim() || undefined,
       };
 
@@ -418,6 +428,21 @@ export default function OpositoresPage() {
         </div>
       )}
 
+      {/* Descripción y ficha negativa de los 3 primeros lugares */}
+      {(retador?.descripcion || retador?.ficha_negativa || segundo?.descripcion || segundo?.ficha_negativa || tercero?.descripcion || tercero?.ficha_negativa) && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          {retador && (retador.descripcion || retador.ficha_negativa) && (
+            <FichaOpositor opositor={retador} etiqueta="Retador principal" colorClase="bg-red-100 text-red-700" />
+          )}
+          {segundo && (segundo.descripcion || segundo.ficha_negativa) && (
+            <FichaOpositor opositor={segundo} etiqueta="Segundo lugar" colorClase="bg-orange-100 text-orange-700" />
+          )}
+          {tercero && (tercero.descripcion || tercero.ficha_negativa) && (
+            <FichaOpositor opositor={tercero} etiqueta="Tercer lugar" colorClase="bg-amber-100 text-amber-700" />
+          )}
+        </div>
+      )}
+
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -540,12 +565,35 @@ export default function OpositoresPage() {
               </div>
 
               <div>
-                <label className="label">Notas</label>
+                <label className="label">Descripción / Perfil del opositor</label>
+                <textarea
+                  className="input w-full min-h-[100px]"
+                  value={form.descripcion}
+                  onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+                  placeholder="Perfil general: trayectoria, propuestas, discurso, fortalezas visibles..."
+                />
+              </div>
+
+              <div>
+                <label className="label">Ficha negativa</label>
+                <p className="mb-1 text-xs text-secondary-500">
+                  Debilidades, polémicas, contradicciones o líneas de ataque. Servirá de referencia para generar contraste con IA.
+                </p>
+                <textarea
+                  className="input w-full min-h-[120px]"
+                  value={form.ficha_negativa}
+                  onChange={(e) => setForm((f) => ({ ...f, ficha_negativa: e.target.value }))}
+                  placeholder="Ej. votó en contra de... prometió X y hizo Y... investigación por..."
+                />
+              </div>
+
+              <div>
+                <label className="label">Notas internas</label>
                 <textarea
                   className="input w-full min-h-[80px]"
                   value={form.notas}
                   onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
-                  placeholder="Observaciones internas..."
+                  placeholder="Observaciones privadas del equipo..."
                 />
               </div>
 
@@ -601,6 +649,40 @@ function FeedBox({
         <div className="flex h-64 flex-col items-center justify-center rounded-lg bg-secondary-50 text-secondary-500">
           <Facebook className="mb-2 h-8 w-8 text-secondary-300" />
           <p className="text-sm">Sin URL de Facebook configurada</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function FichaOpositor({
+  opositor,
+  etiqueta,
+  colorClase,
+}: {
+  opositor: Opositor;
+  etiqueta: string;
+  colorClase: string;
+}) {
+  return (
+    <div className="rounded-xl border border-secondary-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-bold text-secondary-900">{opositor.nombre}</h3>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorClase}`}>{etiqueta}</span>
+      </div>
+
+      {opositor.descripcion && (
+        <div className="mb-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-secondary-500">Descripción / Perfil</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary-700">{opositor.descripcion}</p>
+        </div>
+      )}
+
+      {opositor.ficha_negativa && (
+        <div className="rounded-lg border border-red-200 bg-red-50/60 p-3">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">Ficha negativa</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary-700">{opositor.ficha_negativa}</p>
         </div>
       )}
     </div>

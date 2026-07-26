@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { casillasApi } from '@/lib/api';
 import { Casilla } from '@/types';
 import CasillaForm from '@/components/casillas/CasillaForm';
+import CasillaResultadosHistorico from '@/components/casillas/CasillaResultadosHistorico';
 
 export default function EditarCasillaPage() {
   const { id } = useParams();
@@ -42,12 +43,13 @@ export default function EditarCasillaPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-secondary-900">Editar Casilla</h2>
         <p className="text-secondary-600">Sección {casilla.seccion} • {casilla.ubicacion || 'Sin ubicación'}</p>
       </div>
       <CasillaForm casilla={casilla} />
+      <CasillaResultadosHistorico casillaId={casilla.id} />
     </div>
   );
 }

@@ -270,6 +270,7 @@ export const encuestasApi = {
 export const casillasApi = {
   getAll: (filters?: any) => api.get('/casillas', { params: filters }),
   getOne: (id: string) => api.get(`/casillas/${id}`),
+  getResultadosHistoricos: (id: string) => api.get(`/casillas/${id}/resultados`),
   create: (data: any) => api.post('/casillas', data),
   update: (id: string, data: any) => api.patch(`/casillas/${id}`, data),
   delete: (id: string) => api.delete(`/casillas/${id}`),

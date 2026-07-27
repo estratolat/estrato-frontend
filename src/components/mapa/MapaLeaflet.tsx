@@ -1286,6 +1286,15 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
     pane.style.zIndex = String(zIndex);
     pane.style.pointerEvents = bloqueada ? 'none' : 'auto';
 
+    // Refuerzo: asegurar que todos los elementos gráficos de una capa bloqueada
+    // no intercepten eventos de puntero, permitiendo clics a marcadores/eventos debajo.
+    const aplicarBloqueoPointerEvents = () => {
+      if (!pane) return;
+      pane.querySelectorAll('path, circle, svg').forEach((el) => {
+        (el as HTMLElement).style.pointerEvents = bloqueada ? 'none' : 'auto';
+      });
+    };
+
     const baseStyle = (feature: any) => {
       const props = feature?.properties || {};
       const color = props._feature_color || capa.color || '#3B82F6';
@@ -1303,6 +1312,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
     const layer = L.geoJSON(data, {
       pane: paneName,
       style: baseStyle,
+      interactive: !bloqueada,
       onEachFeature: bloqueada
         ? undefined
         : (feature: any, l: any) => {
@@ -1365,10 +1375,16 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
     layer.addTo(map);
     capaRef.current = layer;
     capasGeoJSONRef.current?.set(capa.id, layer);
+
+    // Aplicar refuerzo de pointer-events tras el render (sync + microtask por seguridad)
+    aplicarBloqueoPointerEvents();
+    const timeoutRefuerzo = setTimeout(aplicarBloqueoPointerEvents, 0);
+
     console.log('[CapaPersonalizada] renderizada', capa.id, capa.nombre, 'bloqueada:', bloqueada, 'orden:', orden, 'features:', data.features.length);
     onRender?.();
 
     return () => {
+      clearTimeout(timeoutRefuerzo);
       if (capaRef.current) {
         capaRef.current.removeFrom(map);
         capasGeoJSONRef.current?.delete(capa.id);

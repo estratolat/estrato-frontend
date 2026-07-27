@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { puedeAcceder } from '@/lib/permisos';
 import { crmApi } from '@/lib/api';
@@ -123,7 +124,13 @@ export default function CrmPage() {
           <h2 className="text-2xl font-bold text-secondary-800">Bandeja de entrada</h2>
           <p className="text-secondary-500">WhatsApp, Messenger, Instagram y más en un solo lugar.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/crm/canales"
+            className="rounded-lg border border-secondary-200 bg-white px-3 py-2 text-sm font-medium text-secondary-700 hover:bg-secondary-50"
+          >
+            ⚙️ Configurar canales
+          </Link>
           <div className="rounded-lg border border-secondary-200 bg-white px-4 py-2 text-center">
             <p className="text-xs text-secondary-500">Pendientes</p>
             <p className="text-xl font-bold text-secondary-800">{stats.pendientes}</p>

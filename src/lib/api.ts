@@ -122,6 +122,13 @@ export const crmApi = {
   enviarMensaje: (data: any) => api.post('/crm/mensajes', data),
   marcarLeido: (id: string) => api.patch(`/crm/mensajes/${id}/leido`),
   getStats: () => api.get('/crm/stats'),
+  // Canales CRM
+  getCanales: (soloActivos = false) =>
+    api.get('/crm/canales', { params: { solo_activos: soloActivos } }),
+  getCanal: (id: string) => api.get(`/crm/canales/${id}`),
+  createCanal: (data: any) => api.post('/crm/canales', data),
+  updateCanal: (id: string, data: any) => api.patch(`/crm/canales/${id}`, data),
+  deleteCanal: (id: string) => api.delete(`/crm/canales/${id}`),
 };
 
 // === API de Apoyos ===
@@ -350,6 +357,18 @@ export const opositoresApi = {
   create: (data: any) => api.post('/opositores', data),
   update: (id: string, data: any) => api.patch(`/opositores/${id}`, data),
   delete: (id: string) => api.delete(`/opositores/${id}`),
+};
+
+// === API de Data México ===
+export const dataApi = {
+  getIndicadores: (filters?: { categoria?: string; periodo?: string; subcategoria?: string }) =>
+    api.get('/data/indicadores', { params: filters }),
+  getResumen: () => api.get('/data/resumen'),
+  getCruce: (indicadorA: string, indicadorB: string, periodo?: string) =>
+    api.get('/data/cruce', { params: { indicadorA, indicadorB, periodo } }),
+  create: (data: any) => api.post('/data/indicadores', data),
+  update: (id: string, data: any) => api.patch(`/data/indicadores/${id}`, data),
+  delete: (id: string) => api.delete(`/data/indicadores/${id}`),
 };
 
 // === API de Mapa Territorial ===

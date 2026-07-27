@@ -2127,7 +2127,7 @@ function ActoresConsolidadosChart({
   const max = sorted[0]?.votos || 1;
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {sorted.map((a) => {
         const isPrincipal = principal && a.partido === principal;
         const desglose = detalle[a.partido] || { individual: 0, coaliciones: [] };
@@ -2135,7 +2135,7 @@ function ActoresConsolidadosChart({
         return (
           <div
             key={a.partido}
-            className={`rounded-lg border p-3 ${isPrincipal ? 'border-primary-300 bg-primary-50' : 'border-secondary-200 bg-white'}`}
+            className={`flex flex-col justify-between rounded-lg border p-3 ${isPrincipal ? 'border-primary-300 bg-primary-50' : 'border-secondary-200 bg-white'}`}
           >
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -2145,7 +2145,7 @@ function ActoresConsolidadosChart({
                 >
                   {a.partido}
                 </span>
-                {isPrincipal && <span className="text-xs font-semibold text-primary-700">Actor principal</span>}
+                {isPrincipal && <span className="text-xs font-semibold text-primary-700">Principal</span>}
               </div>
               <span className="text-lg font-bold text-secondary-900">{a.votos.toLocaleString()}</span>
             </div>
@@ -2154,17 +2154,19 @@ function ActoresConsolidadosChart({
               max={max}
               color={PARTIDO_COLORS[a.partido.toUpperCase()] || PARTIDO_COLORS.OTRO}
             />
-            <div className="mt-3 grid gap-1 text-xs text-secondary-600 sm:grid-cols-2">
-              <div className="rounded bg-secondary-50 px-2 py-1">
-                Voto individual: <strong className="text-secondary-900">{desglose.individual.toLocaleString()}</strong>
+            <div className="mt-3 space-y-1 text-xs text-secondary-600">
+              <div className="flex justify-between rounded bg-secondary-50 px-2 py-1">
+                <span>Voto individual</span>
+                <strong className="text-secondary-900">{desglose.individual.toLocaleString()}</strong>
               </div>
               {desglose.coaliciones.map((c) => (
-                <div key={c.nombre} className="rounded bg-secondary-50 px-2 py-1">
-                  Coalición {c.nombre}: <strong className="text-secondary-900">+{c.votos.toLocaleString()}</strong>
+                <div key={c.nombre} className="flex justify-between rounded bg-secondary-50 px-2 py-1">
+                  <span>Coalición {c.nombre}</span>
+                  <strong className="text-secondary-900">+{c.votos.toLocaleString()}</strong>
                 </div>
               ))}
               {totalCoaliciones === 0 && (
-                <div className="rounded bg-secondary-50 px-2 py-1 italic text-secondary-400">Sin coaliciones registradas</div>
+                <div className="rounded bg-secondary-50 px-2 py-1 italic text-secondary-400">Sin coaliciones</div>
               )}
             </div>
           </div>

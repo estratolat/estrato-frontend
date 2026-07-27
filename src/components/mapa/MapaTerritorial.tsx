@@ -940,7 +940,7 @@ export default function MapaTerritorial() {
             if (!activas[capa.id]) {
               setActivas(prev => ({ ...prev, [capa.id]: true }));
             }
-            setCapaEditarEstilos(capa);
+            abrirExplorador(capa.id, capa.nombre, capa.color);
           }}
           className="flex items-center justify-center gap-1 rounded-md bg-amber-50 py-1.5 text-[10px] font-semibold text-amber-700 transition hover:bg-amber-100"
           title="Buscar polígonos de esta capa"

@@ -44,6 +44,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/eventos', icon: CalendarDaysIcon, label: 'Eventos', color: '#7C3AED', permiso: 'eventos', grupo: 'operacion' },
   { href: '/dashboard/encuestas', icon: ClipboardDocumentListIcon, label: 'Encuestas', color: '#D97706', permiso: 'encuestas', grupo: 'operacion' },
   { href: '/dashboard/casillas', icon: MapPinIcon, label: 'Casillas', color: '#DB2777', permiso: 'casillas', grupo: 'operacion' },
+  { href: '/dashboard/informes-ine', icon: ClipboardDocumentCheckIcon, label: 'Informes INE', color: '#7C2D12', permiso: 'informes_ine', grupo: 'operacion' },
   { href: '/dashboard/monitoreo', icon: EyeIcon, label: 'Monitoreo', color: '#0891B2', permiso: 'monitoreo', grupo: 'operacion' },
 
   // Territorio e inteligencia
@@ -54,6 +55,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/ficha-seccional', icon: DocumentTextIcon, label: 'Ficha Seccional', color: '#C2410C', permiso: 'ficha_seccional', grupo: 'inteligencia' },
   { href: '/dashboard/opositores', icon: UserGroupIcon, label: 'Opositores', color: '#DC2626', permiso: 'opositores', grupo: 'inteligencia' },
   { href: '/dashboard/boletines', icon: DocumentTextIcon, label: 'Boletines IA', color: '#0369A1', permiso: 'boletines', grupo: 'inteligencia' },
+  { href: '/dashboard/data', icon: ChartBarSquareIcon, label: 'Data', color: '#0891B2', permiso: 'data', grupo: 'inteligencia' },
 
   // Configuración del proyecto
   { href: '/dashboard/candidato', icon: UserIcon, label: 'Candidato', color: '#BE185D', permiso: 'candidato', grupo: 'configuracion' },

@@ -141,26 +141,46 @@ const MAPEO_VACIO: MapeoState = {
 // Ej: PAN = PAN + PAN_PRI_PRD + PAN_PRI + PAN_PRD
 function consolidarCoalicionesActores(
   actores: { partido: string; votos: number; tipo?: 'individual' | 'coalicion' }[]
-): { partido: string; votos: number; tipo: 'individual' | 'coalicion' }[] {
+): {
+  consolidado: { partido: string; votos: number; tipo: 'individual' | 'coalicion' }[];
+  detalle: Record<string, { individual: number; coaliciones: { nombre: string; votos: number }[] }>;
+} {
   const acumulado = new Map<string, number>();
+  const individual = new Map<string, number>();
+  const coalicionDetalle = new Map<string, { nombre: string; votos: number }[]>();
 
   for (const actor of actores) {
     if (!actor || !actor.partido || typeof actor.votos !== 'number') continue;
     const partes = actor.partido.split('_');
     const esCoalicion = partes.length > 1;
+
     if (esCoalicion) {
       for (const parte of partes) {
         if (!parte) continue;
         acumulado.set(parte, (acumulado.get(parte) || 0) + actor.votos);
+        if (!coalicionDetalle.has(parte)) coalicionDetalle.set(parte, []);
+        const lista = coalicionDetalle.get(parte)!;
+        lista.push({ nombre: actor.partido, votos: actor.votos });
       }
     } else {
       acumulado.set(actor.partido, (acumulado.get(actor.partido) || 0) + actor.votos);
+      individual.set(actor.partido, (individual.get(actor.partido) || 0) + actor.votos);
     }
   }
 
-  return Array.from(acumulado.entries())
+  const detalle: Record<string, { individual: number; coaliciones: { nombre: string; votos: number }[] }> = {};
+  acumulado.forEach((_votos, partido) => {
+    detalle[partido] = {
+      individual: individual.get(partido) || 0,
+      coaliciones: coalicionDetalle.get(partido) || [],
+    };
+  });
+
+  const consolidado = Array.from(acumulado.entries())
     .map(([partido, votos]) => ({ partido, votos, tipo: 'individual' as const }))
     .sort((a, b) => b.votos - a.votos);
+
+  return { consolidado, detalle };
 }
 
 const CAMPOS_MAPEO: { key: keyof MapeoState; label: string; required?: boolean }[] = [
@@ -2057,9 +2077,11 @@ function MiniBar({
 function ActoresChart({
   actores,
   principal,
+  consolidado,
 }: {
   actores: { partido: string; votos: number }[];
   principal?: string;
+  consolidado?: boolean;
 }) {
   const sorted = [...actores]
     .filter((a) => a && a.partido && typeof a.votos === 'number')
@@ -2080,6 +2102,71 @@ function ActoresChart({
               max={max}
               color={PARTIDO_COLORS[a.partido.toUpperCase()] || PARTIDO_COLORS.OTRO}
             />
+          </div>
+        );
+      })}
+      {consolidado && sorted.length === 0 && (
+        <p className="text-sm text-secondary-500">No hay partidos individuales para consolidar.</p>
+      )}
+    </div>
+  );
+}
+
+function ActoresConsolidadosChart({
+  actores,
+  detalle,
+  principal,
+}: {
+  actores: { partido: string; votos: number }[];
+  detalle: Record<string, { individual: number; coaliciones: { nombre: string; votos: number }[] }>;
+  principal?: string;
+}) {
+  const sorted = [...actores]
+    .filter((a) => a && a.partido && typeof a.votos === 'number')
+    .sort((a, b) => b.votos - a.votos);
+  const max = sorted[0]?.votos || 1;
+
+  return (
+    <div className="space-y-4">
+      {sorted.map((a) => {
+        const isPrincipal = principal && a.partido === principal;
+        const desglose = detalle[a.partido] || { individual: 0, coaliciones: [] };
+        const totalCoaliciones = desglose.coaliciones.reduce((acc, c) => acc + c.votos, 0);
+        return (
+          <div
+            key={a.partido}
+            className={`rounded-lg border p-3 ${isPrincipal ? 'border-primary-300 bg-primary-50' : 'border-secondary-200 bg-white'}`}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold text-white"
+                  style={{ backgroundColor: PARTIDO_COLORS[a.partido.toUpperCase()] || PARTIDO_COLORS.OTRO }}
+                >
+                  {a.partido}
+                </span>
+                {isPrincipal && <span className="text-xs font-semibold text-primary-700">Actor principal</span>}
+              </div>
+              <span className="text-lg font-bold text-secondary-900">{a.votos.toLocaleString()}</span>
+            </div>
+            <MiniBar
+              value={a.votos}
+              max={max}
+              color={PARTIDO_COLORS[a.partido.toUpperCase()] || PARTIDO_COLORS.OTRO}
+            />
+            <div className="mt-3 grid gap-1 text-xs text-secondary-600 sm:grid-cols-2">
+              <div className="rounded bg-secondary-50 px-2 py-1">
+                Voto individual: <strong className="text-secondary-900">{desglose.individual.toLocaleString()}</strong>
+              </div>
+              {desglose.coaliciones.map((c) => (
+                <div key={c.nombre} className="rounded bg-secondary-50 px-2 py-1">
+                  Coalición {c.nombre}: <strong className="text-secondary-900">+{c.votos.toLocaleString()}</strong>
+                </div>
+              ))}
+              {totalCoaliciones === 0 && (
+                <div className="rounded bg-secondary-50 px-2 py-1 italic text-secondary-400">Sin coaliciones registradas</div>
+              )}
+            </div>
           </div>
         );
       })}
@@ -2178,7 +2265,7 @@ function DetalleView({
   }, [h]);
 
   const actores = h.partidos || [];
-  const actoresConsolidados = useMemo(() => consolidarCoalicionesActores(actores), [actores]);
+  const { consolidado: actoresConsolidados, detalle } = useMemo(() => consolidarCoalicionesActores(actores), [actores]);
   const actoresMostrados = consolidarCoaliciones ? actoresConsolidados : actores;
   const sortedActores = [...actoresMostrados]
     .filter((a) => a && typeof a.votos === 'number' && a.partido)
@@ -2247,8 +2334,10 @@ function DetalleView({
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <BarChart3 size={20} className="text-primary-600" />
-            <h3 className="text-lg font-bold text-secondary-900">Votos por actor</h3>
-            {consolidarCoaliciones && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">Con coaliciones consolidadas</span>}
+            <h3 className="text-lg font-bold text-secondary-900">
+              {consolidarCoaliciones ? 'Votos por partido (coaliciones consolidadas)' : 'Votos por actor'}
+            </h3>
+            {consolidarCoaliciones && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">Cada coalición suma a sus partidos</span>}
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-secondary-700">
             <input
@@ -2261,9 +2350,15 @@ function DetalleView({
           </label>
         </div>
         <p className="mb-3 text-xs text-secondary-500">
-          Al consolidar, los votos de cada coalición (PAN_PRI_PRD, PAN_PRI, etc.) se suman a cada partido que la compone.
+          {consolidarCoaliciones
+            ? 'A continuación se muestra el total de votos de cada partido incluyendo su aporte individual más las coaliciones a las que pertenece.'
+            : 'Distribución directa de votos según los actores registrados (partidos y coaliciones).'}
         </p>
-        <ActoresChart actores={actoresMostrados} principal={h.partido_principal} />
+        {consolidarCoaliciones ? (
+          <ActoresConsolidadosChart actores={actoresMostrados} detalle={detalle} principal={h.partido_principal} />
+        ) : (
+          <ActoresChart actores={actoresMostrados} principal={h.partido_principal} />
+        )}
       </div>
 
       {/* Tabla de casillas */}

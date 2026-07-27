@@ -2024,7 +2024,9 @@ function ActoresChart({
   actores: { partido: string; votos: number }[];
   principal?: string;
 }) {
-  const sorted = [...actores].sort((a, b) => b.votos - a.votos);
+  const sorted = [...actores]
+    .filter((a) => a && a.partido && typeof a.votos === 'number')
+    .sort((a, b) => b.votos - a.votos);
   const max = sorted[0]?.votos || 1;
   return (
     <div className="space-y-2">
@@ -2088,7 +2090,7 @@ function CasillasTable({
               <td className="px-3 py-2 text-right text-secondary-700">{r.votos_ganador?.toLocaleString() || '-'}</td>
               <td className="px-3 py-2 text-right text-secondary-700">{r.total_votos?.toLocaleString() || '-'}</td>
               <td className="px-3 py-2 text-right text-secondary-700">
-                {r.participacion_pct !== undefined ? `${r.participacion_pct.toFixed(2)}%` : '-'}
+                {typeof r.participacion_pct === 'number' ? `${r.participacion_pct.toFixed(2)}%` : '-'}
               </td>
               <td className="px-3 py-2">
                 <DesglosePreview desglose={r.desglose_partidos} principal={principal || r.partido_principal} />
@@ -2246,16 +2248,18 @@ function DesglosePreview({
   principal?: string;
 }) {
   if (!desglose || desglose.length === 0) return <span className="text-secondary-400">-</span>;
-  const sorted = [...desglose].sort((a, b) => b.votos - a.votos);
+  const sorted = [...desglose]
+    .filter((a) => a && typeof a.votos === 'number' && a.partido)
+    .sort((a, b) => b.votos - a.votos);
   const top = sorted.slice(0, 3);
   const principalEnTop = principal && top.some((a) => a.partido === principal);
   const principalActor = principal ? sorted.find((a) => a.partido === principal) : null;
   const entries = principalEnTop || !principalActor ? top : [...top.slice(0, 2), principalActor];
   return (
     <div className="flex flex-wrap gap-1">
-      {entries.map((actor) => (
+      {entries.map((actor, idx) => (
         <span
-          key={`${actor.partido}-${actor.tipo}`}
+          key={`${actor.partido || 'X'}-${idx}`}
           className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${
             actor.partido === principal
               ? 'border-primary-300 bg-primary-50 text-primary-800 font-semibold'
@@ -2263,7 +2267,7 @@ function DesglosePreview({
           }`}
           title={actor.tipo === 'coalicion' ? 'Coalición' : 'Individual'}
         >
-          <span className={actor.partido === principal ? 'font-bold' : 'font-semibold'}>{actor.partido}</span> {actor.votos.toLocaleString()}
+          <span className={actor.partido === principal ? 'font-bold' : 'font-semibold'}>{actor.partido || '?'}</span> {actor.votos.toLocaleString()}
           {actor.tipo === 'coalicion' && <span className="text-[10px] text-secondary-400">C</span>}
         </span>
       ))}

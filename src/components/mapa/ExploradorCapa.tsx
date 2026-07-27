@@ -63,7 +63,7 @@ export default function ExploradorCapa({
 
   const elementos = useMemo(() => {
     const lista: ElementoCapa[] = [];
-    const fuentes = capas || (data && capaId ? [{ capa: { id: capaId, nombre: capaNombre || 'Capa', color: color || '#3B82F6', tipo: 'custom', origen: 'propia', visible: true, orden: 0 } as CapaMapa, data }] : []);
+    const fuentes = capas || (data && capaId ? [{ capa: { id: capaId, nombre: capaNombre || 'Capa', color: color || '#3B82F6', tipo: 'custom', origen: 'propia', visible: true, bloqueada: false, orden: 0 } as CapaMapa, data }] : []);
 
     fuentes.forEach(({ capa, data: d }) => {
       if (!d?.features?.length) return;

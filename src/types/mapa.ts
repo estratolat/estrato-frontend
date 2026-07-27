@@ -26,6 +26,28 @@ export interface GeoJSONCollection {
   features: GeoJSONFeature[];
 }
 
+export interface FeatureMetadata {
+  seccion?: string;
+  lider_id?: string;
+  zona_id?: string;
+  tags?: string[];
+  notas?: string;
+  custom?: Record<string, any>;
+  [key: string]: any;
+}
+
+export interface FeatureCapa {
+  feature_id: string;
+  nombre: string;
+  color: string;
+  opacidad: number;
+  bloqueado: boolean;
+  metadata: FeatureMetadata;
+  properties: Record<string, any>;
+  geometry?: any;
+  bbox?: [number, number, number, number];
+}
+
 export interface CapaMapa {
   id: string;
   tipo: string;
@@ -36,7 +58,7 @@ export interface CapaMapa {
   bloqueada: boolean;
   orden: number;
   metadata?: Record<string, any>;
-  estilos?: Record<string, { color?: string; nombre?: string }>;
+  estilos?: Record<string, { color?: string; nombre?: string; opacidad?: number; bloqueado?: boolean; metadata?: FeatureMetadata }>;
 }
 
 export interface MapaData {

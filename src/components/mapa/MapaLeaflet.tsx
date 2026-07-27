@@ -1270,13 +1270,16 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
     pane.style.pointerEvents = bloqueada ? 'none' : 'auto';
 
     const baseStyle = (feature: any) => {
-      const color = feature?.properties?._feature_color || capa.color || '#3B82F6';
+      const props = feature?.properties || {};
+      const color = props._feature_color || capa.color || '#3B82F6';
+      const opacidad = props._feature_opacidad != null ? Number(props._feature_opacidad) : (esCapaSindical ? 0.85 : 0.7);
+      const fillOpacity = props._feature_opacidad != null ? Number(props._feature_opacidad) * 0.35 : (esCapaSindical ? 0.35 : 0.2);
       return {
         color,
         fillColor: color,
         weight: esCapaSindical ? 2.5 : 2,
-        opacity: esCapaSindical ? 0.85 : 0.7,
-        fillOpacity: esCapaSindical ? 0.35 : 0.2,
+        opacity: opacidad,
+        fillOpacity,
       };
     };
 
@@ -1287,7 +1290,13 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
         ? undefined
         : (feature: any, l: any) => {
             const props = feature?.properties || {};
+            const featureBloqueado = Boolean(props._feature_bloqueado);
             const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
+
+            if (featureBloqueado) {
+              l.setStyle({ opacity: baseStyle(feature).opacity, fillOpacity: baseStyle(feature).fillOpacity });
+              return;
+            }
 
             l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre), {
               maxWidth: 320,
@@ -1298,7 +1307,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
             l.on('click', (e: any) => {
               L.DomEvent.stopPropagation(e);
               l.bringToFront();
-              l.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.5 });
+              l.setStyle({ weight: 4, opacity: 1, fillOpacity: Math.min(1, baseStyle(feature).fillOpacity + 0.2) });
               l.openPopup();
               if (onFeatureClick) onFeatureClick(capa.id, featureId, props);
             });

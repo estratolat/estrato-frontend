@@ -383,6 +383,14 @@ export const mapaApi = {
   createCapa: (data: any) => api.post('/mapas/capas', data),
   updateCapa: (id: string, data: any) => api.patch(`/mapas/capas/${id}`, data),
   updateEstilosCapa: (id: string, estilos: Record<string, { color?: string; nombre?: string }>) => api.patch(`/mapas/capas/${id}/estilos`, { estilos }),
+  getFeatures: (capaId: string, params?: { q?: string; limit?: number; offset?: number }) =>
+    api.get(`/mapas/capas/${capaId}/features`, { params }),
+  getFeature: (capaId: string, featureId: string) =>
+    api.get(`/mapas/capas/${capaId}/features/${featureId}`),
+  updateFeature: (capaId: string, featureId: string, data: any) =>
+    api.patch(`/mapas/capas/${capaId}/features/${featureId}`, data),
+  cruceFeature: (capaId: string, featureId: string) =>
+    api.post(`/mapas/capas/${capaId}/features/${featureId}/cruce`),
   deleteCapa: (id: string) => api.delete(`/mapas/capas/${id}`),
   subirCapa: (formData: FormData) => api.post('/mapas/subir', formData),
   getSeccionesINE: (estado_id?: string | number, municipio_id?: string | number) => api.get('/mapas/secciones-ine', { params: { estado_id, municipio_id } }),

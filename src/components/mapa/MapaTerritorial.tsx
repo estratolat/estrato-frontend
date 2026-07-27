@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } fro
 import { useRouter } from 'next/navigation';
 import { Search, LayoutGrid, Compass, Layers, Map, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { MapaData, CapaMapa, MapaPrefs, ResultadoGlobal, DetalleTerritorial, GeoJSONCollection } from '@/types/mapa';
+import { MapaData, CapaMapa, MapaPrefs, ResultadoGlobal, DetalleTerritorial, GeoJSONCollection, FeatureCapa } from '@/types/mapa';
 import { Lider, Zona } from '@/types';
 import { mapaApi, lideresApi, zonasApi, casillasApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
@@ -27,6 +27,7 @@ import BuscadorGlobal from './BuscadorGlobal';
 import FichaTerritorial from './FichaTerritorial';
 import FichaFeature from './FichaFeature';
 import ExploradorCapa, { ElementoCapa } from './ExploradorCapa';
+import EditarFeatureModal from './EditarFeatureModal';
 import PanelFlotante from './PanelFlotante';
 import LeyendaMapa from './LeyendaMapa';
 import type { MapaLeafletRef } from './MapaLeaflet';
@@ -141,19 +142,12 @@ export default function MapaTerritorial() {
   const [capaSubir, setCapaSubir] = useState<string | null>(null);
   const [capaEditar, setCapaEditar] = useState<CapaMapa | null>(null);
   const [capaEditarEstilos, setCapaEditarEstilos] = useState<CapaMapa | null>(null);
-  const [featureEditando, setFeatureEditando] = useState<{
-    capaId: string;
-    featureId: string;
-    nombre: string;
-    color: string;
-    props: Record<string, any>;
-  } | null>(null);
+  const [featureEditando, setFeatureEditando] = useState<FeatureCapa | null>(null);
   const [featureSindicalSeleccionado, setFeatureSindicalSeleccionado] = useState<{
     capaId: string;
     featureId: string;
     props: Record<string, any>;
   } | null>(null);
-  const [guardandoFeature, setGuardandoFeature] = useState(false);
   const [modalIneSecciones, setModalIneSecciones] = useState(false);
   const [modalExcel, setModalExcel] = useState(false);
   const [modalActivo, setModalActivo] = useState<'lider' | 'evento' | 'apoyo' | 'peticion' | 'votante' | null>(null);
@@ -372,20 +366,48 @@ export default function MapaTerritorial() {
     asegurarCapaCargada(el.capaId, featureId, el.feature?.geometry);
     setTimeout(() => {
       mapRef.current?.resaltarFeature?.(el.capaId, featureId, el.feature?.geometry);
+      // Hacer zoom al polígono
+      if (el.feature?.geometry) {
+        try {
+          mapRef.current?.fitBounds?.(el.feature.geometry);
+        } catch {
+          // ignore
+        }
+      }
     }, 300);
   }, [activas, asegurarCapaCargada]);
 
-  const abrirFichaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
+  const elementoCapaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>): ElementoCapa => {
     const capa = capasPersonalizadas.find(c => c.id === capaId);
-    setElementoFicha({
+    return {
       id: featureId,
       nombre: props._feature_nombre || featureId,
       feature: { type: 'Feature', properties: props, geometry: props.__geometry || null },
       capaId,
       capaNombre: capa?.nombre || 'Capa',
       color: props._feature_color || capa?.color || '#3B82F6',
-    });
+    };
   }, [capasPersonalizadas]);
+
+  const abrirFichaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
+    setElementoFicha(elementoCapaDesdeFeature(capaId, featureId, props));
+  }, [elementoCapaDesdeFeature]);
+
+  const abrirEditorFeature = useCallback((el: ElementoCapa) => {
+    const props = el.feature?.properties || {};
+    const metadata = props._feature_metadata || {};
+    setFeatureEditando({
+      feature_id: el.id,
+      nombre: props._feature_nombre || el.nombre,
+      color: props._feature_color || el.color || '#3B82F6',
+      opacidad: props._feature_opacidad != null ? Number(props._feature_opacidad) : 1,
+      bloqueado: Boolean(props._feature_bloqueado),
+      metadata,
+      properties: props,
+      geometry: el.feature?.geometry,
+      bbox: el.feature?.geometry ? undefined : undefined,
+    });
+  }, []);
 
   const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
     abrirFichaDesdeFeature(capaId, featureId, props);
@@ -395,14 +417,7 @@ export default function MapaTerritorial() {
     if (esCapaSindical) {
       setFeatureSindicalSeleccionado({ capaId, featureId, props });
     }
-    setFeatureEditando({
-      capaId,
-      featureId,
-      nombre: props._feature_nombre || featureId,
-      color: props._feature_color || capasPersonalizadas.find(c => c.id === capaId)?.color || '#3B82F6',
-      props,
-    });
-  }, [capasPersonalizadas]);
+  }, [abrirFichaDesdeFeature, capasPersonalizadas]);
 
   const cerrarFeatureEditando = useCallback(() => {
     setFeatureEditando(null);
@@ -614,55 +629,80 @@ export default function MapaTerritorial() {
     mapBounds,
   ]);
 
-  const guardarFeature = useCallback(async () => {
-    if (!featureEditando) return;
-    try {
-      setGuardandoFeature(true);
-      const capa = capasPersonalizadas.find(c => c.id === featureEditando.capaId);
-      const estilosActuales = { ...(capa?.estilos || {}) };
-      const cambios: { color?: string; nombre?: string } = {};
-      if (featureEditando.color) cambios.color = featureEditando.color;
-      if (featureEditando.nombre) cambios.nombre = featureEditando.nombre;
-      estilosActuales[featureEditando.featureId] = { ...(estilosActuales[featureEditando.featureId] || {}), ...cambios };
-      await mapaApi.updateEstilosCapa(featureEditando.capaId, estilosActuales);
-      // Actualizar capas personalizadas localmente para que el color se vea inmediatamente
-      setCapasPersonalizadas(prev =>
-        prev.map(c =>
-          c.id === featureEditando.capaId ? { ...c, estilos: estilosActuales } : c
-        )
-      );
-      // Forzar recarga de geojson de esa capa
-      setData(prev => {
-        const capaGeo = prev[featureEditando.capaId];
-        if (!capaGeo) return prev;
-        const next = { ...prev };
-        next[featureEditando.capaId] = {
-          ...capaGeo,
-          features: capaGeo.features.map((f: any) => {
-            const p = f.properties || {};
-            const fid = String(p._feature_id || p.id || p.ID || p.OBJECTID || p.objectid || p.FID || p.fid || p.gid || p.GID);
-            if (fid !== featureEditando.featureId) return f;
-            return {
-              ...f,
-              properties: {
-                ...p,
-                _feature_color: featureEditando.color,
-                _feature_nombre: featureEditando.nombre || p._feature_nombre,
-                color: featureEditando.color,
-              },
-            };
-          }),
+  const actualizarFeatureLocal = useCallback((capaId: string, featureId: string, actualizado: FeatureCapa) => {
+    // Actualizar estilos de la capa
+    setCapasPersonalizadas(prev =>
+      prev.map(c => {
+        if (c.id !== capaId) return c;
+        const estilos = { ...(c.estilos || {}) };
+        estilos[featureId] = {
+          ...(estilos[featureId] || {}),
+          nombre: actualizado.nombre,
+          color: actualizado.color,
+          opacidad: actualizado.opacidad,
+          bloqueado: actualizado.bloqueado,
+          metadata: actualizado.metadata,
         };
-        return next;
-      });
-      cerrarFeatureEditando();
-    } catch (e) {
-      console.error('Error guardando feature:', e);
-      setError('No se pudo guardar el polígono');
-    } finally {
-      setGuardandoFeature(false);
-    }
-  }, [featureEditando, capasPersonalizadas]);
+        return { ...c, estilos };
+      })
+    );
+
+    // Actualizar data geojson
+    setData(prev => {
+      const capaGeo = prev[capaId];
+      if (!capaGeo) return prev;
+      const next = { ...prev };
+      next[capaId] = {
+        ...capaGeo,
+        features: capaGeo.features.map((f: any) => {
+          const p = f.properties || {};
+          const fid = String(p._feature_id || p.id || p.ID || p.OBJECTID || p.objectid || p.FID || p.fid || p.gid || p.GID);
+          if (fid !== featureId) return f;
+          return {
+            ...f,
+            properties: {
+              ...p,
+              _feature_nombre: actualizado.nombre,
+              _feature_color: actualizado.color,
+              _feature_opacidad: actualizado.opacidad,
+              _feature_bloqueado: actualizado.bloqueado,
+              _feature_metadata: actualizado.metadata,
+              color: actualizado.color,
+            },
+          };
+        }),
+      };
+      return next;
+    });
+
+    // Actualizar ficha si está abierta
+    setElementoFicha(prev => {
+      if (!prev || prev.capaId !== capaId || prev.id !== featureId) return prev;
+      return {
+        ...prev,
+        nombre: actualizado.nombre,
+        color: actualizado.color,
+        feature: {
+          ...prev.feature,
+          properties: {
+            ...(prev.feature?.properties || {}),
+            _feature_nombre: actualizado.nombre,
+            _feature_color: actualizado.color,
+            _feature_opacidad: actualizado.opacidad,
+            _feature_bloqueado: actualizado.bloqueado,
+            _feature_metadata: actualizado.metadata,
+            color: actualizado.color,
+          },
+        },
+      };
+    });
+  }, []);
+
+  const handleExitoEditarFeature = useCallback((actualizado: FeatureCapa) => {
+    if (!featureEditando) return;
+    actualizarFeatureLocal(featureEditando.properties?.capa_id || '', featureEditando.feature_id, actualizado);
+    setFeatureEditando(null);
+  }, [featureEditando, actualizarFeatureLocal]);
 
   const handleExitoDibujo = useCallback((capaIds?: string[]) => {
     setModalGuardarDibujo(false);
@@ -1632,56 +1672,6 @@ export default function MapaTerritorial() {
         </div>
       )}
 
-      {/* Editor de polígono */}
-      {featureEditando && (
-        <div className="absolute left-4 right-4 top-4 z-[600] mx-auto max-w-sm rounded-xl border border-secondary-200 bg-white p-4 shadow-xl">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-secondary-900">Editar polígono</h3>
-            <button
-              onClick={cerrarFeatureEditando}
-              className="text-secondary-400 hover:text-secondary-600"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-[10px] font-semibold uppercase text-secondary-500">Nombre</label>
-              <input
-                type="text"
-                value={featureEditando.nombre}
-                onChange={(e) => setFeatureEditando(prev => prev ? { ...prev, nombre: e.target.value } : null)}
-                className="input w-full text-sm"
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] font-semibold uppercase text-secondary-500">Color</label>
-              <input
-                type="color"
-                value={featureEditando.color}
-                onChange={(e) => setFeatureEditando(prev => prev ? { ...prev, color: e.target.value } : null)}
-                className="h-8 w-16 cursor-pointer rounded border border-secondary-200"
-              />
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={cerrarFeatureEditando}
-                className="btn-secondary flex-1 py-1.5 text-xs"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={guardarFeature}
-                disabled={guardandoFeature}
-                className="btn-primary flex-1 py-1.5 text-xs disabled:opacity-60"
-              >
-                {guardandoFeature ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Loader detalle territorial */}
       {cargandoDetalle && !detalle && (
         <div className="absolute bottom-4 right-4 top-20 z-[500] flex w-[92vw] max-w-md items-center justify-center rounded-xl border border-secondary-200 bg-white/95 shadow-xl">
@@ -1830,14 +1820,53 @@ export default function MapaTerritorial() {
         posicion="derecha"
       >
         <ExploradorCapa
-          capas={capasExplorador}
+          capaId={elementoExplorador?.capaId}
+          capaNombre={elementoExplorador?.capaNombre}
+          color={elementoExplorador?.color}
+          data={elementoExplorador?.capaId ? data[elementoExplorador.capaId] : undefined}
+          capas={elementoExplorador?.capaId ? undefined : capasExplorador}
           onSeleccionar={seleccionarElementoExplorador}
           onCerrar={cerrarExplorador}
         />
       </PanelFlotante>
 
       {/* Ficha de feature */}
-      <FichaFeature elemento={elementoFicha} onCerrar={() => setElementoFicha(null)} />
+      {elementoFicha && (
+        <FichaFeature
+          elemento={elementoFicha}
+          onCerrar={() => setElementoFicha(null)}
+          onEditar={abrirEditorFeature}
+          onVerDetalle={(el) => {
+            setDetalle(null);
+            setCargandoDetalle(true);
+            mapaApi.detalleTerritorial({
+              tipo: 'capa_feature',
+              id: el.id,
+              nombre: el.nombre,
+              geometry: el.feature?.geometry,
+              seccion: el.feature?.properties?._feature_metadata?.seccion,
+            })
+              .then(({ data }) => setDetalle(data))
+              .catch((err) => setError(errorToString(err)))
+              .finally(() => setCargandoDetalle(false));
+          }}
+        />
+      )}
+
+      {/* Modal editar polígono */}
+      {featureEditando && (
+        <EditarFeatureModal
+          capaId={featureEditando.properties?.capa_id || ''}
+          capaNombre={featureEditando.properties?.capa_nombre || 'Capa'}
+          feature={featureEditando}
+          secciones={secciones}
+          lideres={lideres}
+          zonas={zonas}
+          abierto={!!featureEditando}
+          onCerrar={cerrarFeatureEditando}
+          onExito={handleExitoEditarFeature}
+        />
+      )}
 
       {/* Modales */}
       <SubirCapaModal

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Component, type ReactNode } from 'react';
 import { resultadosHistoricosApi } from '@/lib/api';
 import { Icon } from '@/components/ui/Icon';
 import {
@@ -151,7 +151,7 @@ const CAMPOS_MAPEO: { key: keyof MapeoState; label: string; required?: boolean }
   { key: 'filtro_municipio_columna', label: 'Columna filtro municipio' },
 ];
 
-export default function HistoricoElectoralPage() {
+function HistoricoElectoralPageInner() {
   // Listado / resumen
   const [resultados, setResultados] = useState<Resultado[]>([]);
   const [resumen, setResumen] = useState<ResumenBackend | null>(null);
@@ -1611,7 +1611,7 @@ export default function HistoricoElectoralPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KpiCard
             title="Históricos cargados"
-            value={kpis.historicos.toLocaleString()}
+            value={kpis.historicos}
             subtitle="Por tipo, elección y año"
             icon={BarChart3}
             color="text-primary-600"
@@ -1625,7 +1625,7 @@ export default function HistoricoElectoralPage() {
           />
           <KpiCard
             title="Votos actor principal"
-            value={kpis.votosActorPrincipal.toLocaleString()}
+            value={kpis.votosActorPrincipal}
             subtitle={kpis.actorPrincipal || 'Sin actor principal'}
             icon={Target}
             color="text-green-600"
@@ -1687,19 +1687,19 @@ export default function HistoricoElectoralPage() {
                     <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded bg-secondary-50 p-2">
                         <p className="text-secondary-500">Registros</p>
-                        <p className="font-bold text-secondary-900">{g.registros.toLocaleString()}</p>
+                        <p className="font-bold text-secondary-900">{(g.registros ?? 0).toLocaleString()}</p>
                       </div>
                       <div className="rounded bg-secondary-50 p-2">
                         <p className="text-secondary-500">Secciones</p>
-                        <p className="font-bold text-secondary-900">{g.secciones.toLocaleString()}</p>
+                        <p className="font-bold text-secondary-900">{(g.secciones ?? 0).toLocaleString()}</p>
                       </div>
                       <div className="rounded bg-secondary-50 p-2">
                         <p className="text-secondary-500">Casillas</p>
-                        <p className="font-bold text-secondary-900">{g.casillas.toLocaleString()}</p>
+                        <p className="font-bold text-secondary-900">{(g.casillas ?? 0).toLocaleString()}</p>
                       </div>
                       <div className="rounded bg-secondary-50 p-2">
                         <p className="text-secondary-500">Total votos</p>
-                        <p className="font-bold text-secondary-900">{g.total_votos.toLocaleString()}</p>
+                        <p className="font-bold text-secondary-900">{(g.total_votos ?? 0).toLocaleString()}</p>
                       </div>
                     </div>
 
@@ -1841,10 +1841,10 @@ export default function HistoricoElectoralPage() {
                           {g.municipio_id ? `Municipio ${g.municipio_id}` : g.estado_id ? `Estado ${g.estado_id}` : 'Sin territorio'}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">{g.registros.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right">{g.secciones.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right">{g.casillas.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-medium">{g.total_votos.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">{(g.registros ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">{(g.secciones ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">{(g.casillas ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-medium">{(g.total_votos ?? 0).toLocaleString()}</td>
                       <td className="px-4 py-3">
                         {g.partido_principal ? (
                           <span
@@ -1973,12 +1973,18 @@ function KpiCard({
   icon?: React.ComponentType<{ size?: number | string; className?: string }>;
   color?: string;
 }) {
+  const displayValue =
+    value === null || value === undefined
+      ? '—'
+      : typeof value === 'number'
+      ? value.toLocaleString()
+      : String(value);
   return (
     <div className="rounded-lg border border-secondary-200 bg-white p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium text-secondary-500">{title}</p>
-          <p className="text-xl font-bold text-secondary-900 sm:text-2xl">{value}</p>
+          <p className="text-xl font-bold text-secondary-900 sm:text-2xl">{displayValue}</p>
           {subtitle && <p className="truncate text-xs text-secondary-500">{subtitle}</p>}
         </div>
         {IconComp && <IconComp size={32} className={`shrink-0 ${color}`} />}
@@ -2000,12 +2006,17 @@ function MiniBar({
   label?: string;
   width?: number;
 }) {
-  const pct = width !== undefined ? Math.min(100, Math.max(0, width)) : max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
+  const safeValue = typeof value === 'number' ? value : 0;
+  const safeMax = typeof max === 'number' && max > 0 ? max : 1;
+  const pct =
+    width !== undefined
+      ? Math.min(100, Math.max(0, width))
+      : Math.min(100, Math.max(0, (safeValue / safeMax) * 100));
   return (
     <div className="w-full">
       <div className="mb-1 flex items-center justify-between text-xs">
         {label && <span className="font-medium text-secondary-700">{label}</span>}
-        <span className="text-secondary-500">{value.toLocaleString()}</span>
+        <span className="text-secondary-500">{safeValue.toLocaleString()}</span>
       </div>
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary-200">
         <div
@@ -2178,10 +2189,10 @@ function DetalleView({
 
       {/* KPIs del histórico */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard title="Registros" value={h.registros.toLocaleString()} icon={BarChart3} color="text-primary-600" />
-        <KpiCard title="Casillas" value={h.casillas.toLocaleString()} icon={MapPin} color="text-blue-600" />
-        <KpiCard title="Secciones" value={h.secciones.toLocaleString()} icon={Users} color="text-green-600" />
-        <KpiCard title="Total votos" value={h.total_votos.toLocaleString()} icon={Vote} color="text-purple-600" />
+        <KpiCard title="Registros" value={h.registros} icon={BarChart3} color="text-primary-600" />
+        <KpiCard title="Casillas" value={h.casillas} icon={MapPin} color="text-blue-600" />
+        <KpiCard title="Secciones" value={h.secciones} icon={Users} color="text-green-600" />
+        <KpiCard title="Total votos" value={h.total_votos} icon={Vote} color="text-purple-600" />
         <KpiCard
           title="Actor principal"
           value={h.partido_principal ? `${h.partido_principal} ${principalVotos !== undefined ? principalVotos.toLocaleString() : ''}` : '—'}
@@ -2191,7 +2202,7 @@ function DetalleView({
         />
         <KpiCard
           title="Ganador"
-          value={ganador ? `${ganador.partido} ${ganador.votos.toLocaleString()}` : '—'}
+          value={ganador ? `${ganador.partido} ${(ganador.votos ?? 0).toLocaleString()}` : '—'}
           subtitle={ganador ? 'Primer lugar en votos' : undefined}
           icon={Vote}
           color="text-green-600"
@@ -2272,5 +2283,52 @@ function DesglosePreview({
         </span>
       ))}
     </div>
+  );
+}
+
+// Error boundary para capturar errores de renderizado y mostrar el detalle real
+class HistoricoErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('[HistoricoElectoral] Error Boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="space-y-4 p-6">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p className="font-bold">Error al mostrar el histórico electoral</p>
+            <p className="mt-1 font-mono text-xs">{this.state.error?.name}: {this.state.error?.message}</p>
+            {this.state.error?.stack && (
+              <pre className="mt-2 max-h-64 overflow-auto rounded border border-red-100 bg-white p-2 text-[11px]">{this.state.error.stack}</pre>
+            )}
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="btn-secondary"
+          >
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function HistoricoElectoralPage() {
+  return (
+    <HistoricoErrorBoundary>
+      <HistoricoElectoralPageInner />
+    </HistoricoErrorBoundary>
   );
 }

@@ -52,11 +52,12 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
       setCruce(null);
       return;
     }
+    const featureId = elemento.featureId || elemento.id.split('-').slice(1).join('-') || elemento.id;
     const cargar = async () => {
       try {
         setCargandoCruce(true);
         setErrorCruce(null);
-        const { data } = await mapaApi.cruceFeature(elemento.capaId, elemento.id);
+        const { data } = await mapaApi.cruceFeature(elemento.capaId, featureId);
         setCruce(data.resumen || null);
       } catch (err) {
         setErrorCruce(errorToString(err));

@@ -351,7 +351,7 @@ export default function MapaTerritorial() {
     }
   }, [data]);
 
-  const seleccionarElementoExplorador = useCallback((el: ElementoCapa) => {
+  const seleccionarElementoExplorador = useCallback(async (el: ElementoCapa) => {
     setElementoFicha(el);
     setMostrarExplorador(false);
 
@@ -359,14 +359,10 @@ export default function MapaTerritorial() {
     if (!activas[el.capaId]) {
       setActivas(prev => ({ ...prev, [el.capaId]: true }));
     }
-    const props = el.feature?.properties || {};
-    const featureId = String(
-      props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.GID || props.gid || el.id.split('-').slice(1).join('-')
-    );
-    asegurarCapaCargada(el.capaId, featureId, el.feature?.geometry);
+    const featureId = el.featureId || String(el.id.split('-').slice(1).join('-'));
+    await asegurarCapaCargada(el.capaId, featureId, el.feature?.geometry);
     setTimeout(() => {
-      mapRef.current?.resaltarFeature?.(el.capaId, featureId, el.feature?.geometry);
-      // Hacer zoom al polígono
+      // Hacer zoom al polígono primero para que siempre ocurra
       if (el.feature?.geometry) {
         try {
           mapRef.current?.fitBounds?.(el.feature.geometry);
@@ -374,13 +370,15 @@ export default function MapaTerritorial() {
           // ignore
         }
       }
-    }, 300);
+      mapRef.current?.resaltarFeature?.(el.capaId, featureId, el.feature?.geometry);
+    }, 400);
   }, [activas, asegurarCapaCargada]);
 
   const elementoCapaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>): ElementoCapa => {
     const capa = capasPersonalizadas.find(c => c.id === capaId);
     return {
-      id: featureId,
+      id: `${capaId}-${featureId}`,
+      featureId,
       nombre: props._feature_nombre || featureId,
       feature: { type: 'Feature', properties: props, geometry: props.__geometry || null },
       capaId,
@@ -397,7 +395,7 @@ export default function MapaTerritorial() {
     const props = el.feature?.properties || {};
     const metadata = props._feature_metadata || {};
     setFeatureEditando({
-      feature_id: el.id,
+      feature_id: el.featureId || el.id.split('-').slice(1).join('-') || el.id,
       nombre: props._feature_nombre || el.nombre,
       color: props._feature_color || el.color || '#3B82F6',
       opacidad: props._feature_opacidad != null ? Number(props._feature_opacidad) : 1,
@@ -677,7 +675,7 @@ export default function MapaTerritorial() {
 
     // Actualizar ficha si está abierta
     setElementoFicha(prev => {
-      if (!prev || prev.capaId !== capaId || prev.id !== featureId) return prev;
+      if (!prev || prev.capaId !== capaId || prev.featureId !== featureId) return prev;
       return {
         ...prev,
         nombre: actualizado.nombre,
@@ -1839,9 +1837,10 @@ export default function MapaTerritorial() {
           onVerDetalle={(el) => {
             setDetalle(null);
             setCargandoDetalle(true);
+            const featureId = el.featureId || el.id.split('-').slice(1).join('-') || el.id;
             mapaApi.detalleTerritorial({
               tipo: 'capa_feature',
-              id: el.id,
+              id: featureId,
               nombre: el.nombre,
               geometry: el.feature?.geometry,
               seccion: el.feature?.properties?._feature_metadata?.seccion,

@@ -6,6 +6,7 @@ import { GeoJSONCollection, CapaMapa } from '@/types/mapa';
 
 interface ElementoCapa {
   id: string;
+  featureId: string;
   nombre: string;
   subtexto?: string;
   feature: any;
@@ -73,6 +74,7 @@ export default function ExploradorCapa({
         const subtexto = extraerSubtextoFeature(feature);
         lista.push({
           id: `${capa.id}-${id}`,
+          featureId: id,
           nombre,
           subtexto,
           feature,

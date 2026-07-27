@@ -207,12 +207,28 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
     }
   }, [map]);
 
+  const fitGeometryFallback = useCallback((geometryFallback?: any) => {
+    if (!geometryFallback) return;
+    try {
+      const fallback = L.geoJSON(geometryFallback);
+      const fb = fallback.getBounds();
+      fallback.remove();
+      if (fb?.isValid?.()) {
+        registerProgrammaticMove(1200);
+        map.fitBounds(fb, { padding: [60, 60], maxZoom: 16, animate: true });
+      }
+    } catch (e) {
+      console.warn('[MapaBridge] fitBounds fallback error:', e);
+    }
+  }, [map]);
+
   const resaltarFeature = useCallback((capaId: string, featureId: string, geometryFallback?: any) => {
     try {
       const geoLayer = capasGeoJSONRef?.current?.get(capaId);
       if (!geoLayer) {
         console.warn('[MapaBridge] resaltarFeature: capa no encontrada', capaId, '— se reintentará');
         pendingHighlight = { capaId, featureId, intentos: 1 };
+        fitGeometryFallback(geometryFallback);
         return;
       }
 
@@ -225,6 +241,7 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
       if (!target) {
         console.warn('[MapaBridge] resaltarFeature: feature no encontrado', featureId, 'en capa', capaId, 'capa tiene', layers.length, 'layers');
         pendingHighlight = { capaId, featureId, intentos: 1 };
+        fitGeometryFallback(geometryFallback);
         return;
       }
 
@@ -287,7 +304,7 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
     } catch (e) {
       console.warn('[MapaBridge] resaltarFeature error:', e);
     }
-  }, [map, capasGeoJSONRef]);
+  }, [map, capasGeoJSONRef, fitGeometryFallback]);
 
   // Reintento automático mientras haya un highlight pendiente
   useEffect(() => {

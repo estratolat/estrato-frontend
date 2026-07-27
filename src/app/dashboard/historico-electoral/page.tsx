@@ -26,6 +26,7 @@ import {
   Award,
   Target,
   Percent,
+  Calendar,
 } from 'lucide-react';
 
 // Tipos
@@ -1716,11 +1717,12 @@ function HistoricoElectoralPageInner() {
                 return (
                   <div key={idx} className="rounded-lg border border-secondary-200 bg-white p-4 transition hover:shadow-sm">
                     <div className="mb-3 flex items-start justify-between">
-                      <div>
-                        <span className="text-xs font-medium text-secondary-500">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="inline-flex w-fit items-center gap-1 rounded-md bg-primary-50 px-2 py-1 text-xs font-semibold text-primary-700">
+                          <Calendar size={12} />
                           {TIPO_HISTORICO_LABEL[g.tipo_historico] || g.tipo_historico}
                         </span>
-                        <h4 className="text-base font-bold text-secondary-900">
+                        <h4 className="text-lg font-bold leading-tight text-secondary-900">
                           {TIPO_ELECCION_LABEL[g.tipo_eleccion] || g.tipo_eleccion} {g.anio}
                         </h4>
                       </div>

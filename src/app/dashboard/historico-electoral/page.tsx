@@ -137,6 +137,32 @@ const MAPEO_VACIO: MapeoState = {
   filtro_municipio: '',
 };
 
+// Suma los votos de las coaliciones a cada partido que las compone.
+// Ej: PAN = PAN + PAN_PRI_PRD + PAN_PRI + PAN_PRD
+function consolidarCoalicionesActores(
+  actores: { partido: string; votos: number; tipo?: 'individual' | 'coalicion' }[]
+): { partido: string; votos: number; tipo: 'individual' | 'coalicion' }[] {
+  const acumulado = new Map<string, number>();
+
+  for (const actor of actores) {
+    if (!actor || !actor.partido || typeof actor.votos !== 'number') continue;
+    const partes = actor.partido.split('_');
+    const esCoalicion = partes.length > 1;
+    if (esCoalicion) {
+      for (const parte of partes) {
+        if (!parte) continue;
+        acumulado.set(parte, (acumulado.get(parte) || 0) + actor.votos);
+      }
+    } else {
+      acumulado.set(actor.partido, (acumulado.get(actor.partido) || 0) + actor.votos);
+    }
+  }
+
+  return Array.from(acumulado.entries())
+    .map(([partido, votos]) => ({ partido, votos, tipo: 'individual' as const }))
+    .sort((a, b) => b.votos - a.votos);
+}
+
 const CAMPOS_MAPEO: { key: keyof MapeoState; label: string; required?: boolean }[] = [
   { key: 'seccion', label: 'Sección', required: true },
   { key: 'casilla', label: 'Casilla', required: true },
@@ -2126,6 +2152,7 @@ function DetalleView({
   const [casillas, setCasillas] = useState<Resultado[]>([]);
   const [detalleLoading, setDetalleLoading] = useState(true);
   const [detalleError, setDetalleError] = useState<string | null>(null);
+  const [consolidarCoaliciones, setConsolidarCoaliciones] = useState(false);
 
   useEffect(() => {
     const cargar = async () => {
@@ -2151,9 +2178,15 @@ function DetalleView({
   }, [h]);
 
   const actores = h.partidos || [];
-  const sortedActores = [...actores].sort((a, b) => b.votos - a.votos);
+  const actoresConsolidados = useMemo(() => consolidarCoalicionesActores(actores), [actores]);
+  const actoresMostrados = consolidarCoaliciones ? actoresConsolidados : actores;
+  const sortedActores = [...actoresMostrados]
+    .filter((a) => a && typeof a.votos === 'number' && a.partido)
+    .sort((a, b) => b.votos - a.votos);
   const ganador = sortedActores[0];
-  const principalVotos = h.partido_principal ? actores.find((p) => p.partido === h.partido_principal)?.votos : undefined;
+  const principalVotos = h.partido_principal
+    ? actoresMostrados.find((p) => p.partido === h.partido_principal)?.votos
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -2211,11 +2244,26 @@ function DetalleView({
 
       {/* Gráfico de actores */}
       <div className="card p-4">
-        <div className="mb-4 flex items-center gap-2">
-          <BarChart3 size={20} className="text-primary-600" />
-          <h3 className="text-lg font-bold text-secondary-900">Votos por actor</h3>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart3 size={20} className="text-primary-600" />
+            <h3 className="text-lg font-bold text-secondary-900">Votos por actor</h3>
+            {consolidarCoaliciones && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">Con coaliciones consolidadas</span>}
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-secondary-700">
+            <input
+              type="checkbox"
+              checked={consolidarCoaliciones}
+              onChange={(e) => setConsolidarCoaliciones(e.target.checked)}
+              className="h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
+            />
+            Consolidar coaliciones
+          </label>
         </div>
-        <ActoresChart actores={actores} principal={h.partido_principal} />
+        <p className="mb-3 text-xs text-secondary-500">
+          Al consolidar, los votos de cada coalición (PAN_PRI_PRD, PAN_PRI, etc.) se suman a cada partido que la compone.
+        </p>
+        <ActoresChart actores={actoresMostrados} principal={h.partido_principal} />
       </div>
 
       {/* Tabla de casillas */}

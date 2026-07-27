@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { X, MapPin, ExternalLink, Edit3, Users, Crown, Gift, Calendar, FileText } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { X, MapPin, ExternalLink, Edit3, Users, Crown, Gift, Calendar, FileText, GripVertical } from 'lucide-react';
 import { ElementoCapa } from './ExploradorCapa';
 import { mapaApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
@@ -42,10 +42,15 @@ interface CruceResumen {
   peticiones: { count: number };
 }
 
+const POS_INICIAL = { x: 16, y: 80 };
+
 export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEditar }: Props) {
   const [cruce, setCruce] = useState<CruceResumen | null>(null);
   const [cargandoCruce, setCargandoCruce] = useState(false);
   const [errorCruce, setErrorCruce] = useState<string | null>(null);
+  const [pos, setPos] = useState(POS_INICIAL);
+  const dragRef = useRef<{ dragging: boolean; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!elemento?.capaId || !elemento?.id) {
@@ -68,6 +73,50 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
     cargar();
   }, [elemento]);
 
+  // Resetear posición cuando cambia el elemento, para que no quede perdida fuera de pantalla
+  useEffect(() => {
+    setPos(prev => ({
+      x: Math.max(8, Math.min((window.innerWidth || 800) - 320, prev.x)),
+      y: Math.max(8, Math.min((window.innerHeight || 600) - 200, prev.y)),
+    }));
+  }, [elemento?.id]);
+
+  const iniciarDrag = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    dragRef.current = { dragging: true, startX: clientX, startY: clientY, initialX: pos.x, initialY: pos.y };
+    e.preventDefault();
+  }, [pos]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      if (!dragRef.current?.dragging) return;
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const dx = clientX - dragRef.current.startX;
+      const dy = clientY - dragRef.current.startY;
+      const ancho = wrapperRef.current?.offsetWidth || 320;
+      const alto = wrapperRef.current?.offsetHeight || 360;
+      setPos({
+        x: Math.max(8, Math.min((window.innerWidth || 800) - ancho, dragRef.current.initialX + dx)),
+        y: Math.max(8, Math.min((window.innerHeight || 600) - alto, dragRef.current.initialY + dy)),
+      });
+    };
+    const onEnd = () => {
+      if (dragRef.current) dragRef.current.dragging = false;
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+  }, []);
+
   if (!elemento) return null;
 
   const props = elemento.feature?.properties || {};
@@ -85,103 +134,115 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
   ] as const;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-[650] mx-auto max-w-sm rounded-xl border border-secondary-200 bg-white p-4 shadow-xl lg:left-auto lg:right-4 lg:top-20 lg:max-w-xs">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-            style={{ backgroundColor: elemento.color || '#3B82F6' }}
-          >
-            <MapPin size={14} />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-secondary-900">{elemento.nombre}</p>
-            <p className="truncate text-[10px] text-secondary-500">{elemento.capaNombre}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          {onEditar && (
-            <button
-              onClick={() => onEditar(elemento)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-secondary-400 transition hover:bg-primary-50 hover:text-primary-600"
-              title="Editar polígono"
-            >
-              <Edit3 size={15} />
-            </button>
-          )}
-          <button
-            onClick={onCerrar}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className="max-h-40 overflow-y-auto">
-        {metadata.tags?.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1">
-            {metadata.tags.map((t: string) => (
-              <span key={t} className="rounded-full bg-secondary-100 px-2 py-0.5 text-[10px] font-medium text-secondary-700">
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {metadata.seccion && (
-          <p className="mb-1 text-xs text-secondary-600">
-            Sección: <span className="font-semibold">{metadata.seccion}</span>
-          </p>
-        )}
-
-        {entries.length === 0 ? (
-          <p className="text-xs text-secondary-500">No hay propiedades adicionales.</p>
-        ) : (
-          <div className="space-y-1">
-            {entries.slice(0, 8).map(([key, value]) => (
-              <div key={key} className="flex items-start justify-between gap-2 text-xs">
-                <span className="font-medium text-secondary-600">{formatearPropiedad(key)}:</span>
-                <span className="max-w-[60%] text-right text-secondary-800">{formatearValor(value)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 border-t border-secondary-100 pt-3">
-        <p className="mb-2 text-[10px] font-semibold uppercase text-secondary-500">Datos de campaña dentro</p>
-        {cargandoCruce ? (
-          <div className="flex items-center gap-2 text-xs text-secondary-500">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-            Calculando...
-          </div>
-        ) : errorCruce ? (
-          <p className="text-xs text-red-600">{errorCruce}</p>
-        ) : cruce ? (
-          <div className="grid grid-cols-3 gap-2">
-            {tarjetas.map(({ key, label, icon: Icon, color, bg }) => {
-              const count = (cruce as any)[key]?.count ?? 0;
-              return (
-                <div key={key} className={`rounded-lg ${bg} p-2 text-center`}>
-                  <Icon size={14} className={`mx-auto mb-1 ${color}`} />
-                  <p className="text-sm font-bold text-secondary-900">{count}</p>
-                  <p className="text-[10px] text-secondary-600">{label}</p>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-
-      {onVerDetalle && (
-        <button
-          onClick={() => onVerDetalle(elemento)}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary-50 py-2 text-xs font-semibold text-primary-700 transition hover:bg-primary-100"
+    <div
+      ref={wrapperRef}
+      className="fixed z-[650] w-[92vw] max-w-sm lg:w-80"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      <div className="rounded-xl border border-secondary-200 bg-white p-3 shadow-xl">
+        <div
+          onMouseDown={iniciarDrag}
+          onTouchStart={iniciarDrag}
+          className="mb-2 flex cursor-grab items-center justify-between gap-2 rounded-lg bg-secondary-50/70 px-2 py-1.5 active:cursor-grabbing"
         >
-          <ExternalLink size={14} /> Ver detalle completo
-        </button>
-      )}
+          <div className="flex items-center gap-2">
+            <GripVertical size={14} className="text-secondary-400" />
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+              style={{ backgroundColor: elemento.color || '#3B82F6' }}
+            >
+              <MapPin size={13} />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-secondary-900">{elemento.nombre}</p>
+              <p className="truncate text-[10px] text-secondary-500">{elemento.capaNombre}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            {onEditar && (
+              <button
+                onClick={() => onEditar(elemento)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-secondary-400 transition hover:bg-primary-50 hover:text-primary-600"
+                title="Editar polígono"
+              >
+                <Edit3 size={14} />
+              </button>
+            )}
+            <button
+              onClick={onCerrar}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
+              title="Cerrar"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-44 overflow-y-auto px-1">
+          {metadata.tags?.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {metadata.tags.map((t: string) => (
+                <span key={t} className="rounded-full bg-secondary-100 px-2 py-0.5 text-[10px] font-medium text-secondary-700">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {metadata.seccion && (
+            <p className="mb-1 text-xs text-secondary-600">
+              Sección: <span className="font-semibold">{metadata.seccion}</span>
+            </p>
+          )}
+
+          {entries.length === 0 ? (
+            <p className="text-xs text-secondary-500">No hay propiedades adicionales.</p>
+          ) : (
+            <div className="space-y-1">
+              {entries.slice(0, 8).map(([key, value]) => (
+                <div key={key} className="flex items-start justify-between gap-2 text-xs">
+                  <span className="font-medium text-secondary-600">{formatearPropiedad(key)}:</span>
+                  <span className="max-w-[60%] text-right text-secondary-800">{formatearValor(value)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 border-t border-secondary-100 pt-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase text-secondary-500">Datos de campaña dentro</p>
+          {cargandoCruce ? (
+            <div className="flex items-center gap-2 text-xs text-secondary-500">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+              Calculando...
+            </div>
+          ) : errorCruce ? (
+            <p className="text-xs text-red-600">{errorCruce}</p>
+          ) : cruce ? (
+            <div className="grid grid-cols-3 gap-2">
+              {tarjetas.map(({ key, label, icon: Icon, color, bg }) => {
+                const count = (cruce as any)[key]?.count ?? 0;
+                return (
+                  <div key={key} className={`rounded-lg ${bg} p-2 text-center`}>
+                    <Icon size={14} className={`mx-auto mb-1 ${color}`} />
+                    <p className="text-sm font-bold text-secondary-900">{count}</p>
+                    <p className="text-[10px] text-secondary-600">{label}</p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+
+        {onVerDetalle && (
+          <button
+            onClick={() => onVerDetalle(elemento)}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary-50 py-2 text-xs font-semibold text-primary-700 transition hover:bg-primary-100"
+          >
+            <ExternalLink size={14} /> Ver detalle completo
+          </button>
+        )}
+      </div>
     </div>
   );
 }

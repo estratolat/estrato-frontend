@@ -246,6 +246,8 @@ export const resultadosHistoricosApi = {
   getAll: (filters?: any) => api.get('/resultados-historicos', { params: filters }),
   getResumen: () => api.get('/resultados-historicos/resumen'),
   getTipos: () => api.get('/resultados-historicos/tipos'),
+  getCruce: (params: { tipo_eleccion: string; tipo_historico?: string; anios?: number[]; partidos_bloque?: string[] }) =>
+    api.get('/resultados-historicos/cruce', { params }),
   preview: (formData: FormData) => api.post('/resultados-historicos/preview', formData),
   importar: (formData: FormData) => api.post('/resultados-historicos/importar', formData),
   eliminarLote: (data: any) => api.delete('/resultados-historicos/lote', { data }),

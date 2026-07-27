@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState, Component, type ReactNode } from 'react';
-import { resultadosHistoricosApi } from '@/lib/api';
+import dynamic from 'next/dynamic';
+import { resultadosHistoricosApi, mapaApi } from '@/lib/api';
 import { Icon } from '@/components/ui/Icon';
+
+const MapaCruceHistorico = dynamic(() => import('./MapaCruceHistorico'), { ssr: false });
+const TablaCruceHistorico = dynamic(() => import('./TablaCruceHistorico'), { ssr: false });
 import {
   Upload,
   Search,
@@ -27,6 +31,8 @@ import {
   Target,
   Percent,
   Calendar,
+  Map as MapIcon,
+  BarChart2,
 } from 'lucide-react';
 
 // Tipos
@@ -99,7 +105,7 @@ const PARTIDO_COLORS: Record<string, string> = {
 };
 
 type WizardStep = 'archivo' | 'metadatos' | 'encabezado' | 'mapeo' | 'validacion' | 'importando';
-type Vista = 'dashboard' | 'listado' | 'detalle' | 'wizard';
+type Vista = 'dashboard' | 'listado' | 'detalle' | 'analisis' | 'wizard';
 
 interface MapeoState {
   seccion: string;
@@ -208,6 +214,13 @@ function HistoricoElectoralPageInner() {
   const [historicoSeleccionado, setHistoricoSeleccionado] = useState<Agrupado | null>(null);
   const [filtros, setFiltros] = useState({ tipo_historico: '', tipo_eleccion: '', anio: '', seccion: '' });
 
+  // Análisis territorial / cruce histórico
+  const [cruceData, setCruceData] = useState<any | null>(null);
+  const [cruceSeccionesINE, setCruceSeccionesINE] = useState<any[]>([]);
+  const [cruceLoading, setCruceLoading] = useState(false);
+  const [cruceError, setCruceError] = useState<string | null>(null);
+  const [subVistaAnalisis, setSubVistaAnalisis] = useState<'mapa' | 'tabla'>('mapa');
+
   // Wizard
   const [step, setStep] = useState<WizardStep>('archivo');
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -285,6 +298,30 @@ function HistoricoElectoralPageInner() {
       setError(err.response?.data?.message || 'Error al cargar datos históricos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarCruce = async () => {
+    if (cruceData) return; // ya cargado
+    try {
+      setCruceLoading(true);
+      setCruceError(null);
+      const { data } = await resultadosHistoricosApi.getCruce({
+        tipo_eleccion: 'ayuntamiento',
+        tipo_historico: 'principal',
+      });
+      setCruceData(data);
+
+      // Obtener estado/municipio del primer histórico disponible
+      const referencia = resultados.find((r) => r.estado_id && r.municipio_id);
+      const estadoId = referencia?.estado_id ?? 11;
+      const municipioId = referencia?.municipio_id ?? 14;
+      const { data: secciones } = await mapaApi.getSeccionesINE(estadoId, municipioId);
+      setCruceSeccionesINE(secciones || []);
+    } catch (err: any) {
+      setCruceError(err.response?.data?.message || 'Error al cargar cruce histórico');
+    } finally {
+      setCruceLoading(false);
     }
   };
 
@@ -1942,6 +1979,96 @@ function HistoricoElectoralPageInner() {
     );
   };
 
+  const renderAnalisis = () => {
+    if (cruceLoading) {
+      return (
+        <div className="flex h-96 items-center justify-center rounded-lg border border-secondary-200 bg-white">
+          <div className="flex flex-col items-center gap-2 text-secondary-500">
+            <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary-600" />
+            <span className="text-sm">Cargando análisis territorial...</span>
+          </div>
+        </div>
+      );
+    }
+    if (cruceError) {
+      return (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertCircle size={16} />
+            Error al cargar el análisis
+          </div>
+          <p className="mt-1">{cruceError}</p>
+        </div>
+      );
+    }
+    if (!cruceData || !cruceData.secciones || cruceData.secciones.length === 0) {
+      return (
+        <div className="rounded-lg border border-secondary-200 bg-white px-6 py-8 text-center text-secondary-500">
+          <MapIcon size={32} className="mx-auto mb-2 text-secondary-300" />
+          <p>No hay datos suficientes para el análisis territorial cruzado.</p>
+          <p className="mt-1 text-xs">Se requieren al menos dos elecciones históricas del mismo tipo.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-secondary-200 bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-secondary-900">Análisis territorial cruzado</h3>
+              <p className="text-sm text-secondary-500">
+                Bloque {cruceData.metadata?.bloque || 'PRI'} · Elecciones:{' '}
+                {(cruceData.metadata?.anios || []).join(', ')} · {cruceData.secciones.length} secciones
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSubVistaAnalisis('mapa')}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  subVistaAnalisis === 'mapa'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                }`}
+              >
+                <MapIcon size={16} /> Mapa
+              </button>
+              <button
+                onClick={() => setSubVistaAnalisis('tabla')}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  subVistaAnalisis === 'tabla'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                }`}
+              >
+                <Table2 size={16} /> Tabla
+              </button>
+            </div>
+          </div>
+
+          {subVistaAnalisis === 'mapa' && (
+            <div className="mt-4">
+              <MapaCruceHistorico
+                cruce={cruceData.secciones}
+                seccionesINE={cruceSeccionesINE}
+                bloque={cruceData.metadata?.bloque || []}
+              />
+            </div>
+          )}
+          {subVistaAnalisis === 'tabla' && (
+            <div className="mt-4">
+              <TablaCruceHistorico
+                cruce={cruceData.secciones}
+                anios={cruceData.metadata?.anios || []}
+                bloque={cruceData.metadata?.bloque || []}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -1980,6 +2107,17 @@ function HistoricoElectoralPageInner() {
               <Table2 size={16} /> Listado
             </button>
           )}
+          {vista !== 'analisis' && (
+            <button
+              onClick={() => {
+                cargarCruce();
+                setVista('analisis');
+              }}
+              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-secondary-700 transition hover:bg-secondary-50"
+            >
+              <MapIcon size={16} /> Análisis territorial
+            </button>
+          )}
           <button
             onClick={() => {
               resetWizard();
@@ -2003,6 +2141,7 @@ function HistoricoElectoralPageInner() {
       {vista === 'dashboard' && renderDashboard()}
       {vista === 'listado' && renderListado()}
       {vista === 'detalle' && renderDetalle()}
+      {vista === 'analisis' && renderAnalisis()}
       {vista === 'wizard' && renderWizard()}
     </div>
   );

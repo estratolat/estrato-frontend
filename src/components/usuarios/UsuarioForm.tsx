@@ -53,6 +53,18 @@ const ROLES_LABELS: Record<string, string> = {
   encargado_peticiones: 'Encargado de Peticiones',
 };
 
+function mergeSecciones(
+  schemaSecciones: Seccion[] | undefined,
+  fallbackSecciones: Seccion[]
+): Seccion[] {
+  const map = new Map<string, Seccion>();
+  (schemaSecciones || []).forEach((s) => map.set(s.id, s));
+  fallbackSecciones.forEach((s) => {
+    if (!map.has(s.id)) map.set(s.id, s);
+  });
+  return Array.from(map.values());
+}
+
 const ICONO_POR_SECCION: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   dashboard: Squares2X2Icon,
   votantes: UsersIcon,
@@ -75,6 +87,7 @@ const ICONO_POR_SECCION: Record<string, React.ComponentType<{ className?: string
   boletines: DocumentTextIcon,
   llamadas: ChatBubbleLeftRightIcon,
   opositores: UserGroupIcon,
+  informes_ine: ClipboardDocumentCheckIcon,
 };
 
 export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loading }: UsuarioFormProps) {
@@ -277,7 +290,7 @@ export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loadin
           Activa las secciones del dashboard a las que este usuario podrá acceder. También afecta si puede entrar a la App de Brigada.
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(schema?.secciones || SECCIONES).map((seccion: Seccion) => {
+          {mergeSecciones(schema?.secciones, SECCIONES).map((seccion: Seccion) => {
             const active = form.permisos.includes(seccion.id);
             const IconoSeccion = ICONO_POR_SECCION[seccion.id];
             const color = seccion.color || SECCIONES.find((s) => s.id === seccion.id)?.color || '#64748B';

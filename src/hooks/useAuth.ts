@@ -108,6 +108,7 @@ export function useAuth() {
       localStorage.removeItem('user');
       localStorage.removeItem('permisos');
       document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+      document.cookie = 'permisos=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
       window.location.href = '/login';
     }
   }, []);

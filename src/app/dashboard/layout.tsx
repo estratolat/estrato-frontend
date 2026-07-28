@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/hooks/useAuth';
-import { puedeAcceder } from '@/lib/permisos';
+import { puedeAcceder, esSoloAppBrigada } from '@/lib/permisos';
 import {
   Squares2X2Icon,
   UsersIcon,
@@ -87,8 +87,16 @@ export default function DashboardLayout({
   );
 
   useEffect(() => {
-    if (!loading && !user && typeof window !== 'undefined') {
+    if (loading || typeof window === 'undefined') return;
+
+    if (!user) {
       router.replace('/login');
+      return;
+    }
+
+    // Los usuarios de solo app brigada no tienen nada que hacer en el dashboard
+    if (esSoloAppBrigada(user.permisos, user.rol)) {
+      router.replace('/brigada');
     }
   }, [loading, user, router]);
 

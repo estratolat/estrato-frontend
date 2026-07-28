@@ -62,3 +62,11 @@ export function puedeAcceder(
 export function labelSeccion(id: string): string {
   return SECCIONES.find((s) => s.id === id)?.label || id;
 }
+
+export function esSoloAppBrigada(
+  permisos: string[] | undefined,
+  rol?: UserRole | string
+): boolean {
+  const efectivos = permisos && permisos.length > 0 ? permisos : (rol ? permisosPorRol(rol) : []);
+  return efectivos.length === 1 && efectivos[0] === 'app_brigada';
+}

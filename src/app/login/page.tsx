@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { authApi } from '@/lib/api';
+import { esSoloAppBrigada } from '@/lib/permisos';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,10 +42,18 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('permisos', JSON.stringify(data.user.permisos || []));
 
-      // Cookie para que el middleware de Next.js pueda proteger rutas
-      setCookie('token', data.access_token, 7);
+      const permisos = Array.isArray(data.user.permisos) ? data.user.permisos : [];
 
-      router.push('/dashboard');
+      // Cookies para que el middleware de Next.js pueda proteger rutas
+      setCookie('token', data.access_token, 7);
+      setCookie('permisos', JSON.stringify(permisos), 7);
+
+      // Usuarios de solo app brigada no deben llegar al dashboard
+      if (esSoloAppBrigada(permisos, data.user.rol)) {
+        router.push('/brigada');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || err.message || 'Error de red';

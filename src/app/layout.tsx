@@ -32,7 +32,7 @@ const alacrity = localFont({
 export const metadata: Metadata = {
   title: 'ESTRATO - Cuartel Digital para Campañas Políticas',
   description:
-    'Geointeligencia, CRM omnicanal, brigadas, IA y movilización política en una sola plataforma.',
+    'Mapa territorial, histórico electoral, CRM, app de brigada y control de campaña en una sola plataforma para México.',
 };
 
 export default function RootLayout({

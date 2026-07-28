@@ -23,6 +23,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Send,
   LucideProps,
 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ const iconMap = {
   ver: Eye,
   ocultar: EyeOff,
   eliminar: Trash2,
+  enviar: Send,
   historico: TrendingUp,
   plus: Plus,
   buscar: Search,

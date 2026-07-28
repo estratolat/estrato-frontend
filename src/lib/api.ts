@@ -76,6 +76,7 @@ export const usersApi = {
   update: (id: string, data: any) => api.patch(`/users/${id}`, data),
   deactivate: (id: string) => api.patch(`/users/${id}/desactivar`),
   delete: (id: string) => api.delete(`/users/${id}`),
+  resendInvitation: (id: string) => api.post(`/users/${id}/reenviar-invitacion`),
   getPermisosSchema: () => api.get('/users/permisos/schema'),
 };
 

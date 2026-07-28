@@ -96,6 +96,16 @@ export default function UsuariosPage() {
     }
   };
 
+  const handleResendInvitation = async (id: string, email: string) => {
+    if (!confirm(`¿Reenviar correo de invitación a ${email}?`)) return;
+    try {
+      await usersApi.resendInvitation(id);
+      alert('Invitación reenviada. Verifica inbox/spam en unos minutos.');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al reenviar invitación');
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -137,12 +147,16 @@ export default function UsuariosPage() {
             <tbody className="divide-y divide-secondary-100">
               {usuarios.map((u) => {
                 const perms = Array.isArray(u.permisos) ? u.permisos : permisosPorRol(u.rol);
+                const tieneInvitacionPendiente = !!u.invitation_token && !u.password_hash;
                 return (
                   <tr key={u.id} className={!u.activo ? 'opacity-60' : ''}>
                     <td className="px-4 py-3">
                       <p className="font-medium text-secondary-800">{u.nombre || 'Sin nombre'}</p>
                       <p className="text-xs text-secondary-500">{u.email}</p>
                       {u.telefono && <p className="text-xs text-secondary-400">{u.telefono}</p>}
+                      {tieneInvitacionPendiente && (
+                        <p className="mt-1 text-xs text-amber-600">Invitación pendiente</p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ROLES_COLORS[u.rol] || 'bg-secondary-100 text-secondary-600'}`}>
@@ -179,6 +193,15 @@ export default function UsuariosPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        {tieneInvitacionPendiente && (
+                          <button
+                            onClick={() => handleResendInvitation(u.id, u.email)}
+                            className="rounded-lg p-2 text-secondary-500 hover:bg-primary-50 hover:text-primary-600"
+                            title="Reenviar invitación"
+                          >
+                            <Icon name="enviar" size={16} />
+                          </button>
+                        )}
                         <Link
                           href={`/dashboard/usuarios/${u.id}/editar`}
                           className="rounded-lg p-2 text-secondary-500 hover:bg-secondary-100 hover:text-primary-600"

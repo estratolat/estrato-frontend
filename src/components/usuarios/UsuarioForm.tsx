@@ -53,6 +53,8 @@ const ROLES_LABELS: Record<string, string> = {
   encargado_peticiones: 'Encargado de Peticiones',
 };
 
+const ROLES_APP_BRIGADA = ['brigadista', 'coord_zona', 'coord_general'];
+
 function mergeSecciones(
   schemaSecciones: Seccion[] | undefined,
   fallbackSecciones: Seccion[]
@@ -104,6 +106,7 @@ export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loadin
   });
   const [schema, setSchema] = useState<PermisosSchema | null>(null);
   const [customPerms, setCustomPerms] = useState(false);
+  const esBrigada = ROLES_APP_BRIGADA.includes(form.rol);
 
   useEffect(() => {
     usersApi
@@ -200,14 +203,18 @@ export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loadin
           />
         </div>
         <div>
-          <label className="label">Teléfono (para login de brigada)</label>
+          <label className="label">
+            Teléfono {esBrigada && <span className="text-red-500">*</span>}
+          </label>
           <input
             type="tel"
             className="input w-full"
             value={form.telefono}
             onChange={(e) => handleChange('telefono', e.target.value)}
             placeholder="+52..."
+            required={esBrigada}
           />
+          {esBrigada && <p className="mt-1 text-xs text-secondary-500">Obligatorio para entrar a la App de Brigada.</p>}
         </div>
         <div>
           <label className="label">PIN numérico (para brigada)</label>
@@ -217,8 +224,9 @@ export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loadin
             className="input w-full"
             value={form.pin}
             onChange={(e) => handleChange('pin', e.target.value)}
-            placeholder="1234"
+            placeholder={esBrigada ? 'Vacío = generamos uno automáticamente' : '1234'}
           />
+          {esBrigada && !form.pin && <p className="mt-1 text-xs text-secondary-500">Si lo dejas vacío, generamos un PIN de 4 dígitos.</p>}
         </div>
         <div>
           <label className="label">Rol</label>
@@ -245,21 +253,28 @@ export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loadin
             ))}
           </select>
         </div>
-        <div>
-          <label className="label">Contraseña inicial {initial && '(dejar en blanco para no cambiar)'}</label>
-          <input
-            type="text"
-            className="input w-full"
-            value={form.password}
-            onChange={(e) => handleChange('password', e.target.value)}
-            placeholder={initial ? '••••••' : 'Opcional: si la dejas vacía se envía invitación por correo'}
-          />
-          {!initial && (
-            <p className="mt-1 text-xs text-secondary-500">
-              Si no defines contraseña, el usuario recibirá un correo de admin@estrato.lat con un enlace para activar su cuenta.
-            </p>
-          )}
-        </div>
+        {!esBrigada && (
+          <div>
+            <label className="label">Contraseña inicial {initial && '(dejar en blanco para no cambiar)'}</label>
+            <input
+              type="text"
+              className="input w-full"
+              value={form.password}
+              onChange={(e) => handleChange('password', e.target.value)}
+              placeholder={initial ? '••••••' : 'Opcional: si la dejas vacía se envía invitación por correo'}
+            />
+            {!initial && (
+              <p className="mt-1 text-xs text-secondary-500">
+                Si no defines contraseña, el usuario recibirá un correo de admin@estrato.lat con un enlace para activar su cuenta.
+              </p>
+            )}
+          </div>
+        )}
+        {esBrigada && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <strong>App de Brigada:</strong> este usuario accederá con su <strong>teléfono</strong> y <strong>PIN</strong>, no con contraseña. Se enviará un correo con los datos de acceso.
+          </div>
+        )}
         <div className="flex items-center gap-3 pt-6">
           <button
             type="button"

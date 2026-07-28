@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, Download } from 'lucide-react';
-import TikTokEmbed from '@/components/landing/TikTokEmbed';
+import VideoCard from '@/components/landing/VideoCard';
 
 const LIBROS = [
   {
@@ -57,30 +57,36 @@ const LIBROS = [
 
 const RECOMENDACIONES = [
   {
-    id: '7553795381893631240',
+    video: '/videos/antonio-sola.mp4',
+    poster: '/images/thumbnails/antonio-sola.mp4.png',
     nombre: 'Antonio Sola',
     titulo: 'Creador de Presidentes',
     descripcion:
-      'Consultor español. Asesora políticos y gobiernos en los cinco continentes.',
+      'Consultor español. Asesora a presidentes, políticos y gobiernos en los cinco continentes.',
   },
   {
-    id: '7553769159851642120',
+    video: '/videos/gisela-rubach.mp4',
+    poster: '/images/thumbnails/gisela-rubach.mp4.png',
     nombre: 'Gisela Rubach',
     titulo: 'Estratega política',
     descripcion:
       'Académica y consultora mexicana. Pionera de la mercadotecnia política en América Latina.',
   },
   {
-    id: '7650029975650864404',
-    nombre: 'Por confirmar',
-    titulo: 'Consultor internacional',
-    descripcion: 'Próximamente actualizaremos el nombre y perfil de este recomendador.',
+    video: '/videos/somee-2024.mp4',
+    poster: '/images/thumbnails/somee-2024.mp4.png',
+    nombre: 'SOMEE',
+    titulo: 'Sociedad Mexicana de Estudios Electorales',
+    descripcion:
+      'Congreso Internacional de Estudios Electorales 2024, Facultad de Ciencias Políticas de Toluca. Aceptó el escrito de Gabriel Ibarra.',
   },
   {
-    id: '7441056841125104952',
-    nombre: 'Por confirmar',
-    titulo: 'Consultor internacional',
-    descripcion: 'Próximamente actualizaremos el nombre y perfil de este recomendador.',
+    video: '/videos/yury-ramirez-antonio.mp4',
+    poster: '/images/thumbnails/yury-ramirez-antonio.mp4.png',
+    nombre: 'Yury Ramírez',
+    titulo: 'Colaboradora ESTRATO',
+    descripcion:
+      'Junto a Antonio, colabora en el desarrollo y operación de ESTRATO.',
   },
 ];
 
@@ -249,7 +255,7 @@ export default function LibrosPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {RECOMENDACIONES.map((rec) => (
               <div
-                key={rec.id}
+                key={rec.video}
                 className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171e]"
               >
                 <div className="border-b border-white/10 p-4">
@@ -258,16 +264,17 @@ export default function LibrosPage() {
                   <p className="mt-1 text-xs leading-snug text-white/50">{rec.descripcion}</p>
                 </div>
                 <div className="flex-1">
-                  <TikTokEmbed videoId={rec.id} />
+                  <VideoCard
+                    src={rec.video}
+                    poster={rec.poster}
+                    nombre={rec.nombre}
+                    titulo={rec.titulo}
+                  />
                 </div>
               </div>
             ))}
           </div>
 
-          <p className="mt-8 text-center text-xs text-white/40">
-            Los videos se reproducen directamente aquí. Si falta el nombre de algún recomendador,
-            envíanoslo y lo actualizamos.
-          </p>
         </div>
       </section>
 

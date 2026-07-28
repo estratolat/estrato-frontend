@@ -252,8 +252,13 @@ export default function UsuarioForm({ initial, zonas, onSubmit, onCancel, loadin
             className="input w-full"
             value={form.password}
             onChange={(e) => handleChange('password', e.target.value)}
-            placeholder={initial ? '••••••' : 'demo123'}
+            placeholder={initial ? '••••••' : 'Opcional: si la dejas vacía se envía invitación por correo'}
           />
+          {!initial && (
+            <p className="mt-1 text-xs text-secondary-500">
+              Si no defines contraseña, el usuario recibirá un correo de admin@estrato.lat con un enlace para activar su cuenta.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3 pt-6">
           <button

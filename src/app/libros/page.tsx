@@ -10,7 +10,7 @@ const LIBROS = [
     tipo: 'pago',
     descripcion:
       'Guía práctica que aplica principios de estrategia militar a la comunicación política moderna. Para candidatos y equipos de campaña que quieren ganar el combate narrativo.',
-    portada: '/images/guerra-mensajes.png',
+    portada: '/images/guerra-de-mensajes.jpg',
     opciones: [
       {
         label: 'PDF digital',
@@ -39,7 +39,7 @@ const LIBROS = [
     tipo: 'gratis',
     descripcion:
       'El clásico de la estrategia militar que sigue inspirando a líderes, políticos y estrategas de comunicación. Versión gratuita para descargar.',
-    portada: '/images/arte-de-la-guerra-portada.png',
+    portada: '/images/arte-de-la-guerra.jpg',
     opciones: [
       {
         label: 'PDF digital',

@@ -6,7 +6,7 @@ const nextConfig = {
   },
   // Rewrites para API (útil en desarrollo local; en Vercel usamos CORS directo)
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://estrato-backend.vercel.app';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.estrato.lat';
     return [
       {
         source: '/api/:path*',

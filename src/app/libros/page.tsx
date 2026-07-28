@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { BookOpen, Download, Play, ArrowRight } from 'lucide-react';
+import { BookOpen, Download } from 'lucide-react';
+import TikTokEmbed from '@/components/landing/TikTokEmbed';
 
 const LIBROS = [
   {
@@ -23,10 +24,10 @@ const LIBROS = [
       },
       {
         label: 'Ejemplar impreso',
-        extra: 'Envío por correo',
+        extra: 'Envío cotizado por separado',
         precio: '$550 MXN',
         cta: 'Pedir por WhatsApp',
-        href: 'https://wa.me/524182456138?text=Hola%2C%20quiero%20comprar%20Guerra%20de%20Mensajes%20en%20versi%C3%B3n%20impresa%20(%24550%20MXN%20con%20env%C3%ADo%20por%20correo).',
+        href: 'https://wa.me/524182456138?text=Hola%2C%20quiero%20comprar%20Guerra%20de%20Mensajes%20en%20versi%C3%B3n%20impresa%20(%24550%20MXN).%20Me%20interesa%20cotizar%20el%20env%C3%ADo.',
         externo: true,
         primario: false,
       },
@@ -54,30 +55,32 @@ const LIBROS = [
   },
 ];
 
-const TIKTOKS = [
+const RECOMENDACIONES = [
   {
     id: '7553795381893631240',
-    url: 'https://www.tiktok.com/@gaboibarrab/video/7553795381893631240',
-    titulo: 'Contenido de Gabriel Ibarra',
-    autor: '@gaboibarrab',
+    nombre: 'Antonio Sola',
+    titulo: 'Creador de Presidentes',
+    descripcion:
+      'Consultor español. Asesora políticos y gobiernos en los cinco continentes.',
   },
   {
     id: '7553769159851642120',
-    url: 'https://www.tiktok.com/@gaboibarrab/video/7553769159851642120',
-    titulo: 'Contenido de Gabriel Ibarra',
-    autor: '@gaboibarrab',
+    nombre: 'Gisela Rubach',
+    titulo: 'Estratega política',
+    descripcion:
+      'Académica y consultora mexicana. Pionera de la mercadotecnia política en América Latina.',
   },
   {
     id: '7650029975650864404',
-    url: 'https://www.tiktok.com/@gaboibarrab/video/7650029975650864404',
-    titulo: 'Contenido de Gabriel Ibarra',
-    autor: '@gaboibarrab',
+    nombre: 'Por confirmar',
+    titulo: 'Consultor internacional',
+    descripcion: 'Próximamente actualizaremos el nombre y perfil de este recomendador.',
   },
   {
     id: '7441056841125104952',
-    url: 'https://www.tiktok.com/@gaboibarrab/video/7441056841125104952',
-    titulo: 'Contenido de Gabriel Ibarra',
-    autor: '@gaboibarrab',
+    nombre: 'Por confirmar',
+    titulo: 'Consultor internacional',
+    descripcion: 'Próximamente actualizaremos el nombre y perfil de este recomendador.',
   },
 ];
 
@@ -228,55 +231,42 @@ export default function LibrosPage() {
         </div>
       </section>
 
-      {/* Videos TikTok */}
+      {/* Recomendaciones en video */}
       <section className="relative z-10 border-y border-white/10 bg-[#0d0e13] px-6 py-20 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <div className="mb-12 text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#d73216]">
-              En video
+              Recomendaciones
             </p>
             <h2 className="mt-3 text-3xl font-black text-white lg:text-4xl">
-              Ideas detrás de los libros
+              Consultores de renombre recomiendan el libro
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-white/60">
-              Fragmentos de contenido de Gabriel Ibarra sobre estrategia, mensajes y campañas.
+              Líderes de la consultoría política internacional hablan sobre Guerra de Mensajes.
             </p>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {TIKTOKS.map((video) => (
-              <a
-                key={video.id}
-                href={video.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171e] transition hover:border-[#d73216]/40"
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {RECOMENDACIONES.map((rec) => (
+              <div
+                key={rec.id}
+                className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171e]"
               >
-                <div className="relative flex h-48 items-center justify-center bg-[#1a1b24]">
-                  <div className="absolute inset-0 opacity-30 transition group-hover:opacity-50">
-                    <div className="absolute left-1/3 top-1/3 h-16 w-16 rounded-full bg-[#d73216]/30 blur-xl" />
-                  </div>
-                  <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-[#d73216]/20 text-[#d73216] transition group-hover:scale-110 group-hover:bg-[#d73216] group-hover:text-white">
-                    <Play size={24} fill="currentColor" />
-                  </div>
-                  <div className="absolute bottom-3 left-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/80">
-                    TikTok
-                  </div>
+                <div className="border-b border-white/10 p-4">
+                  <h3 className="text-base font-bold text-white">{rec.nombre}</h3>
+                  <p className="text-xs font-semibold text-[#d73216]">{rec.titulo}</p>
+                  <p className="mt-1 text-xs leading-snug text-white/50">{rec.descripcion}</p>
                 </div>
-                <div className="flex flex-1 flex-col p-4">
-                  <h3 className="text-sm font-bold text-white">{video.titulo}</h3>
-                  <p className="mt-1 text-xs text-white/50">{video.autor}</p>
-                  <div className="mt-auto flex items-center gap-1 pt-4 text-xs font-semibold text-[#d73216]">
-                    Ver en TikTok
-                    <ArrowRight size={12} />
-                  </div>
+                <div className="flex-1">
+                  <TikTokEmbed videoId={rec.id} />
                 </div>
-              </a>
+              </div>
             ))}
           </div>
 
           <p className="mt-8 text-center text-xs text-white/40">
-            Los títulos de los videos se pueden personalizar cuando nos indiques el tema de cada uno.
+            Los videos se reproducen directamente aquí. Si falta el nombre de algún recomendador,
+            envíanoslo y lo actualizamos.
           </p>
         </div>
       </section>

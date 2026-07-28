@@ -81,6 +81,7 @@ export default function NosotrosPage() {
           <div className="hidden items-center gap-8 text-sm font-medium text-white/70 md:flex">
             <Link href="/#funciones" className="transition hover:text-white">Soluciones</Link>
             <Link href="/nosotros" className="text-white transition">Nosotros</Link>
+            <Link href="/libros" className="transition hover:text-white">Libros</Link>
             <Link href="/contacto" className="transition hover:text-white">Contacto</Link>
           </div>
 

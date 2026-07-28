@@ -102,6 +102,9 @@ export default function Home() {
             <Link href="/nosotros" className="transition hover:text-white">
               Nosotros
             </Link>
+            <Link href="/libros" className="transition hover:text-white">
+              Libros
+            </Link>
             <Link href="/contacto" className="transition hover:text-white">
               Contacto
             </Link>

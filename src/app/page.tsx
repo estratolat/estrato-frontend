@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import type { LucideIcon } from 'lucide-react';
 import {
   Users,
   MessageSquare,
@@ -17,6 +18,65 @@ import {
   MapPin,
   Target,
 } from 'lucide-react';
+
+interface Modulo {
+  codigo: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+const MODULOS: Modulo[] = [
+  {
+    codigo: 'M01',
+    title: 'Mapa Territorial',
+    subtitle: 'Territorio en vivo',
+    description:
+      'Visualiza secciones INE, colonias, apoyos, casillas y KMLs propios. Sabe dónde mover brigadas y dónde ganar.',
+    icon: Map,
+  },
+  {
+    codigo: 'M02',
+    title: 'Inteligencia Electoral',
+    subtitle: 'Datos que deciden',
+    description:
+      'Histórico electoral cruzado por sección, ficha seccional, proyección de votos y monitoreo de resultados.',
+    icon: BarChart3,
+  },
+  {
+    codigo: 'M03',
+    title: 'Operación de Campo',
+    subtitle: 'Brigada digital',
+    description:
+      'App de brigada, votantes, líderes, apoyos, casillas y eventos. Captura con GPS y foto, sincroniza en tiempo real.',
+    icon: Smartphone,
+  },
+  {
+    codigo: 'M04',
+    title: 'CRM y Comunicación',
+    subtitle: 'Canales unificados',
+    description:
+      'Mensajes y WhatsApp centralizados por votante, encuestas y boletines para mantener contacto con tu base.',
+    icon: MessageSquare,
+  },
+  {
+    codigo: 'M05',
+    title: 'Cumplimiento INE',
+    subtitle: 'Control y reportes',
+    description:
+      'Bitácora de apoyos, informes INE, monitoreo y aviso de privacidad. Reduce riesgos de fiscalización.',
+    icon: ClipboardList,
+  },
+  {
+    codigo: 'M06',
+    title: 'Control Centralizado',
+    subtitle: 'Admin de campaña',
+    description:
+      'Dashboard general, perfil del candidato, usuarios con permisos y admin multi-campaña. Cada equipo ve lo suyo.',
+    icon: Users,
+  },
+];
 
 export default function Home() {
   return (
@@ -120,7 +180,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Módulos reales */}
+      {/* Módulos reales - estilo panel de operaciones */}
       <section id="funciones" className="relative overflow-hidden border-t border-white/10 px-6 py-24 lg:px-12">
         <div className="pointer-events-none absolute inset-0 opacity-30">
           <div
@@ -132,54 +192,21 @@ export default function Home() {
         <div className="relative mx-auto max-w-6xl">
           <div className="mb-16 text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#d73216]">
-              Funciones
+              Módulos Operativos
             </p>
             <h2 className="mt-3 text-3xl font-black text-white lg:text-5xl">
               Lo que ESTRATO hace hoy
             </h2>
             <p className="mx-auto mt-5 max-w-3xl text-base leading-relaxed text-white/60 lg:text-lg">
-              No prometemos features que no existen. Estos son los módulos que ya usan las campañas
-              dentro de la plataforma.
+              Seis módulos activos dentro del panel. Sin promesas de AI, sin features inventadas:
+              solo herramientas que ya usan las campañas.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <FeatureCard
-              title="Mapa Territorial"
-              subtitle="Territorio en vivo"
-              description="Visualiza secciones INE, colonias, apoyos, casillas y KMLs propios. Sabe dónde mover brigadas y dónde ganar."
-              icon={<Map size={32} />}
-            />
-            <FeatureCard
-              title="Inteligencia Electoral"
-              subtitle="Datos que deciden"
-              description="Histórico electoral cruzado por sección, ficha seccional, proyección de votos y monitoreo de resultados."
-              icon={<BarChart3 size={32} />}
-            />
-            <FeatureCard
-              title="Operación de Campo"
-              subtitle="Brigada digital"
-              description="App de brigada, votantes, líderes, apoyos, casillas y eventos. Captura con GPS y foto, sincroniza en tiempo real."
-              icon={<Smartphone size={32} />}
-            />
-            <FeatureCard
-              title="CRM y Comunicación"
-              subtitle="Canales unificados"
-              description="Mensajes y WhatsApp centralizados por votante, encuestas y boletines para mantener contacto con tu base."
-              icon={<MessageSquare size={32} />}
-            />
-            <FeatureCard
-              title="Cumplimiento INE"
-              subtitle="Control y reportes"
-              description="Bitácora de apoyos, informes INE, monitoreo y aviso de privacidad. Reduce riesgos de fiscalización."
-              icon={<ClipboardList size={32} />}
-            />
-            <FeatureCard
-              title="Control Centralizado"
-              subtitle="Admin de campaña"
-              description="Dashboard general, perfil del candidato, usuarios con permisos y admin multi-campaña. Cada equipo ve lo suyo."
-              icon={<Users size={32} />}
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            {MODULOS.map((m) => (
+              <ModuloCard key={m.codigo} modulo={m} />
+            ))}
           </div>
         </div>
       </section>
@@ -221,7 +248,7 @@ export default function Home() {
 
       {/* Seguridad */}
       <section className="border-t border-white/10 px-6 py-24 lg:px-12">
-        <div className="mx-auto max-w-6xl">
+        <div className="relative mx-auto max-w-6xl">
           <div className="mb-16 text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#d73216]">
               Seguridad
@@ -231,19 +258,19 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <SecurityCard
-              icon={<Database size={28} />}
+          <div className="grid gap-4 md:grid-cols-3">
+            <SecurityRow
+              icon={<Database size={24} />}
               title="Multi-tenant"
               description="Cada campaña opera en su propio espacio. Los datos nunca se mezclan entre clientes."
             />
-            <SecurityCard
-              icon={<Lock size={28} />}
+            <SecurityRow
+              icon={<Lock size={24} />}
               title="Permisos por rol"
               description="Controla qué ve cada usuario: brigadista, coordinador, administrador o superadmin."
             />
-            <SecurityCard
-              icon={<Shield size={28} />}
+            <SecurityRow
+              icon={<Shield size={24} />}
               title="LFPDPPP"
               description="Aviso de privacidad visible y gestión responsable de datos personales de votantes."
             />
@@ -302,6 +329,64 @@ export default function Home() {
         </p>
       </footer>
     </main>
+  );
+}
+
+function ModuloCard({ modulo }: { modulo: Modulo }) {
+  const Icon = modulo.icon;
+  return (
+    <div className="group relative flex items-start gap-5 overflow-hidden rounded-xl border border-white/10 bg-[#0d0e13] p-5 transition hover:border-[#d73216]/40 hover:bg-[#0d0e13]/80">
+      {/* Línea de estado roja */}
+      <div className="absolute left-0 top-0 h-full w-1 bg-[#d73216]/60 transition group-hover:bg-[#d73216]" />
+
+      {/* Código de módulo */}
+      <div className="shrink-0 pt-1">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-[#d73216]/30 bg-[#d73216]/10 text-[#d73216]">
+          <Icon size={22} />
+        </div>
+      </div>
+
+      <div className="flex-1">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-white">{modulo.title}</h3>
+          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-mono font-semibold tracking-wider text-white/50">
+            {modulo.codigo}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-[#d73216]">
+          {modulo.subtitle}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-white/55">{modulo.description}</p>
+      </div>
+
+      {/* Indicador de estado */}
+      <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+        <span className="h-2 w-2 rounded-full bg-green-500" />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Activo</span>
+      </div>
+    </div>
+  );
+}
+
+function SecurityRow({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-4 rounded-xl border border-white/10 bg-[#16171e] p-5 transition hover:border-[#d73216]/30">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#d73216]/15 text-[#d73216]">
+        {icon}
+      </div>
+      <div>
+        <h3 className="text-base font-bold text-white">{title}</h3>
+        <p className="mt-1 text-sm leading-relaxed text-white/55">{description}</p>
+      </div>
+    </div>
   );
 }
 
@@ -365,32 +450,6 @@ function DashboardMockup() {
   );
 }
 
-function FeatureCard({
-  title,
-  subtitle,
-  description,
-  icon,
-}: {
-  title: string;
-  subtitle: string;
-  description: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02] p-8 transition hover:border-[#d73216]/30 hover:bg-white/[0.04]">
-      <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#d73216]/10 blur-3xl opacity-0 transition duration-500 group-hover:opacity-100" />
-      <div className="relative">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d73216]/15 text-[#d73216] transition group-hover:bg-[#d73216] group-hover:text-white">
-          {icon}
-        </div>
-        <p className="mt-5 text-sm font-bold uppercase tracking-wider text-[#d73216]">{subtitle}</p>
-        <h3 className="mt-1 text-xl font-bold text-white">{title}</h3>
-        <p className="mt-3 leading-relaxed text-white/55">{description}</p>
-      </div>
-    </div>
-  );
-}
-
 function StepCard({
   step,
   icon,
@@ -410,26 +469,6 @@ function StepCard({
       </div>
       <h3 className="text-xl font-bold text-white">{title}</h3>
       <p className="mt-3 leading-relaxed text-white/55">{description}</p>
-    </div>
-  );
-}
-
-function SecurityCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-[#16171e] p-6 text-center transition hover:border-[#d73216]/30">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d73216]/15 text-[#d73216]">
-        {icon}
-      </div>
-      <h3 className="text-lg font-bold text-white">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-white/55">{description}</p>
     </div>
   );
 }

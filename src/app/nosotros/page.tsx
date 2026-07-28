@@ -1,30 +1,63 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
-const TEAM = [
-  {
-    name: 'Yury Constanza Ramírez Díaz',
-    role: 'Consultora Política y Comunicación de Gobierno',
-    image: '/images/team/yury.jpg',
-    bio: `Consultora política en campañas electorales y comunicación de gobierno. Experta en estrategia electoral y movilización de votantes. Master en Consultoría Política por la Universidad Camilo José Cela (España).\n\nAyuda a los candidatos a conectar con el votante, sin perder tiempo ni dinero, a través de su metodología CIEM. Conferencista internacional en comunicación política y gerencia de campañas en México, Paraguay, Panamá, España, Ecuador, Perú, Estados Unidos, República Dominicana y Colombia.\n\nGanadora de los Napolitan Victory Awards (Washington D.C.) como «mujer influyente de la comunicación política» 2018, «campaña del año en movilización de votantes» 2022 y «campaña del año al concejo municipal» 2024. Coautora de nueve libros de marketing político y autora del ebook «Check list para elaborar tu presupuesto de campaña electoral».\n\nEs abogada, magíster en derecho administrativo, especialista en alta dirección del Estado, coach integral certificada y especialista en Inteligencia Artificial.`,
-  },
-  {
-    name: 'José Antonio Sánchez',
-    role: 'Consultor, Estratega y Coach Político',
-    image: '/images/team/antonio.jpg',
-    bio: `Consultor, estratega y coach político electoral y gubernamental. Más de 38 años de experiencia en el desarrollo y ejecución de estrategias político electorales en más de 550 campañas, impulsando victorias y transformaciones políticas.\n\nGanador de los premios Napolitan Victory Awards 2024 por campaña del Consejo a la Municipalidad del año, puestos misceláneos y mención honorífica por campañas a Cámara de Representantes.\n\nDirector ejecutivo internacional de World International Coaching y CEO de la firma Precisión Consultores.`,
-  },
+interface TeamMember {
+  name: string;
+  role: string;
+  image: string;
+  bio: string;
+  flags: { code: string; label: string; emoji: string }[];
+}
+
+const TEAM: TeamMember[] = [
   {
     name: 'Gabriel Ibarra Báez',
     role: 'Estratega de Comunicación y Autor de Guerra de Mensajes',
     image: '/images/team/gabo.jpg',
-    bio: `Estratega de comunicación con formación en diseño gráfico publicitario, especializado en desarrollo y ejecución de narrativas públicas y comunicación.\n\nHa fusionado la potencia visual con la estrategia discursiva como Director de Comunicación Social en gobiernos municipales, liderando la relación con medios, posicionamiento de agenda pública y difusión de logros institucionales. En el Gobierno del Estado de Guanajuato, colaboró con operación digital para redes sociales oficiales del Gobernador.\n\nAsesor en campañas electorales en México, enfocado en imagen, posicionamiento de candidatos, mensajes clave y contención de daños. Es conferencista, capacitador y autor del libro Guerra de Mensajes, guía práctica que aplica principios de estrategia militar a la comunicación política moderna.`,
+    bio: `Estratega de comunicación con formación en diseño gráfico publicitario, especializado en desarrollo y ejecución de narrativas públicas y comunicación.
+
+Ha fusionado la potencia visual con la estrategia discursiva como Director de Comunicación Social en gobiernos municipales, liderando la relación con medios, posicionamiento de agenda pública y difusión de logros institucionales. En el Gobierno del Estado de Guanajuato, colaboró con operación digital para redes sociales oficiales del Gobernador.
+
+Asesor en campañas electorales en México, enfocado en imagen, posicionamiento de candidatos, mensajes clave y contención de daños. Es conferencista, capacitador y autor del libro Guerra de Mensajes, guía práctica que aplica principios de estrategia militar a la comunicación política moderna.
+
+Es el responsable de la estructura, producto y desarrollo de ESTRATO.`,
+    flags: [{ code: 'MX', label: 'México', emoji: '🇲🇽' }],
   },
   {
     name: 'Alejandra Sierra López',
     role: 'Especialista en Derecho Electoral y Estrategia Partidista',
     image: '/images/team/alejandra.jpg',
-    bio: `Destacada por su experiencia en la planificación y ejecución de estrategias para partidos políticos y gobiernos. Se ha especializado en la prevención de Delitos Electorales y comparte su experiencia a través de cursos de capacitación para equipos gubernamentales y de campaña.\n\nCuenta con una sólida formación académica que incluye una Maestría en Ciencia Política y diplomados en Derecho Electoral.`,
+    bio: `Destacada por su experiencia en la planificación y ejecución de estrategias para partidos políticos y gobiernos. Se ha especializado en la prevención de Delitos Electorales y comparte su experiencia a través de cursos de capacitación para equipos gubernamentales y de campaña.
+
+Cuenta con una sólida formación académica que incluye una Maestría en Ciencia Política y diplomados en Derecho Electoral.`,
+    flags: [{ code: 'MX', label: 'México', emoji: '🇲🇽' }],
+  },
+  {
+    name: 'Yury Constanza Ramírez Díaz',
+    role: 'Consultora Política y Comunicación de Gobierno',
+    image: '/images/team/yury.jpg',
+    bio: `Consultora política en campañas electorales y comunicación de gobierno. Experta en estrategia electoral y movilización de votantes. Master en Consultoría Política por la Universidad Camilo José Cela (España).
+
+Ayuda a los candidatos a conectar con el votante, sin perder tiempo ni dinero, a través de su metodología CIEM. Conferencista internacional en comunicación política y gerencia de campañas en México, Paraguay, Panamá, España, Ecuador, Perú, Estados Unidos, República Dominicana y Colombia.
+
+Ganadora de los Napolitan Victory Awards (Washington D.C.) como «mujer influyente de la comunicación política» 2018, «campaña del año en movilización de votantes» 2022 y «campaña del año al concejo municipal» 2024. Coautora de nueve libros de marketing político y autora del ebook «Check list para elaborar tu presupuesto de campaña electoral».
+
+Es abogada, magíster en derecho administrativo, especialista en alta dirección del Estado, coach integral certificada y especialista en Inteligencia Artificial.`,
+    flags: [{ code: 'CO', label: 'Colombia', emoji: '🇨🇴' }],
+  },
+  {
+    name: 'José Antonio Sánchez',
+    role: 'Consultor, Estratega y Coach Político',
+    image: '/images/team/antonio.jpg',
+    bio: `Consultor, estratega y coach político electoral y gubernamental. Más de 38 años de experiencia en el desarrollo y ejecución de estrategias político electorales en más de 550 campañas, impulsando victorias y transformaciones políticas.
+
+Ganador de los premios Napolitan Victory Awards 2024 por campaña del Consejo a la Municipalidad del año, puestos misceláneos y mención honorífica por campañas a Cámara de Representantes.
+
+Director ejecutivo internacional de World International Coaching y CEO de la firma Precisión Consultores.`,
+    flags: [
+      { code: 'CO', label: 'Colombia', emoji: '🇨🇴' },
+      { code: 'MX', label: 'México', emoji: '🇲🇽' },
+    ],
   },
 ];
 
@@ -46,7 +79,7 @@ export default function NosotrosPage() {
           </Link>
 
           <div className="hidden items-center gap-8 text-sm font-medium text-white/70 md:flex">
-            <Link href="/#soluciones" className="transition hover:text-white">Soluciones</Link>
+            <Link href="/#funciones" className="transition hover:text-white">Soluciones</Link>
             <Link href="/nosotros" className="text-white transition">Nosotros</Link>
             <Link href="/contacto" className="transition hover:text-white">Contacto</Link>
           </div>
@@ -84,7 +117,7 @@ export default function NosotrosPage() {
       {/* Equipo */}
       <section className="relative z-10 px-6 pb-20 lg:px-12">
         <div className="mx-auto grid max-w-5xl gap-6">
-          {TEAM.map((member) => (
+          {TEAM.map((member, index) => (
             <div
               key={member.name}
               className="group flex flex-col gap-6 rounded-2xl border border-white/10 bg-white/[0.02] p-6 transition hover:border-[#d73216]/30 hover:bg-white/[0.04] sm:flex-row sm:items-start"
@@ -97,6 +130,17 @@ export default function NosotrosPage() {
                   className="object-cover grayscale transition duration-500 group-hover:grayscale-0"
                   sizes="160px"
                 />
+                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/80 to-transparent py-2">
+                  {member.flags.map((flag) => (
+                    <span
+                      key={flag.code}
+                      title={flag.label}
+                      className="text-lg leading-none"
+                    >
+                      {flag.emoji}
+                    </span>
+                  ))}
+                </div>
               </div>
 
               <div className="flex-1 text-center sm:text-left">
@@ -106,7 +150,28 @@ export default function NosotrosPage() {
                 <h2 className="mt-1 text-xl font-bold text-white lg:text-2xl">
                   {member.name}
                 </h2>
-                <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-white/55">
+
+                {/* Banderas como badges debajo del nombre */}
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  {member.flags.map((flag) => (
+                    <span
+                      key={flag.code}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70"
+                    >
+                      <span className="text-base leading-none">{flag.emoji}</span>
+                      {flag.label}
+                    </span>
+                  ))}
+                </div>
+
+                {index === 0 && (
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#d73216]/30 bg-[#d73216]/10 px-3 py-1 text-xs font-semibold text-[#d73216]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#d73216]" />
+                    Creador y estructura de ESTRATO
+                  </div>
+                )}
+
+                <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/55">
                   {member.bio}
                 </p>
               </div>

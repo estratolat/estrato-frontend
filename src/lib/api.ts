@@ -74,6 +74,7 @@ export const usersApi = {
   getOne: (id: string) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
   update: (id: string, data: any) => api.patch(`/users/${id}`, data),
+  deactivate: (id: string) => api.patch(`/users/${id}/desactivar`),
   delete: (id: string) => api.delete(`/users/${id}`),
   getPermisosSchema: () => api.get('/users/permisos/schema'),
 };

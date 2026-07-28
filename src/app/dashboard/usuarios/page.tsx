@@ -76,13 +76,23 @@ export default function UsuariosPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeactivate = async (id: string) => {
     if (!confirm('¿Desactivar este acceso?')) return;
+    try {
+      await usersApi.deactivate(id);
+      loadData();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al desactivar usuario');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar este usuario permanentemente? Esta acción no se puede deshacer.')) return;
     try {
       await usersApi.delete(id);
       loadData();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al desactivar usuario');
+      setError(err.response?.data?.message || 'Error al eliminar usuario');
     }
   };
 
@@ -177,11 +187,18 @@ export default function UsuariosPage() {
                           <Icon name="configuracion" size={16} />
                         </Link>
                         <button
-                          onClick={() => handleDelete(u.id)}
-                          className="rounded-lg p-2 text-secondary-500 hover:bg-red-50 hover:text-red-600"
+                          onClick={() => handleDeactivate(u.id)}
+                          className="rounded-lg p-2 text-secondary-500 hover:bg-amber-50 hover:text-amber-600"
                           title="Desactivar"
                         >
                           <Icon name="ocultar" size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(u.id)}
+                          className="rounded-lg p-2 text-secondary-500 hover:bg-red-50 hover:text-red-600"
+                          title="Eliminar permanentemente"
+                        >
+                          <Icon name="eliminar" size={16} />
                         </button>
                       </div>
                     </td>

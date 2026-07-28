@@ -22,6 +22,7 @@ import {
   TrendingUp,
   Plus,
   Search,
+  Trash2,
   LucideProps,
 } from 'lucide-react';
 
@@ -46,6 +47,7 @@ const iconMap = {
   app: Smartphone,
   ver: Eye,
   ocultar: EyeOff,
+  eliminar: Trash2,
   historico: TrendingUp,
   plus: Plus,
   buscar: Search,

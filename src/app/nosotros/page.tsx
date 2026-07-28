@@ -20,7 +20,7 @@ Ha fusionado la potencia visual con la estrategia discursiva como Director de Co
 
 Asesor en campañas electorales en México, enfocado en imagen, posicionamiento de candidatos, mensajes clave y contención de daños. Es conferencista, capacitador y autor del libro Guerra de Mensajes, guía práctica que aplica principios de estrategia militar a la comunicación política moderna.
 
-Es el responsable de la estructura, producto y desarrollo de ESTRATO.`,
+Autor del libro Guerra de Mensajes y estratega detrás del enfoque comunicacional de ESTRATO.`,
     flags: [{ code: 'MX', label: 'México', emoji: '🇲🇽' }],
   },
   {
@@ -130,17 +130,6 @@ export default function NosotrosPage() {
                   className="object-cover grayscale transition duration-500 group-hover:grayscale-0"
                   sizes="160px"
                 />
-                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/80 to-transparent py-2">
-                  {member.flags.map((flag) => (
-                    <span
-                      key={flag.code}
-                      title={flag.label}
-                      className="text-lg leading-none"
-                    >
-                      {flag.emoji}
-                    </span>
-                  ))}
-                </div>
               </div>
 
               <div className="flex-1 text-center sm:text-left">
@@ -164,19 +153,77 @@ export default function NosotrosPage() {
                   ))}
                 </div>
 
-                {index === 0 && (
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#d73216]/30 bg-[#d73216]/10 px-3 py-1 text-xs font-semibold text-[#d73216]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#d73216]" />
-                    Creador y estructura de ESTRATO
-                  </div>
-                )}
-
                 <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/55">
                   {member.bio}
                 </p>
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Libro: Guerra de Mensajes */}
+      <section className="relative z-10 border-y border-white/10 bg-[#0d0e13] px-6 py-20 lg:px-12">
+        <div className="mx-auto max-w-5xl">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <div className="order-2 text-center lg:order-1 lg:text-left">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#d73216]">
+                Libro de Gabriel Ibarra
+              </p>
+              <h2 className="mt-3 text-3xl font-black text-white lg:text-4xl">
+                Guerra de Mensajes
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-white/60 lg:text-lg">
+                La guía práctica que aplica principios de estrategia militar a la comunicación
+                política moderna. Para candidatos, comunicadores y equipos de campaña que quieren
+                ganar el combate narrativo.
+              </p>
+
+              <ul className="mt-6 space-y-3 text-sm text-white/70">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#d73216]">✦</span>
+                  <span>Estrategia de mensajes para campañas electorales.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#d73216]">✦</span>
+                  <span>Principios militares adaptados a la política actual.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#d73216]">✦</span>
+                  <span>Formato PDF, listo para leer en cualquier dispositivo.</span>
+                </li>
+              </ul>
+
+              <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:items-start">
+                <a
+                  href="/libros/guerra-de-mensajes.pdf"
+                  download
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#d73216] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#b82412] lg:px-9 lg:text-base"
+                >
+                  Descargar PDF
+                </a>
+                <Link
+                  href="/contacto"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 px-7 py-3.5 text-sm font-bold text-white transition hover:bg-white/10 lg:px-9 lg:text-base"
+                >
+                  Pedir edición impresa
+                </Link>
+              </div>
+            </div>
+
+            <div className="order-1 flex justify-center lg:order-2">
+              <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-white/10 shadow-2xl shadow-black/40">
+                <Image
+                  src="/images/guerra-mensajes.png"
+                  alt="Portada del libro Guerra de Mensajes por Gabriel Ibarra"
+                  width={600}
+                  height={400}
+                  className="w-full object-cover"
+                  priority
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

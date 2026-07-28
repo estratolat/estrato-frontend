@@ -241,8 +241,14 @@ export default function NosotrosPage() {
 
             {/* El Arte de la Guerra - Gratuito */}
             <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-[#16171e] p-6 sm:flex-row">
-              <div className="mx-auto flex h-[260px] w-full max-w-[200px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-[#1a1b24] sm:mx-0">
-                <span className="text-center text-6xl">📜</span>
+              <div className="mx-auto w-full max-w-[200px] shrink-0 overflow-hidden rounded-xl border border-white/10 sm:mx-0">
+                <Image
+                  src="/images/arte-de-la-guerra-portada.png"
+                  alt="Portada de El Arte de la Guerra de Sun Tzu"
+                  width={400}
+                  height={600}
+                  className="w-full object-cover"
+                />
               </div>
 
               <div className="flex flex-1 flex-col text-center sm:text-left">

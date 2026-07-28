@@ -162,65 +162,111 @@ export default function NosotrosPage() {
         </div>
       </section>
 
-      {/* Libro: Guerra de Mensajes */}
+      {/* Libros */}
       <section className="relative z-10 border-y border-white/10 bg-[#0d0e13] px-6 py-20 lg:px-12">
-        <div className="mx-auto max-w-5xl">
-          <div className="grid items-center gap-10 lg:grid-cols-2">
-            <div className="order-2 text-center lg:order-1 lg:text-left">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#d73216]">
-                Libro de Gabriel Ibarra
-              </p>
-              <h2 className="mt-3 text-3xl font-black text-white lg:text-4xl">
-                Guerra de Mensajes
-              </h2>
-              <p className="mt-4 text-base leading-relaxed text-white/60 lg:text-lg">
-                La guía práctica que aplica principios de estrategia militar a la comunicación
-                política moderna. Para candidatos, comunicadores y equipos de campaña que quieren
-                ganar el combate narrativo.
-              </p>
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-12 text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#d73216]">
+              Biblioteca ESTRATO
+            </p>
+            <h2 className="mt-3 text-3xl font-black text-white lg:text-5xl">
+              Libros para ganar la guerra de narrativas
+            </h2>
+          </div>
 
-              <ul className="mt-6 space-y-3 text-sm text-white/70">
-                <li className="flex items-start gap-2">
-                  <span className="text-[#d73216]">✦</span>
-                  <span>Estrategia de mensajes para campañas electorales.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#d73216]">✦</span>
-                  <span>Principios militares adaptados a la política actual.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#d73216]">✦</span>
-                  <span>Formato PDF, listo para leer en cualquier dispositivo.</span>
-                </li>
-              </ul>
-
-              <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:items-start">
-                <a
-                  href="/libros/guerra-de-mensajes.pdf"
-                  download
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#d73216] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#b82412] lg:px-9 lg:text-base"
-                >
-                  Descargar PDF
-                </a>
-                <Link
-                  href="/contacto"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 px-7 py-3.5 text-sm font-bold text-white transition hover:bg-white/10 lg:px-9 lg:text-base"
-                >
-                  Pedir edición impresa
-                </Link>
-              </div>
-            </div>
-
-            <div className="order-1 flex justify-center lg:order-2">
-              <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-white/10 shadow-2xl shadow-black/40">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Guerra de Mensajes - De pago */}
+            <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-[#16171e] p-6 sm:flex-row">
+              <div className="mx-auto w-full max-w-[200px] shrink-0 overflow-hidden rounded-xl border border-white/10 sm:mx-0">
                 <Image
                   src="/images/guerra-mensajes.png"
                   alt="Portada del libro Guerra de Mensajes por Gabriel Ibarra"
-                  width={600}
-                  height={400}
+                  width={400}
+                  height={600}
                   className="w-full object-cover"
                   priority
                 />
+              </div>
+
+              <div className="flex flex-1 flex-col text-center sm:text-left">
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#d73216]">
+                  Libro de Gabriel Ibarra
+                </p>
+                <h3 className="mt-1 text-2xl font-black text-white">
+                  Guerra de Mensajes
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-white/60">
+                  Guía práctica que aplica principios de estrategia militar a la comunicación política
+                  moderna. Para candidatos y equipos de campaña que quieren ganar el combate narrativo.
+                </p>
+
+                <div className="mt-5 space-y-3">
+                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-white">PDF digital</p>
+                      <p className="text-xs text-white/50">Descarga inmediata</p>
+                    </div>
+                    <p className="text-lg font-black text-[#d73216]">$350 MXN</p>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-white">Ejemplar impreso</p>
+                      <p className="text-xs text-white/50">Envío por correo</p>
+                    </div>
+                    <p className="text-lg font-black text-[#d73216]">$550 MXN</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-col gap-3">
+                  <a
+                    href="https://www.mercadopago.com.mx/checkout/v1/payment/redirect/64afcb95-6d02-4a53-9352-c954819e50b4/payment-option-form/?source=link&preference-id=1398845935-746a3f7c-2ad5-4609-b56c-a9fc14766239&router-request-id=a35128f5-3754-4770-85f8-3b3004916311&p=752ca108e48c95535a04318159fb1c4d"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#d73216] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#b82412]"
+                  >
+                    Comprar PDF $350
+                  </a>
+                  <a
+                    href="https://wa.me/524182456138?text=Hola%2C%20quiero%20comprar%20Guerra%20de%20Mensajes%20en%20versi%C3%B3n%20impresa%20(%24550%20MXN%20con%20env%C3%ADo%20por%20correo)."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/10"
+                  >
+                    Pedir impreso por WhatsApp
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* El Arte de la Guerra - Gratuito */}
+            <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-[#16171e] p-6 sm:flex-row">
+              <div className="mx-auto flex h-[260px] w-full max-w-[200px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-[#1a1b24] sm:mx-0">
+                <span className="text-center text-6xl">📜</span>
+              </div>
+
+              <div className="flex flex-1 flex-col text-center sm:text-left">
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-green-500">
+                  Descarga gratuita
+                </p>
+                <h3 className="mt-1 text-2xl font-black text-white">
+                  El Arte de la Guerra
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-white/70">Sun Tzu</p>
+                <p className="mt-3 text-sm leading-relaxed text-white/60">
+                  El clásico de la estrategia militar que sigue inspirando a líderes, políticos y
+                  estrategas de comunicación. Versión gratuita para descargar.
+                </p>
+
+                <div className="mt-auto pt-5">
+                  <a
+                    href="/libros/arte-de-la-guerra.pdf"
+                    download
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-5 py-3 text-sm font-bold text-green-400 transition hover:bg-green-500/20"
+                  >
+                    Descargar PDF gratis
+                  </a>
+                </div>
               </div>
             </div>
           </div>

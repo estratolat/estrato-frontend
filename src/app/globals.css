@@ -101,11 +101,21 @@
   z-index: 1;
 }
 
-.leaflet-control,
 .leaflet-pane,
 .leaflet-top,
 .leaflet-bottom {
-  z-index: 1 !important;
+  z-index: auto !important;
+}
+
+.leaflet-control {
+  z-index: 800 !important;
+}
+
+/* Leaflet Draw toolbar debe estar por encima de paneles flotantes */
+.leaflet-control-draw,
+.leaflet-draw-toolbar,
+.leaflet-draw-section {
+  z-index: 1100 !important;
 }
 
 /* Custom map markers */

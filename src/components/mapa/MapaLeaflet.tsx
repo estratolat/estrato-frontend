@@ -90,6 +90,7 @@ interface Props {
   onEditarLider?: (lider: Lider) => void;
   onEditarEvento?: (props: Record<string, any>) => void;
   onDibujoListo?: (geojson: GeoJSONCollection) => void;
+  modoDibujo?: boolean;
   filtrosApoyos?: Record<string, boolean>;
   seleccion?: { geometry: any; properties?: any; tipo?: string; nombre?: string } | null;
   onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
@@ -102,7 +103,7 @@ const highlightRef: { layer: L.GeoJSON | null; timer: any } = { layer: null, tim
 let pendingHighlight: { capaId: string; featureId: string; intentos: number } | null = null;
 
 export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
-  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, onDibujoListo, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange, casillaUbicando },
+  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, onDibujoListo, modoDibujo, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange, casillaUbicando },
   ref
 ) {
   const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
@@ -163,7 +164,7 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
 
       {activas.lideres && <CapaLideres lideres={lideres} modo={modoLideres} onEditar={onEditarLider} />}
 
-      {activas.custom && onDibujoListo && <CapaDibujo onDibujoListo={onDibujoListo} />}
+      {activas.custom && onDibujoListo && <CapaDibujo onDibujoListo={onDibujoListo} modoDibujo={modoDibujo} />}
 
       {personalizadas.map(capa => (
         activas[capa.id] && data[capa.id] && (
@@ -986,7 +987,13 @@ function CapaCasillas({ data, onEditar }: { data?: GeoJSONCollection; onEditar?:
   return null;
 }
 
-function CapaDibujo({ onDibujoListo }: { onDibujoListo: (geojson: GeoJSONCollection) => void }) {
+function CapaDibujo({
+  onDibujoListo,
+  modoDibujo,
+}: {
+  onDibujoListo: (geojson: GeoJSONCollection) => void;
+  modoDibujo?: boolean;
+}) {
   const map = useMap();
   const drawnItemsRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
   const controlRef = useRef<L.Control.Draw | null>(null);
@@ -1098,6 +1105,18 @@ function CapaDibujo({ onDibujoListo }: { onDibujoListo: (geojson: GeoJSONCollect
     };
   }, [map]);
 
+  useEffect(() => {
+    if (!modoDibujo) return;
+    const container = controlRef.current?.getContainer();
+    if (!container) return;
+    container.style.display = 'block';
+    setVisible(true);
+    const firstButton = container.querySelector('a.leaflet-draw-draw-polygon') as HTMLElement | null;
+    if (firstButton) {
+      setTimeout(() => firstButton.click(), 100);
+    }
+  }, [modoDibujo]);
+
   const handleGuardar = useCallback(() => {
     const features: any[] = [];
     drawnItemsRef.current.eachLayer((layer: any) => {
@@ -1133,12 +1152,24 @@ function CapaDibujo({ onDibujoListo }: { onDibujoListo: (geojson: GeoJSONCollect
   }, []);
 
   const toggleToolbar = useCallback(() => {
-    setVisible((v) => !v);
+    setVisible((v) => {
+      const next = !v;
+      const container = controlRef.current?.getContainer();
+      if (container) {
+        container.style.display = next ? 'block' : 'none';
+      }
+      return next;
+    });
+  }, []);
+
+  const activarPrimerTool = useCallback(() => {
     const container = controlRef.current?.getContainer();
-    if (container) {
-      container.style.display = visible ? 'none' : 'block';
-    }
-  }, [visible]);
+    if (!container) return;
+    container.style.display = 'block';
+    setVisible(true);
+    const firstButton = container.querySelector('a.leaflet-draw-draw-polygon') as HTMLElement | null;
+    firstButton?.click();
+  }, []);
 
   return (
     <div className="absolute bottom-6 left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-2 rounded-xl border border-secondary-200 bg-white p-2 shadow-lg">

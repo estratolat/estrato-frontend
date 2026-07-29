@@ -286,6 +286,7 @@ export default function MapaTerritorial() {
   const activarModoDibujo = useCallback(() => {
     setModoDibujo(true);
     setActivas(prev => ({ ...prev, custom: true }));
+    setMostrarPanelCapas(false);
   }, []);
 
   const desactivarModoDibujo = useCallback(() => {
@@ -1646,6 +1647,7 @@ export default function MapaTerritorial() {
           onEditarLider={(l) => abrirModal('lider', l.votante?.coordenadas || null, l)}
           onEditarEvento={(props) => abrirModal('evento', props.coordenadas || null, props)}
           onDibujoListo={modoDibujo ? handleDibujoListo : undefined}
+          modoDibujo={modoDibujo}
           seleccion={seleccion}
           onFeatureClick={handleFeatureClick}
           resultadoDestacado={resultadoDestacado}

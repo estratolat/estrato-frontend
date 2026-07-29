@@ -1986,6 +1986,7 @@ export default function MapaTerritorial() {
         onExito={handleExitoDibujo}
         geojson={dibujoGeojson}
         secciones={secciones}
+        capasPersonalizadas={capasPersonalizadas}
       />
     </div>
   );

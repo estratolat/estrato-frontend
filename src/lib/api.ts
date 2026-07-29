@@ -397,6 +397,7 @@ export const mapaApi = {
     api.post(`/mapas/capas/${capaId}/features/${featureId}/cruce`),
   deleteCapa: (id: string) => api.delete(`/mapas/capas/${id}`),
   subirCapa: (formData: FormData) => api.post('/mapas/subir', formData),
+  agregarFeatures: (capaId: string, geojson: any) => api.post(`/mapas/capas/${capaId}/features`, { geojson }),
   getSeccionesINE: (estado_id?: string | number, municipio_id?: string | number) => api.get('/mapas/secciones-ine', { params: { estado_id, municipio_id } }),
   importarSeccionesINE: (formData: FormData) => api.post('/mapas/secciones-ine/importar', formData),
   importarSeccionesExcel: (formData: FormData) => api.post('/mapas/secciones/importar-excel', formData),

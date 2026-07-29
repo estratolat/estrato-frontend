@@ -140,7 +140,14 @@ export default function NuevoEventoModal({ abierto, onCerrar, onExito, coordenad
         onExito(res.data?.id, payload.coordenadas?.lat, payload.coordenadas?.lng);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al crear evento');
+      const status = err.response?.status;
+      const backendMsg = err.response?.data?.message || err.response?.data?.error;
+      const esRed = !err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error');
+      setError(
+        esRed
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión o que el backend esté activo.'
+          : backendMsg || `Error ${status || ''} al crear evento`
+      );
     } finally {
       setLoading(false);
     }

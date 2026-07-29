@@ -80,11 +80,13 @@ export default function GuardarDibujoModal({ abierto, onCerrar, onExito, geojson
       onCerrar();
     } catch (err: any) {
       console.error('[GuardarDibujoModal] error:', err);
+      const status = err.response?.status;
+      const backendMsg = err.response?.data?.message || err.response?.data?.error;
       const esRed = !err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error');
       setError(
         esRed
-          ? 'No se pudo conectar con el servidor. Verifica que el backend de ESTRATO esté corriendo (npm run start:dev en estrato-backend).'
-          : (errorToString(err) || 'Error al guardar el dibujo')
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión o que el backend esté activo.'
+          : backendMsg || errorToString(err) || `Error ${status || ''} al guardar el dibujo`
       );
     } finally {
       setLoading(false);

@@ -33,6 +33,19 @@ Cuenta con una sólida formación académica que incluye una Maestría en Cienci
     flags: [{ code: 'MX', label: 'México', emoji: '🇲🇽' }],
   },
   {
+    name: 'Rogelio Sánchez Pallares',
+    role: 'Director de Tecnología y Transformación Digital',
+    image: '/images/team/rogelio.jpg',
+    bio: `Ingeniero en sistemas y especialista en transformación digital, integración de plataformas tecnológicas e infraestructura TI. Cuenta con más de 20 años de experiencia construyendo soluciones web y más de 10 años liderando áreas de tecnología en el sector financiero no bancario.
+
+Actualmente se desempeña como Director de TI en Grupo Arquimo / Credix, donde ha encabezado proyectos de desarrollo de plataformas crediticias, integración con bancos, automatización de procesos, seguridad, redes, gestión de proveedores y continuidad operativa.
+
+Su experiencia combina visión estratégica, liderazgo de equipos multidisciplinarios y conocimiento técnico en desarrollo web, bases de datos, APIs, infraestructura, nube y gobierno tecnológico. Es autor de No más código;, ensayo contemporáneo de cultura tecnológica, liderazgo e inteligencia artificial, en el que reflexiona sobre la transición del programador operativo al estratega tecnológico.
+
+También ha participado en iniciativas académicas, de innovación y alfabetización tecnológica, así como en comités relacionados con innovación y tecnología para el sector financiero.`,
+    flags: [{ code: 'MX', label: 'México', emoji: '🇲🇽' }],
+  },
+  {
     name: 'Yury Constanza Ramírez Díaz',
     role: 'Consultora Política y Comunicación de Gobierno',
     image: '/images/team/yury.jpg',

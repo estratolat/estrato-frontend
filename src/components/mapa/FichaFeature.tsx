@@ -239,35 +239,39 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
           )}
         </div>
 
-        {datosOficiales && (datosOficiales.partido_ganador || datosOficiales.votos_totales) && (
+        {seccion && (
           <div className="mt-3 border-t border-secondary-100 pt-3">
             <p className="mb-2 text-[10px] font-semibold uppercase text-secondary-500">Histórico electoral</p>
-            <div className="space-y-1.5 rounded-lg bg-secondary-50 p-2">
-              {datosOficiales.partido_ganador && (
-                <div className="flex items-start justify-between gap-2 text-xs">
-                  <span className="font-medium text-secondary-600">Partido ganador:</span>
-                  <span className="max-w-[60%] text-right font-semibold text-secondary-900">{datosOficiales.partido_ganador}</span>
-                </div>
-              )}
-              {datosOficiales.votos_ganador != null && (
-                <div className="flex items-start justify-between gap-2 text-xs">
-                  <span className="font-medium text-secondary-600">Votos ganador:</span>
-                  <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.votos_ganador).toLocaleString()}</span>
-                </div>
-              )}
-              {datosOficiales.votos_totales != null && (
-                <div className="flex items-start justify-between gap-2 text-xs">
-                  <span className="font-medium text-secondary-600">Votos totales:</span>
-                  <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.votos_totales).toLocaleString()}</span>
-                </div>
-              )}
-              {datosOficiales.participacion_pct != null && (
-                <div className="flex items-start justify-between gap-2 text-xs">
-                  <span className="font-medium text-secondary-600">Participación:</span>
-                  <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.participacion_pct).toFixed(2)}%</span>
-                </div>
-              )}
-            </div>
+            <p className="mb-2 text-[10px] text-secondary-500">Sección detectada: <span className="font-semibold text-secondary-700">{seccion}</span></p>
+
+            {datosOficiales && (datosOficiales.partido_ganador || datosOficiales.votos_totales) && (
+              <div className="mb-2 space-y-1.5 rounded-lg bg-secondary-50 p-2">
+                {datosOficiales.partido_ganador && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Partido ganador:</span>
+                    <span className="max-w-[60%] text-right font-semibold text-secondary-900">{datosOficiales.partido_ganador}</span>
+                  </div>
+                )}
+                {datosOficiales.votos_ganador != null && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Votos ganador:</span>
+                    <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.votos_ganador).toLocaleString()}</span>
+                  </div>
+                )}
+                {datosOficiales.votos_totales != null && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Votos totales:</span>
+                    <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.votos_totales).toLocaleString()}</span>
+                  </div>
+                )}
+                {datosOficiales.participacion_pct != null && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Participación:</span>
+                    <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.participacion_pct).toFixed(2)}%</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {cargandoHistorico ? (
               <div className="mt-2 flex items-center gap-2 text-xs text-secondary-500">
@@ -299,9 +303,9 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                   </tbody>
                 </table>
               </div>
-            ) : seccion ? (
+            ) : (
               <p className="mt-2 text-[10px] text-secondary-500">No hay histórico cargado para la sección {seccion}.</p>
-            ) : null}
+            )}
           </div>
         )}
 

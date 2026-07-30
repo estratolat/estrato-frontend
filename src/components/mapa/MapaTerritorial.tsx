@@ -1857,12 +1857,14 @@ export default function MapaTerritorial() {
             setDetalle(null);
             setCargandoDetalle(true);
             const featureId = el.featureId || el.id.split('-').slice(1).join('-') || el.id;
+            const propsDetalle = el.feature?.properties || {};
+            const seccionDetalle = propsDetalle.seccion || propsDetalle.SECCION || propsDetalle._feature_metadata?.seccion || null;
             mapaApi.detalleTerritorial({
               tipo: 'capa_feature',
               id: featureId,
               nombre: el.nombre,
               geometry: el.feature?.geometry,
-              seccion: el.feature?.properties?._feature_metadata?.seccion,
+              seccion: seccionDetalle,
             })
               .then(({ data }) => setDetalle(data))
               .catch((err) => setError(errorToString(err)))

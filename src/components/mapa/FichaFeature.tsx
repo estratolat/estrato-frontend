@@ -82,7 +82,9 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
         setDatosOficiales(data.datos_oficiales || null);
 
         const seccionBusqueda = elemento?.feature?.properties?.seccion || elemento?.feature?.properties?.SECCION || data?.seccion || null;
-        if (seccionBusqueda) {
+        if (data?.historico?.length) {
+          setHistoricoCompleto(data.historico);
+        } else if (seccionBusqueda) {
           try {
             const res = await resultadosHistoricosApi.getAll({ seccion: seccionBusqueda, limit: 50 });
             setHistoricoCompleto(res.data?.resultados || res.data || []);

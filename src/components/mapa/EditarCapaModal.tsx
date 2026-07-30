@@ -19,6 +19,7 @@ export default function EditarCapaModal({ capa, abierto, onCerrar, onExito }: Pr
   const [nombre, setNombre] = useState(capa.nombre);
   const [color, setColor] = useState(capa.color);
   const [grupo, setGrupo] = useState(((capa.metadata as any)?.grupo || '').toString());
+  const [bloqueada, setBloqueada] = useState(Boolean(capa.bloqueada));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ export default function EditarCapaModal({ capa, abierto, onCerrar, onExito }: Pr
       setLoading(true);
       setError(null);
       const metadata = { ...(capa.metadata || {}), grupo: grupo.trim() || null };
-      await mapaApi.updateCapa(capa.id, { nombre: nombre.trim(), color, metadata });
+      await mapaApi.updateCapa(capa.id, { nombre: nombre.trim(), color, bloqueada, metadata });
       onExito();
       onCerrar();
     } catch (err: any) {
@@ -88,6 +89,16 @@ export default function EditarCapaModal({ capa, abierto, onCerrar, onExito }: Pr
             />
             <p className="mt-1 text-[10px] text-secondary-500">Las capas con el mismo grupo se mostrarán juntas.</p>
           </div>
+
+          <label className="flex items-center gap-2 rounded-lg border border-secondary-200 p-2">
+            <input
+              type="checkbox"
+              checked={bloqueada}
+              onChange={(e) => setBloqueada(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-sm text-secondary-700">Bloquear capa (no interactiva en el mapa)</span>
+          </label>
 
           <div>
             <label className="label">Color</label>

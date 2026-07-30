@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, LayoutGrid, Compass, Layers, Map, X } from 'lucide-react';
+import { Search, LayoutGrid, Compass, Layers, Map, X, Lock } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { MapaData, CapaMapa, MapaPrefs, ResultadoGlobal, DetalleTerritorial, GeoJSONCollection, FeatureCapa } from '@/types/mapa';
 import { Lider, Zona } from '@/types';
@@ -917,6 +917,21 @@ export default function MapaTerritorial() {
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600"
         >
           <Icon name="seguridad" size={14} />
+        </button>
+
+        <button
+          onClick={async () => {
+            try {
+              await mapaApi.updateCapa(capa.id, { bloqueada: !capa.bloqueada });
+              setCapasPersonalizadas(prev => prev.map(c => c.id === capa.id ? { ...c, bloqueada: !c.bloqueada } : c));
+            } catch (err) {
+              console.error('Error cambiando bloqueo de capa:', err);
+            }
+          }}
+          title={capa.bloqueada ? 'Desbloquear capa' : 'Bloquear capa'}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition ${capa.bloqueada ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-secondary-400 hover:bg-secondary-100 hover:text-secondary-600'}`}
+        >
+          <Lock size={14} />
         </button>
       </div>
       <div className="grid grid-cols-3 gap-1.5">

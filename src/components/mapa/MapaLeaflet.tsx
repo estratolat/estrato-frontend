@@ -1326,9 +1326,13 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
       });
     };
 
+    const estilosCapa = (capa.estilos as Record<string, any>) || {};
+
     const baseStyle = (feature: any) => {
       const props = feature?.properties || {};
-      const color = props._feature_color || capa.color || '#3B82F6';
+      const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
+      const estiloFeature = estilosCapa[featureId] || {};
+      const color = estiloFeature.color || props._feature_color || capa.color || '#3B82F6';
       const opacidad = props._feature_opacidad != null ? Number(props._feature_opacidad) : (esCapaSindical ? 0.85 : 0.7);
       const fillOpacity = props._feature_opacidad != null ? Number(props._feature_opacidad) * 0.35 : (esCapaSindical ? 0.35 : 0.2);
       return {

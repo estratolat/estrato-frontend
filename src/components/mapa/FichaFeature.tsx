@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { X, MapPin, ExternalLink, Edit3, Users, Crown, Gift, Calendar, FileText, GripVertical } from 'lucide-react';
 import { ElementoCapa } from './ExploradorCapa';
-import { mapaApi } from '@/lib/api';
+import { mapaApi, resultadosHistoricosApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
 
 interface Props {
@@ -42,32 +42,62 @@ interface CruceResumen {
   peticiones: { count: number };
 }
 
+interface DatosOficiales {
+  partido_ganador?: string | null;
+  votos_ganador?: number | null;
+  votos_totales?: number | null;
+  participacion_pct?: number | null;
+}
+
 const POS_INICIAL = { x: 16, y: 80 };
 
 export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEditar }: Props) {
   const [cruce, setCruce] = useState<CruceResumen | null>(null);
+  const [datosOficiales, setDatosOficiales] = useState<DatosOficiales | null>(null);
+  const [historicoCompleto, setHistoricoCompleto] = useState<any[]>([]);
+  const [cargandoHistorico, setCargandoHistorico] = useState(false);
   const [cargandoCruce, setCargandoCruce] = useState(false);
   const [errorCruce, setErrorCruce] = useState<string | null>(null);
   const [pos, setPos] = useState(POS_INICIAL);
   const dragRef = useRef<{ dragging: boolean; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
+  const seccion = elemento?.feature?.properties?.seccion || elemento?.feature?.properties?.SECCION || elemento?.feature?.properties?._feature_metadata?.seccion || null;
+
   useEffect(() => {
     if (!elemento?.capaId || !elemento?.id) {
       setCruce(null);
+      setDatosOficiales(null);
+      setHistoricoCompleto([]);
       return;
     }
     const featureId = elemento.featureId || elemento.id.split('-').slice(1).join('-') || elemento.id;
     const cargar = async () => {
       try {
         setCargandoCruce(true);
+        setCargandoHistorico(true);
         setErrorCruce(null);
         const { data } = await mapaApi.cruceFeature(elemento.capaId, featureId);
         setCruce(data.resumen || null);
+        setDatosOficiales(data.datos_oficiales || null);
+
+        const seccionBusqueda = elemento?.feature?.properties?.seccion || elemento?.feature?.properties?.SECCION || data?.seccion || null;
+        if (seccionBusqueda) {
+          try {
+            const res = await resultadosHistoricosApi.getAll({ seccion: seccionBusqueda, limit: 50 });
+            setHistoricoCompleto(res.data?.resultados || res.data || []);
+          } catch (e) {
+            console.error('Error cargando histórico completo:', e);
+            setHistoricoCompleto([]);
+          }
+        } else {
+          setHistoricoCompleto([]);
+        }
       } catch (err) {
         setErrorCruce(errorToString(err));
       } finally {
         setCargandoCruce(false);
+        setCargandoHistorico(false);
       }
     };
     cargar();
@@ -208,6 +238,72 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
             </div>
           )}
         </div>
+
+        {datosOficiales && (datosOficiales.partido_ganador || datosOficiales.votos_totales) && (
+          <div className="mt-3 border-t border-secondary-100 pt-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase text-secondary-500">Histórico electoral</p>
+            <div className="space-y-1.5 rounded-lg bg-secondary-50 p-2">
+              {datosOficiales.partido_ganador && (
+                <div className="flex items-start justify-between gap-2 text-xs">
+                  <span className="font-medium text-secondary-600">Partido ganador:</span>
+                  <span className="max-w-[60%] text-right font-semibold text-secondary-900">{datosOficiales.partido_ganador}</span>
+                </div>
+              )}
+              {datosOficiales.votos_ganador != null && (
+                <div className="flex items-start justify-between gap-2 text-xs">
+                  <span className="font-medium text-secondary-600">Votos ganador:</span>
+                  <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.votos_ganador).toLocaleString()}</span>
+                </div>
+              )}
+              {datosOficiales.votos_totales != null && (
+                <div className="flex items-start justify-between gap-2 text-xs">
+                  <span className="font-medium text-secondary-600">Votos totales:</span>
+                  <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.votos_totales).toLocaleString()}</span>
+                </div>
+              )}
+              {datosOficiales.participacion_pct != null && (
+                <div className="flex items-start justify-between gap-2 text-xs">
+                  <span className="font-medium text-secondary-600">Participación:</span>
+                  <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.participacion_pct).toFixed(2)}%</span>
+                </div>
+              )}
+            </div>
+
+            {cargandoHistorico ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-secondary-500">
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+                Cargando histórico...
+              </div>
+            ) : historicoCompleto.length > 0 ? (
+              <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-secondary-100">
+                <table className="w-full text-[10px]">
+                  <thead className="bg-secondary-50">
+                    <tr>
+                      <th className="px-2 py-1 text-left font-semibold text-secondary-600">Año</th>
+                      <th className="px-2 py-1 text-left font-semibold text-secondary-600">Elección</th>
+                      <th className="px-2 py-1 text-left font-semibold text-secondary-600">Ganador</th>
+                      <th className="px-2 py-1 text-right font-semibold text-secondary-600">Votos</th>
+                      <th className="px-2 py-1 text-right font-semibold text-secondary-600">Particip.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historicoCompleto.map((h, idx) => (
+                      <tr key={idx} className="border-t border-secondary-100">
+                        <td className="px-2 py-1 text-secondary-900">{h.anio}</td>
+                        <td className="px-2 py-1 capitalize text-secondary-700">{String(h.tipo_eleccion).replace(/_/g, ' ')}</td>
+                        <td className="px-2 py-1 font-medium text-secondary-900">{h.partido_ganador || '-'}</td>
+                        <td className="px-2 py-1 text-right text-secondary-800">{h.total_votos != null ? Number(h.total_votos).toLocaleString() : '-'}</td>
+                        <td className="px-2 py-1 text-right text-secondary-800">{h.participacion_pct != null ? `${Number(h.participacion_pct).toFixed(2)}%` : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : seccion ? (
+              <p className="mt-2 text-[10px] text-secondary-500">No hay histórico cargado para la sección {seccion}.</p>
+            ) : null}
+          </div>
+        )}
 
         <div className="mt-3 border-t border-secondary-100 pt-3">
           <p className="mb-2 text-[10px] font-semibold uppercase text-secondary-500">Datos de campaña dentro</p>

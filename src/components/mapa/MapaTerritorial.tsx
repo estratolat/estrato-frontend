@@ -201,7 +201,7 @@ export default function MapaTerritorial() {
   const [mostrarResumen, setMostrarResumen] = useState(true);
   const [mostrarExplorador, setMostrarExplorador] = useState(false);
   const [mostrarPanelCapas, setMostrarPanelCapas] = useState(false);
-  const [elementoExplorador, setElementoExplorador] = useState<{ capaId?: string; capaNombre?: string; color?: string } | null>(null);
+  const [elementoExplorador, setElementoExplorador] = useState<{ capaId?: string; capaNombre?: string; color?: string; capa?: CapaMapa } | null>(null);
   const [elementoFicha, setElementoFicha] = useState<ElementoCapa | null>(null);
 
   // Posición arrastrable del resumen
@@ -319,8 +319,8 @@ export default function MapaTerritorial() {
     setSeleccion(null);
   }, []);
 
-  const abrirExplorador = useCallback((capaId?: string, capaNombre?: string, color?: string) => {
-    setElementoExplorador(capaId ? { capaId, capaNombre, color } : null);
+  const abrirExplorador = useCallback((capaId?: string, capaNombre?: string, color?: string, capa?: CapaMapa) => {
+    setElementoExplorador(capaId ? { capaId, capaNombre, color, capa } : null);
     setMostrarExplorador(true);
   }, []);
 
@@ -939,7 +939,7 @@ export default function MapaTerritorial() {
             if (!activas[capa.id]) {
               setActivas(prev => ({ ...prev, [capa.id]: true }));
             }
-            abrirExplorador(capa.id, capa.nombre, capa.color);
+            abrirExplorador(capa.id, capa.nombre, capa.color, capa);
           }}
           className="flex items-center justify-center gap-1 rounded-md bg-amber-50 py-1.5 text-[10px] font-semibold text-amber-700 transition hover:bg-amber-100"
           title="Buscar polígonos de esta capa"
@@ -1458,7 +1458,8 @@ export default function MapaTerritorial() {
     }
     const features = data[capaId]?.features;
     if (features && features.length > 0) {
-      abrirExplorador(capaId, capasPersonalizadas.find(c => c.id === capaId)?.nombre, capasPersonalizadas.find(c => c.id === capaId)?.color);
+      const capaExplorar = capasPersonalizadas.find(c => c.id === capaId);
+      abrirExplorador(capaId, capaExplorar?.nombre, capaExplorar?.color, capaExplorar);
     }
   }, [activas, data, capasPersonalizadas, abrirExplorador]);
 
@@ -1823,6 +1824,7 @@ export default function MapaTerritorial() {
           capaId={elementoExplorador?.capaId}
           capaNombre={elementoExplorador?.capaNombre}
           color={elementoExplorador?.color}
+          capa={elementoExplorador?.capa}
           data={elementoExplorador?.capaId ? data[elementoExplorador.capaId] : undefined}
           capas={elementoExplorador?.capaId ? undefined : capasExplorador}
           onSeleccionar={seleccionarElementoExplorador}

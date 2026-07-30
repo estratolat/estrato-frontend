@@ -20,6 +20,7 @@ interface Props {
   capaId?: string;
   capaNombre?: string;
   color?: string;
+  capa?: CapaMapa;
   data?: GeoJSONCollection;
   capas?: { capa: CapaMapa; data?: GeoJSONCollection }[];
   onSeleccionar: (elemento: ElementoCapa) => void;
@@ -56,6 +57,7 @@ export default function ExploradorCapa({
   capaId,
   capaNombre,
   color,
+  capa,
   data,
   capas,
   onSeleccionar,
@@ -65,7 +67,8 @@ export default function ExploradorCapa({
 
   const elementos = useMemo(() => {
     const lista: ElementoCapa[] = [];
-    const fuentes = capas || (data && capaId ? [{ capa: { id: capaId, nombre: capaNombre || 'Capa', color: color || '#3B82F6', tipo: 'custom', origen: 'propia', visible: true, bloqueada: false, orden: 0 } as CapaMapa, data }] : []);
+    const capaSingle = capa || (data && capaId ? { id: capaId, nombre: capaNombre || 'Capa', color: color || '#3B82F6', tipo: 'custom', origen: 'propia', visible: true, bloqueada: false, orden: 0 } as CapaMapa : undefined);
+    const fuentes = capas || (capaSingle && data ? [{ capa: capaSingle, data }] : []);
 
     fuentes.forEach(({ capa, data: d }) => {
       if (!d?.features?.length) return;

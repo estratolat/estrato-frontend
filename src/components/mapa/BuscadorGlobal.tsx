@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import { Search, X, MapPin, ChevronRight } from 'lucide-react';
+import { Search, X, MapPin, ChevronRight, Lock } from 'lucide-react';
 import { mapaApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
 import type { ResultadoGlobal, TipoResultadoGlobal } from '@/types/mapa';
@@ -199,9 +199,17 @@ export default forwardRef<BuscadorGlobalRef, Props>(function BuscadorGlobal({ on
                       {meta.label.slice(0, 2)}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-secondary-900">{r.nombre}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-semibold text-secondary-900">{r.nombre}</p>
+                        {(r.bloqueada || r.bloqueado) && (
+                          <span title={r.bloqueada ? 'Capa bloqueada' : 'Polígono bloqueado'}>
+                            <Lock size={12} className="text-amber-600" />
+                          </span>
+                        )}
+                      </div>
                       <p className="truncate text-[10px] text-secondary-500 capitalize">
                         {meta.label}
+                        {r.bloqueada ? ' • Bloqueado' : r.bloqueado ? ' • Polígono bloqueado' : ''}
                         {r.estado ? ` • ${r.estado}` : ''}
                         {r.municipio ? ` • ${r.municipio}` : ''}
                         {r.seccion ? ` • Sección ${r.seccion}` : ''}

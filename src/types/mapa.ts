@@ -112,6 +112,8 @@ export interface ResultadoGlobal {
   bbox?: [number, number, number, number];
   geometry?: any;
   url?: string;
+  bloqueada?: boolean;
+  bloqueado?: boolean;
 }
 
 export interface ItemTerritorial {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, MapPin, ChevronRight, X } from 'lucide-react';
+import { Search, MapPin, ChevronRight, X, Lock } from 'lucide-react';
 import { GeoJSONCollection, CapaMapa } from '@/types/mapa';
 
 interface ElementoCapa {
@@ -13,6 +13,7 @@ interface ElementoCapa {
   capaId: string;
   capaNombre: string;
   color?: string;
+  bloqueado?: boolean;
 }
 
 interface Props {
@@ -72,6 +73,10 @@ export default function ExploradorCapa({
         const id = extraerIdFeature(feature);
         const nombre = extraerNombreFeature(feature, capa.nombre);
         const subtexto = extraerSubtextoFeature(feature);
+        const props = feature?.properties || {};
+        const estilos = (capa.estilos as Record<string, any>) || {};
+        const estiloFeature = estilos[id] || {};
+        const bloqueado = Boolean(capa.bloqueada) || Boolean(props._feature_bloqueado) || Boolean(estiloFeature.bloqueado);
         lista.push({
           id: `${capa.id}-${id}`,
           featureId: id,
@@ -81,6 +86,7 @@ export default function ExploradorCapa({
           capaId: capa.id,
           capaNombre: capa.nombre,
           color: capa.color,
+          bloqueado,
         });
       });
     });
@@ -158,7 +164,14 @@ export default function ExploradorCapa({
                   {el.nombre.slice(0, 2).toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-secondary-900">{el.nombre}</p>
+                  <div className="flex items-center gap-1">
+                    <p className="truncate text-xs font-semibold text-secondary-900">{el.nombre}</p>
+                    {el.bloqueado && (
+                      <span title="Bloqueado">
+                        <Lock size={12} className="text-amber-600" />
+                      </span>
+                    )}
+                  </div>
                   {el.subtexto && (
                     <p className="truncate text-[10px] text-secondary-500">{el.subtexto}</p>
                   )}

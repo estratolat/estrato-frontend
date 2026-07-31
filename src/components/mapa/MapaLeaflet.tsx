@@ -1208,7 +1208,7 @@ function CapaDibujo({
 
 interface CapaPersonalizadaProps {
   data: any;
-  capa: { id: string; nombre: string; color: string; bloqueada?: boolean; orden?: number };
+  capa: { id: string; nombre: string; color: string; bloqueada?: boolean; orden?: number; estilos?: any };
   capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
   onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
   onRender?: () => void;

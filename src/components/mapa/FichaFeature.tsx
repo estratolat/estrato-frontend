@@ -42,10 +42,17 @@ interface CruceResumen {
   peticiones: { count: number };
 }
 
+interface NumeraliaData {
+  padron_2024?: number | null;
+  lista_nominal_2024?: number | null;
+  padron_historico?: Record<string, any> | null;
+}
+
 interface DatosOficiales {
   partido_ganador?: string | null;
   votos_ganador?: number | null;
   votos_totales?: number | null;
+  lista_nominal?: number | null;
   participacion_pct?: number | null;
 }
 
@@ -54,6 +61,7 @@ const POS_INICIAL = { x: 16, y: 80 };
 export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEditar }: Props) {
   const [cruce, setCruce] = useState<CruceResumen | null>(null);
   const [datosOficiales, setDatosOficiales] = useState<DatosOficiales | null>(null);
+  const [numeralia, setNumeralia] = useState<NumeraliaData | null>(null);
   const [historicoCompleto, setHistoricoCompleto] = useState<any[]>([]);
   const [cargandoHistorico, setCargandoHistorico] = useState(false);
   const [cargandoCruce, setCargandoCruce] = useState(false);
@@ -68,6 +76,7 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
     if (!elemento?.capaId || !elemento?.id) {
       setCruce(null);
       setDatosOficiales(null);
+      setNumeralia(null);
       setHistoricoCompleto([]);
       return;
     }
@@ -80,6 +89,7 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
         const { data } = await mapaApi.cruceFeature(elemento.capaId, featureId);
         setCruce(data.resumen || null);
         setDatosOficiales(data.datos_oficiales || null);
+        setNumeralia(data.numeralia || null);
 
         const seccionBusqueda = elemento?.feature?.properties?.seccion || elemento?.feature?.properties?.SECCION || data?.seccion || null;
         if (data?.historico?.length) {
@@ -266,12 +276,55 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                     <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.votos_totales).toLocaleString()}</span>
                   </div>
                 )}
+                {datosOficiales.lista_nominal != null && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Lista nominal:</span>
+                    <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.lista_nominal).toLocaleString()}</span>
+                  </div>
+                )}
+                {datosOficiales.votos_totales != null && datosOficiales.lista_nominal != null && datosOficiales.lista_nominal > 0 && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Participación real:</span>
+                    <span className="max-w-[60%] text-right text-secondary-800">{((Number(datosOficiales.votos_totales) / Number(datosOficiales.lista_nominal)) * 100).toFixed(2)}%</span>
+                  </div>
+                )}
                 {datosOficiales.participacion_pct != null && (
                   <div className="flex items-start justify-between gap-2 text-xs">
                     <span className="font-medium text-secondary-600">Participación:</span>
                     <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.participacion_pct).toFixed(2)}%</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {numeralia && (
+              <div className="mb-3 space-y-1.5 rounded-lg border border-secondary-100 bg-white p-2">
+                <p className="mb-1 text-[10px] font-semibold uppercase text-secondary-500">Numeralia electoral</p>
+                {(() => {
+                  const datos2021 = numeralia.padron_historico?.['2021'];
+                  return (
+                    <>
+                      {datos2021?.padron?.total != null && (
+                        <div className="flex items-start justify-between gap-2 text-xs">
+                          <span className="font-medium text-secondary-600">Padrón 2021:</span>
+                          <span className="max-w-[60%] text-right text-secondary-800">{Number(datos2021.padron.total).toLocaleString()} <span className="text-[10px] text-secondary-500">(H {Number(datos2021.padron.hombres || 0).toLocaleString()} / M {Number(datos2021.padron.mujeres || 0).toLocaleString()})</span></span>
+                        </div>
+                      )}
+                      {datos2021?.lista_nominal?.total != null && (
+                        <div className="flex items-start justify-between gap-2 text-xs">
+                          <span className="font-medium text-secondary-600">Lista nominal 2021:</span>
+                          <span className="max-w-[60%] text-right text-secondary-800">{Number(datos2021.lista_nominal.total).toLocaleString()} <span className="text-[10px] text-secondary-500">(H {Number(datos2021.lista_nominal.hombres || 0).toLocaleString()} / M {Number(datos2021.lista_nominal.mujeres || 0).toLocaleString()})</span></span>
+                        </div>
+                      )}
+                      {numeralia.lista_nominal_2024 != null && (
+                        <div className="flex items-start justify-between gap-2 text-xs">
+                          <span className="font-medium text-secondary-600">Lista nominal 2024:</span>
+                          <span className="max-w-[60%] text-right text-secondary-800">{Number(numeralia.lista_nominal_2024).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
 
@@ -289,6 +342,7 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                       <th className="px-2 py-1 text-left font-semibold text-secondary-600">Elección</th>
                       <th className="px-2 py-1 text-left font-semibold text-secondary-600">Ganador</th>
                       <th className="px-2 py-1 text-right font-semibold text-secondary-600">Votos</th>
+                      <th className="px-2 py-1 text-right font-semibold text-secondary-600">Lista nominal</th>
                       <th className="px-2 py-1 text-right font-semibold text-secondary-600">Particip.</th>
                     </tr>
                   </thead>
@@ -299,7 +353,8 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                         <td className="px-2 py-1 capitalize text-secondary-700">{String(h.tipo_eleccion).replace(/_/g, ' ')}</td>
                         <td className="px-2 py-1 font-medium text-secondary-900">{h.partido_ganador || '-'}</td>
                         <td className="px-2 py-1 text-right text-secondary-800">{h.total_votos != null ? Number(h.total_votos).toLocaleString() : '-'}</td>
-                        <td className="px-2 py-1 text-right text-secondary-800">{h.participacion_pct != null ? `${Number(h.participacion_pct).toFixed(2)}%` : '-'}</td>
+                        <td className="px-2 py-1 text-right text-secondary-800">{h.lista_nominal != null ? Number(h.lista_nominal).toLocaleString() : '-'}</td>
+                        <td className="px-2 py-1 text-right text-secondary-800">{h.participacion_pct != null ? `${Number(h.participacion_pct).toFixed(2)}%` : (h.total_votos != null && h.lista_nominal != null && h.lista_nominal > 0 ? `${((Number(h.total_votos) / Number(h.lista_nominal)) * 100).toFixed(2)}%` : '-')}</td>
                       </tr>
                     ))}
                   </tbody>

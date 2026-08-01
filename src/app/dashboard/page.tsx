@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>(emptyStats);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const tenant = user?.tenant;
   const candidatoFoto = tenant?.foto_url;
@@ -56,6 +56,9 @@ export default function DashboardPage() {
     .toUpperCase();
 
   useEffect(() => {
+    // No cargar datos hasta que la sesión esté lista y haya un usuario
+    if (authLoading || !user) return;
+
     const cargarDatos = async () => {
       setLoading(true);
       setError('');
@@ -109,7 +112,7 @@ export default function DashboardPage() {
     };
 
     cargarDatos();
-  }, []);
+  }, [authLoading, user]);
 
   if (loading) {
     return (

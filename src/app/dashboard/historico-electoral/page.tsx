@@ -405,6 +405,10 @@ function HistoricoElectoralPageInner() {
     // Si no hay sesión el layout redirige; mientras tanto no hacemos nada.
     if (authLoading || !user) return;
     cargarDatos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
+
+  useEffect(() => {
     try {
       const guardado = sessionStorage.getItem("estrato_wizard_historico");
       if (guardado) {

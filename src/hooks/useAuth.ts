@@ -93,8 +93,18 @@ export function useAuth() {
           localStorage.setItem('user', JSON.stringify(refreshed));
           parsed = refreshed;
         }
-      } catch (e) {
-        // Si falla /auth.me, seguimos con lo que haya en localStorage
+      } catch (e: any) {
+        // Si /auth/me falla por token inválido/expirado, limpiar sesión
+        // para que el layout redirija limpiamente al login sin parpadeos
+        if (e.response?.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('tenantId');
+          localStorage.removeItem('tenantSlug');
+          localStorage.removeItem('user');
+          localStorage.removeItem('permisos');
+          document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+          document.cookie = 'permisos=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+        }
       }
     }
 

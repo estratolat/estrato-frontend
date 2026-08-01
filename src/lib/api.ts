@@ -57,8 +57,9 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
       const isLogin = url.includes('/auth/login');
 
-      // No redirigir en el login para que el formulario pueda mostrar el error
-      if (!isLogin && typeof window !== 'undefined') {
+      // No redirigir en endpoints de auth para que el flujo de sesión se maneje limpiamente
+      const isAuthEndpoint = isLogin || url.includes('/auth/me');
+      if (!isAuthEndpoint && typeof window !== 'undefined') {
         localStorage.removeItem('token');
         const isBrigada = window.location.pathname.startsWith('/brigada');
         window.location.href = isBrigada ? '/brigada/login' : '/login';

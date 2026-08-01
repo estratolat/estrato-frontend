@@ -109,10 +109,10 @@ export default function DashboardLayout({
   }
 
   if (!user) {
+    // Redirigir limpiamente; mientras tanto mostrar spinner para evitar parpadeo
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-secondary-100">
-        <p className="text-secondary-600">No hay sesión activa.</p>
-        <Link href="/login" className="btn-primary px-6 py-2">Iniciar sesión</Link>
+      <div className="flex h-screen items-center justify-center bg-secondary-100">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary-600"></div>
       </div>
     );
   }

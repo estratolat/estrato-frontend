@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, Component, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { resultadosHistoricosApi, mapaApi } from "@/lib/api";
 import { Icon } from "@/components/ui/Icon";
+import { useAuth } from "@/hooks/useAuth";
 
 const MapaCruceHistorico = dynamic(() => import("./MapaCruceHistorico"), {
   ssr: false,
@@ -298,6 +299,8 @@ const CAMPOS_MAPEO: {
 ];
 
 function HistoricoElectoralPageInner() {
+  const { user, loading: authLoading } = useAuth();
+
   // Listado / resumen
   const [resultados, setResultados] = useState<Resultado[]>([]);
   const [resumen, setResumen] = useState<ResumenBackend | null>(null);
@@ -398,6 +401,9 @@ function HistoricoElectoralPageInner() {
   const [rawLoading, setRawLoading] = useState(false);
 
   useEffect(() => {
+    // Esperar autenticación antes de disparar peticiones protegidas.
+    // Si no hay sesión el layout redirige; mientras tanto no hacemos nada.
+    if (authLoading || !user) return;
     cargarDatos();
     try {
       const guardado = sessionStorage.getItem("estrato_wizard_historico");

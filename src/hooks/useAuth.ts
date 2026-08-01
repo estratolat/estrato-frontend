@@ -21,6 +21,13 @@ export interface AuthUser {
   rol: UserRole;
   tenant_id: string;
   tenant_slug?: string;
+  tenant?: {
+    id: string;
+    slug: string;
+    nombre_candidato: string;
+    cargo_busca?: string | null;
+    foto_url?: string | null;
+  };
   zona_id?: string;
   permisos?: string[];
 }
@@ -71,6 +78,15 @@ export function useAuth() {
             rol: data.rol as UserRole,
             tenant_id: data.tenant_id,
             tenant_slug: data.tenant?.slug || readStorage<string>('tenantSlug') || undefined,
+            tenant: data.tenant
+              ? {
+                  id: data.tenant.id,
+                  slug: data.tenant.slug,
+                  nombre_candidato: data.tenant.nombre_candidato,
+                  cargo_busca: data.tenant.cargo_busca,
+                  foto_url: data.tenant.foto_url,
+                }
+              : undefined,
             zona_id: data.zona_id || undefined,
             permisos: Array.isArray(data.permisos) ? data.permisos : undefined,
           };

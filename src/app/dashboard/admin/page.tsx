@@ -65,6 +65,14 @@ export default function AdminProjectsPage() {
   const [editError, setEditError] = useState('');
   const [uploadingFoto, setUploadingFoto] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean;
+    project?: Project;
+    multiple?: boolean;
+  }>({ open: false });
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     if (!loading && user && user.rol !== 'superadmin') {
       router.replace('/dashboard');
@@ -81,6 +89,7 @@ export default function AdminProjectsPage() {
       setError('');
       const { data } = await adminApi.getProjects();
       setProjects(data || []);
+      setSelectedIds(new Set());
     } catch (err: any) {
       setError(errorToString(err) || 'Error al cargar proyectos');
     } finally {
@@ -145,6 +154,46 @@ export default function AdminProjectsPage() {
   const closeEditModal = () => {
     setEditProject(null);
     setEditError('');
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === projects.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(projects.map((p) => p.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDelete = async () => {
+    const idsToDelete = confirmDelete.project
+      ? [confirmDelete.project.id]
+      : Array.from(selectedIds);
+
+    if (idsToDelete.length === 0) {
+      setConfirmDelete({ open: false });
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setError('');
+      await Promise.all(idsToDelete.map((id) => adminApi.deleteProject(id)));
+      await loadProjects();
+      setConfirmDelete({ open: false });
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al eliminar proyecto(s)');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const resizeAndCompressImage = (
@@ -323,84 +372,123 @@ export default function AdminProjectsPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-secondary-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary-50 text-left text-xs font-semibold uppercase text-secondary-600">
-              <tr>
-                <th className="px-4 py-3">Proyecto</th>
-                <th className="px-4 py-3">Slug</th>
-                <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3">Usuarios</th>
-                <th className="px-4 py-3">Votantes</th>
-                <th className="px-4 py-3">Eventos</th>
-                <th className="px-4 py-3">Creado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-secondary-100">
-              {projects.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-4 py-6 text-center text-secondary-500">
-                    No hay proyectos creados todavía.
-                  </td>
-                </tr>
-              ) : (
-                projects.map((p) => (
-                  <tr key={p.id} className="hover:bg-secondary-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {p.foto_url ? (
-                          <img
-                            src={p.foto_url}
-                            alt={p.nombre_candidato}
-                            className="h-10 w-10 rounded-full object-cover ring-1 ring-secondary-200"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 text-xs font-bold">
-                            {p.nombre_candidato.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-secondary-900">{p.nombre_candidato}</p>
-                          {p.cargo_busca && <p className="text-xs text-secondary-500">{p.cargo_busca}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-secondary-600">{p.slug}</td>
-                    <td className="px-4 py-3 capitalize">{p.plan}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          p.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {p.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{p.stats.usuarios}</td>
-                    <td className="px-4 py-3">{p.stats.votantes}</td>
-                    <td className="px-4 py-3">{p.stats.eventos}</td>
-                    <td className="px-4 py-3 text-secondary-500">
-                      {new Date(p.created_at).toLocaleDateString('es-MX')}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEditModal(p)}
-                        className="inline-flex items-center gap-1 rounded-md bg-secondary-100 px-2.5 py-1.5 text-xs font-semibold text-secondary-700 transition hover:bg-primary-100 hover:text-primary-700"
-                        title="Editar proyecto"
-                      >
-                        <Icon name="seguridad" size={14} /> Editar
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <input
+            id="select-all"
+            type="checkbox"
+            checked={projects.length > 0 && selectedIds.size === projects.length}
+            onChange={toggleSelectAll}
+            className="h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
+          />
+          <label htmlFor="select-all" className="text-sm text-secondary-700">
+            {selectedIds.size > 0
+              ? `${selectedIds.size} proyecto${selectedIds.size > 1 ? 's' : ''} seleccionado${selectedIds.size > 1 ? 's' : ''}`
+              : 'Seleccionar todos'}
+          </label>
         </div>
+        {selectedIds.size > 0 && (
+          <button
+            onClick={() => setConfirmDelete({ open: true, multiple: true })}
+            className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+          >
+            <Icon name="eliminar" size={14} />
+            Eliminar seleccionados
+          </button>
+        )}
       </div>
+
+      {projects.length === 0 ? (
+        <div className="rounded-xl border border-secondary-200 bg-white p-8 text-center text-sm text-secondary-500 shadow-sm">
+          No hay proyectos creados todavía.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {projects.map((p) => (
+            <div
+              key={p.id}
+              className={`relative flex flex-col rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-md ${
+                selectedIds.has(p.id) ? 'border-primary-400 ring-1 ring-primary-400' : 'border-secondary-200'
+              }`}
+            >
+              <div className="mb-3 flex items-start justify-between">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(p.id)}
+                  onChange={() => toggleSelect(p.id)}
+                  className="h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
+                />
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => openEditModal(p)}
+                    className="inline-flex items-center gap-1 rounded-md bg-secondary-100 px-2 py-1 text-xs font-semibold text-secondary-700 transition hover:bg-primary-100 hover:text-primary-700"
+                    title="Editar proyecto"
+                  >
+                    <Icon name="seguridad" size={12} />
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete({ open: true, project: p })}
+                    className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:text-red-800"
+                    title="Eliminar proyecto definitivamente"
+                  >
+                    <Icon name="eliminar" size={12} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-3 flex items-center gap-3">
+                {p.foto_url ? (
+                  <img
+                    src={p.foto_url}
+                    alt={p.nombre_candidato}
+                    className="h-14 w-14 rounded-full object-cover ring-1 ring-secondary-200"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 text-primary-600 text-sm font-bold">
+                    {p.nombre_candidato.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-secondary-900">{p.nombre_candidato}</p>
+                  {p.cargo_busca && <p className="truncate text-xs text-secondary-500">{p.cargo_busca}</p>}
+                </div>
+              </div>
+
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-secondary-100 px-2 py-0.5 text-xs font-semibold capitalize text-secondary-700">
+                  {p.plan}
+                </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    p.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {p.activo ? 'Activo' : 'Inactivo'}
+                </span>
+              </div>
+
+              <div className="mt-auto grid grid-cols-3 gap-2 border-t border-secondary-100 pt-3 text-center text-xs">
+                <div>
+                  <p className="font-semibold text-secondary-900">{p.stats.usuarios}</p>
+                  <p className="text-secondary-500">Usuarios</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-secondary-900">{p.stats.votantes}</p>
+                  <p className="text-secondary-500">Votantes</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-secondary-900">{p.stats.eventos}</p>
+                  <p className="text-secondary-500">Eventos</p>
+                </div>
+              </div>
+
+              <p className="mt-2 text-center text-[10px] text-secondary-400">
+                {new Date(p.created_at).toLocaleDateString('es-MX')}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
@@ -680,6 +768,55 @@ export default function AdminProjectsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete.open && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+          <div className="relative z-[10000] w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
+                <Icon name="eliminar" size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-secondary-900">
+                {confirmDelete.multiple ? 'Eliminar proyectos seleccionados' : 'Eliminar proyecto definitivamente'}
+              </h3>
+            </div>
+
+            <div className="mb-6 space-y-3 text-sm text-secondary-700">
+              <p>
+                ¿Estás seguro de que deseas eliminar{confirmDelete.multiple ? ' los proyectos seleccionados' : ' este proyecto'}?
+              </p>
+              {confirmDelete.project && (
+                <p className="rounded-lg bg-secondary-50 px-3 py-2 font-medium text-secondary-900">
+                  {confirmDelete.project.nombre_candidato} (<span className="font-mono">{confirmDelete.project.slug}</span>)
+                </p>
+              )}
+              <p className="text-red-600">
+                Esta acción no se puede deshacer. Se borrarán todos los datos{confirmDelete.multiple ? ' de los proyectos' : ' del proyecto'}: usuarios,
+                votantes, eventos, mapas, encuestas, casillas, peticiones, historiales y configuraciones.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete({ open: false })}
+                className="btn-secondary flex-1"
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                disabled={deleting}
+              >
+                {deleting ? 'Eliminando...' : 'Sí, eliminar definitivamente'}
+              </button>
+            </div>
           </div>
         </div>
       )}

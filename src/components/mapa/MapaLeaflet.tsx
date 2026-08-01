@@ -138,6 +138,8 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
 
       <ManejadorResultadoDestacado resultado={resultadoDestacado} capasGeoJSONRef={capasGeoJSONRef} />
 
+      <CentradorCapas data={data} activas={activas} personalizadas={personalizadas} />
+
       {activas.votantes && data.votantes && (
         <CapaVotantes data={data.votantes} />
       )}
@@ -174,6 +176,8 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
             capa={capa}
             capasGeoJSONRef={capasGeoJSONRef}
             onFeatureClick={onFeatureClick}
+            onSeleccionarCoordenada={onSeleccionarCoordenada}
+            onAccionPunto={onAccionPunto}
             onRender={() => handleCapaRender(capa.id)}
           />
         )
@@ -1211,6 +1215,8 @@ interface CapaPersonalizadaProps {
   capa: { id: string; nombre: string; color: string; bloqueada?: boolean; orden?: number; estilos?: any };
   capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
   onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
+  onSeleccionarCoordenada?: (lat: number, lng: number) => void;
+  onAccionPunto?: (tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante', lat: number, lng: number) => void;
   onRender?: () => void;
 }
 
@@ -1243,11 +1249,15 @@ function resultadosHtml(resultados: any): string {
   return `<table class="w-full text-xs"><thead><tr class="bg-secondary-100"><th class="px-2 py-1 text-left">Año</th><th class="px-2 py-1 text-left">Planilla</th><th class="px-2 py-1 text-right">Votos gan.</th><th class="px-2 py-1 text-right">Total</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function crearPopupHtml(props: Record<string, any>, capaId: string, capaNombre: string): string {
+function crearPopupHtml(props: Record<string, any>, capaId: string, capaNombre: string, geometryType?: string): string {
   const nombre = escaparHtml(String(props._feature_nombre || props.NOMBRE || props.nombre || props.name || 'Sin nombre'));
   const zona = props.zona_sindical ? escaparHtml(String(props.zona_sindical)) : null;
   const colorZona = props.color_zona ? String(props.color_zona) : null;
-  const tipoEntidad = props.tipo_entidad ? escaparHtml(String(props.tipo_entidad)) : null;
+  const tipoEntidad = props.tipo_entidad
+    ? escaparHtml(String(props.tipo_entidad))
+    : props.tipo
+      ? escaparHtml(String(props.tipo))
+      : null;
   const dependenciasEje = Array.isArray(props.dependencias_eje) ? props.dependencias_eje : [];
   const dependenciasEspecificas = Array.isArray(props.dependencias_especificas)
     ? props.dependencias_especificas
@@ -1255,6 +1265,7 @@ function crearPopupHtml(props: Record<string, any>, capaId: string, capaNombre: 
   const sede = props.sede_votacion ? escaparHtml(String(props.sede_votacion)) : null;
   const resultados = props.resultados_historicos || null;
   const esNodo = props.es_nodo === true;
+  const esPunto = geometryType === 'Point' || geometryType === 'MultiPoint';
   const featureId = String(props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID);
 
   const colorDot = colorZona
@@ -1284,16 +1295,50 @@ function crearPopupHtml(props: Record<string, any>, capaId: string, capaNombre: 
           ${resultadosHtml(resultados)}
         </div>
       </div>
-      <div class="mt-3 flex gap-2">
-        <button id="btn-editar-feature-${featureId}" class="flex-1 rounded-md bg-primary-600 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-primary-700">Editar polígono</button>
+      <div class="mt-3 space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btn-editar-feature-${featureId}" class="rounded-md bg-primary-600 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-primary-700">${esPunto ? 'Ver detalle' : 'Editar polígono'}</button>
+          <button id="btn-registrar-aqui-${featureId}" class="rounded-md bg-secondary-100 px-2 py-1.5 text-[11px] font-semibold text-secondary-700 hover:bg-secondary-200">+ Registrar aquí</button>
+        </div>
+        <div class="rounded-md border border-secondary-200 bg-secondary-50/60 p-2">
+          <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-500">Registrar acción</p>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="btn-accion-evento-${featureId}" class="rounded bg-red-50 px-1.5 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-100">Evento</button>
+            <button id="btn-accion-lider-${featureId}" class="rounded bg-purple-50 px-1.5 py-1 text-[10px] font-semibold text-purple-700 hover:bg-purple-100">Líder</button>
+            <button id="btn-accion-votante-${featureId}" class="rounded bg-blue-50 px-1.5 py-1 text-[10px] font-semibold text-blue-700 hover:bg-blue-100">Votante</button>
+            <button id="btn-accion-apoyo-${featureId}" class="rounded bg-amber-50 px-1.5 py-1 text-[10px] font-semibold text-amber-700 hover:bg-amber-100">Apoyo</button>
+            <button id="btn-accion-peticion-${featureId}" class="rounded bg-sky-50 px-1.5 py-1 text-[10px] font-semibold text-sky-700 hover:bg-sky-100">Petición</button>
+          </div>
+        </div>
       </div>
     </div>
   `;
 }
 
-function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRender }: CapaPersonalizadaProps) {
+function obtenerCoordenadasFeature(feature: any, layer: any): { lat: number; lng: number } | null {
+  try {
+    const geom = feature?.geometry;
+    if (!geom) return null;
+    if (geom.type === 'Point') {
+      return { lat: geom.coordinates[1], lng: geom.coordinates[0] };
+    }
+    const centroid = layer?.getBounds?.()?.getCenter?.() || null;
+    if (centroid) return { lat: centroid.lat, lng: centroid.lng };
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSeleccionarCoordenada, onAccionPunto, onRender }: CapaPersonalizadaProps) {
   const map = useMap();
   const capaRef = useRef<L.GeoJSON | null>(null);
+  const onFeatureClickRef = useRef(onFeatureClick);
+  const onSeleccionarRef = useRef(onSeleccionarCoordenada);
+  const onAccionPuntoRef = useRef(onAccionPunto);
+  onFeatureClickRef.current = onFeatureClick;
+  onSeleccionarRef.current = onSeleccionarCoordenada;
+  onAccionPuntoRef.current = onAccionPunto;
 
   useEffect(() => {
     if (capaRef.current) {
@@ -1360,18 +1405,37 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
               return;
             }
 
-            l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre), {
-              maxWidth: 320,
+            const geometryType = feature?.geometry?.type;
+
+            l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre, geometryType), {
+              maxWidth: 340,
               className: 'capa-popup-sindical',
-              autoPan: false,
+              autoPan: true,
+              autoPanPadding: [40, 40],
             });
+
+            // Etiqueta permanente para capas de puntos (colonias / localidades)
+            if (geometryType === 'Point' || geometryType === 'MultiPoint') {
+              const label = escaparHtml(String(props._feature_nombre || props.nombre || props.NOMBRE || props.name || props.NAME || 'Sin nombre'));
+              l.bindTooltip(
+                `<div class="mapa-point-label">${label}</div>`,
+                {
+                  permanent: true,
+                  direction: 'bottom',
+                  offset: [0, 10],
+                  opacity: 1,
+                  interactive: false,
+                  className: 'mapa-point-label-tooltip',
+                } as any,
+              );
+            }
 
             l.on('click', (e: any) => {
               L.DomEvent.stopPropagation(e);
               l.bringToFront();
               l.setStyle({ weight: 4, opacity: 1, fillOpacity: Math.min(1, baseStyle(feature).fillOpacity + 0.2) });
               l.openPopup();
-              if (onFeatureClick) onFeatureClick(capa.id, featureId, props);
+              if (onFeatureClickRef.current) onFeatureClickRef.current(capa.id, featureId, props);
             });
 
             l.on('popupclose', () => {
@@ -1379,17 +1443,53 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
             });
 
             l.on('popupopen', () => {
-              const btn = document.getElementById(`btn-editar-feature-${featureId}`);
-              if (btn && onFeatureClick) {
-                const handler = () => onFeatureClick(capa.id, featureId, props);
-                btn.addEventListener('click', handler);
-                // Limpiar listener al cerrar popup para evitar duplicados
-                const cleanup = () => {
-                  btn.removeEventListener('click', handler);
-                  l.off('popupclose', cleanup);
+              const tieneFeatureClick = !!onFeatureClickRef.current;
+              const tieneSeleccionar = !!onSeleccionarRef.current;
+              const tieneAccionPunto = !!onAccionPuntoRef.current;
+              console.log('[CapaPersonalizada] popupopen', capa.id, featureId, { tieneFeatureClick, tieneSeleccionar, tieneAccionPunto });
+
+              const coords = obtenerCoordenadasFeature(feature, l);
+              console.log('[CapaPersonalizada] coords obtenidas', coords);
+
+              const btnEditar = document.getElementById(`btn-editar-feature-${featureId}`);
+              if (btnEditar && onFeatureClickRef.current) {
+                btnEditar.onclick = () => {
+                  console.log('[CapaPersonalizada] click Editar', capa.id, featureId);
+                  onFeatureClickRef.current?.(capa.id, featureId, props);
                 };
-                l.on('popupclose', cleanup);
               }
+
+              const btnRegistrar = document.getElementById(`btn-registrar-aqui-${featureId}`);
+              if (btnRegistrar && onSeleccionarRef.current) {
+                btnRegistrar.onclick = () => {
+                  console.log('[CapaPersonalizada] click Registrar aquí', coords);
+                  if (coords) {
+                    onSeleccionarRef.current?.(coords.lat, coords.lng);
+                    l.closePopup();
+                  }
+                };
+              }
+
+              const acciones: Array<{ id: string; tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante' }> = [
+                { id: `btn-accion-evento-${featureId}`, tipo: 'evento' },
+                { id: `btn-accion-lider-${featureId}`, tipo: 'lider' },
+                { id: `btn-accion-votante-${featureId}`, tipo: 'votante' },
+                { id: `btn-accion-apoyo-${featureId}`, tipo: 'apoyo' },
+                { id: `btn-accion-peticion-${featureId}`, tipo: 'peticion' },
+              ];
+
+              acciones.forEach(({ id, tipo }) => {
+                const btn = document.getElementById(id);
+                if (btn && onAccionPuntoRef.current && coords) {
+                  btn.onclick = () => {
+                    console.log('[CapaPersonalizada] click acción', tipo, coords);
+                    onAccionPuntoRef.current?.(tipo, coords.lat, coords.lng);
+                    l.closePopup();
+                  };
+                } else if (btn) {
+                  console.log('[CapaPersonalizada] botón acción deshabilitado', id, { tieneAccionPunto, coords });
+                }
+              });
             });
           },
       pointToLayer: (feature: any, latlng: any) => {
@@ -1425,7 +1525,63 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onRend
         capasGeoJSONRef.current?.delete(capa.id);
       }
     };
-  }, [data, capa.id, capa.color, capa.nombre, capa.bloqueada, capa.orden, map, capasGeoJSONRef, onFeatureClick, onRender]);
+  }, [data, capa.id, capa.color, capa.nombre, capa.bloqueada, capa.orden, map, capasGeoJSONRef, onRender]);
+
+  return null;
+}
+
+function CentradorCapas({
+  data,
+  activas,
+  personalizadas,
+}: {
+  data: MapaData;
+  activas: Record<string, boolean>;
+  personalizadas: { id: string; nombre: string; tipo: string; color: string; bloqueada?: boolean; orden?: number }[];
+}) {
+  const map = useMap();
+  const yaCentradoRef = useRef(false);
+
+  useEffect(() => {
+    if (yaCentradoRef.current) return;
+
+    const capasActivas = personalizadas.filter(c => activas[c.id] && data[c.id]?.features?.length);
+    if (capasActivas.length === 0) return;
+
+    // Calcular bounds combinados de todas las capas personalizadas activas
+    let globalBounds: L.LatLngBounds | null = null;
+    capasActivas.forEach(capa => {
+      const geo = L.geoJSON(data[capa.id]!);
+      const bounds = geo.getBounds();
+      geo.remove();
+      if (bounds?.isValid?.()) {
+        if (!globalBounds) {
+          globalBounds = bounds;
+        } else {
+          globalBounds.extend(bounds);
+        }
+      }
+    });
+
+    if (!globalBounds) return;
+
+    const boundsTyped = globalBounds as L.LatLngBounds;
+    if (!boundsTyped.isValid()) return;
+    const center = boundsTyped.getCenter();
+    const isOutsideMexico = center.lat < 14 || center.lat > 33 || center.lng < -118 || center.lng > -86;
+    const currentCenter = map.getCenter();
+    const isCurrentlyInMexico =
+      currentCenter.lat >= 14 && currentCenter.lat <= 33 &&
+      currentCenter.lng >= -118 && currentCenter.lng <= -86;
+
+    // Solo auto-centrar si las capas están fuera de México y el mapa sigue en México
+    // (para no sobreescribir el comportamiento de proyectos mexicanos existentes)
+    if (isOutsideMexico && isCurrentlyInMexico) {
+      yaCentradoRef.current = true;
+      registerProgrammaticMove(1200);
+      map.fitBounds(boundsTyped, { padding: [80, 80], maxZoom: 14, animate: true });
+    }
+  }, [map, data, activas, personalizadas]);
 
   return null;
 }

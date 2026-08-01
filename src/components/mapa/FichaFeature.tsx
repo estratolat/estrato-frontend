@@ -70,7 +70,31 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
   const dragRef = useRef<{ dragging: boolean; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const seccion = elemento?.feature?.properties?.seccion || elemento?.feature?.properties?.SECCION || elemento?.feature?.properties?._feature_metadata?.seccion || null;
+  const detectarSeccion = (): string | null => {
+    const props = elemento?.feature?.properties || {};
+    const posibles = [
+      props.seccion,
+      props.SECCION,
+      props.Seccion,
+      props._feature_metadata?.seccion,
+      props.section,
+      props.sección,
+    ];
+    for (const p of posibles) {
+      if (p != null && String(p).trim() !== '') {
+        return String(p).replace(/\D/g, '').padStart(4, '0').slice(0, 4);
+      }
+    }
+    // Fallback: extraer de nombre tipo "Sección 0752" o del featureId
+    const nombre = elemento?.nombre || props._feature_nombre || props.NOMBRE || props.nombre || '';
+    const matchNombre = String(nombre).match(/(?:seccion|sección|section|secc)\s*[ _-]*(\d{1,4})/i);
+    if (matchNombre) return matchNombre[1].padStart(4, '0').slice(0, 4);
+    const matchId = String(elemento?.featureId || elemento?.id || '').match(/(\d{3,4})/);
+    if (matchId) return matchId[1].padStart(4, '0').slice(0, 4);
+    return null;
+  };
+
+  const seccion = detectarSeccion();
 
   useEffect(() => {
     if (!elemento?.capaId || !elemento?.id) {
@@ -87,6 +111,14 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
         setCargandoHistorico(true);
         setErrorCruce(null);
         const { data } = await mapaApi.cruceFeature(elemento.capaId, featureId);
+        console.log('[FichaFeature] cruceFeature response:', {
+          capaId: elemento.capaId,
+          featureId,
+          seccion: data?.seccion,
+          datos_oficiales: data?.datos_oficiales,
+          numeralia: data?.numeralia,
+          historico_length: data?.historico?.length,
+        });
         setCruce(data.resumen || null);
         setDatosOficiales(data.datos_oficiales || null);
         setNumeralia(data.numeralia || null);
@@ -256,7 +288,7 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
             <p className="mb-2 text-[10px] font-semibold uppercase text-secondary-500">Histórico electoral</p>
             <p className="mb-2 text-[10px] text-secondary-500">Sección detectada: <span className="font-semibold text-secondary-700">{seccion}</span></p>
 
-            {datosOficiales && (datosOficiales.partido_ganador || datosOficiales.votos_totales) && (
+            {datosOficiales && (datosOficiales.partido_ganador || datosOficiales.votos_ganador != null || datosOficiales.votos_totales != null || datosOficiales.lista_nominal != null || datosOficiales.participacion_pct != null) && (
               <div className="mb-2 space-y-1.5 rounded-lg bg-secondary-50 p-2">
                 {datosOficiales.partido_ganador && (
                   <div className="flex items-start justify-between gap-2 text-xs">
@@ -278,7 +310,7 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                 )}
                 {datosOficiales.lista_nominal != null && (
                   <div className="flex items-start justify-between gap-2 text-xs">
-                    <span className="font-medium text-secondary-600">Lista nominal:</span>
+                    <span className="font-medium text-secondary-600">Lista nominal (última elección):</span>
                     <span className="max-w-[60%] text-right text-secondary-800">{Number(datosOficiales.lista_nominal).toLocaleString()}</span>
                   </div>
                 )}
@@ -297,9 +329,21 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
               </div>
             )}
 
-            {numeralia && (
+            {numeralia && (numeralia.padron_2024 != null || numeralia.lista_nominal_2024 != null || numeralia.padron_historico) && (
               <div className="mb-3 space-y-1.5 rounded-lg border border-secondary-100 bg-white p-2">
                 <p className="mb-1 text-[10px] font-semibold uppercase text-secondary-500">Numeralia electoral</p>
+                {numeralia.padron_2024 != null && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Padrón 2024:</span>
+                    <span className="max-w-[60%] text-right text-secondary-800">{Number(numeralia.padron_2024).toLocaleString()}</span>
+                  </div>
+                )}
+                {numeralia.lista_nominal_2024 != null && (
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <span className="font-medium text-secondary-600">Lista nominal 2024:</span>
+                    <span className="max-w-[60%] text-right text-secondary-800">{Number(numeralia.lista_nominal_2024).toLocaleString()}</span>
+                  </div>
+                )}
                 {(() => {
                   const datos2021 = numeralia.padron_historico?.['2021'];
                   return (
@@ -314,12 +358,6 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                         <div className="flex items-start justify-between gap-2 text-xs">
                           <span className="font-medium text-secondary-600">Lista nominal 2021:</span>
                           <span className="max-w-[60%] text-right text-secondary-800">{Number(datos2021.lista_nominal.total).toLocaleString()} <span className="text-[10px] text-secondary-500">(H {Number(datos2021.lista_nominal.hombres || 0).toLocaleString()} / M {Number(datos2021.lista_nominal.mujeres || 0).toLocaleString()})</span></span>
-                        </div>
-                      )}
-                      {numeralia.lista_nominal_2024 != null && (
-                        <div className="flex items-start justify-between gap-2 text-xs">
-                          <span className="font-medium text-secondary-600">Lista nominal 2024:</span>
-                          <span className="max-w-[60%] text-right text-secondary-800">{Number(numeralia.lista_nominal_2024).toLocaleString()}</span>
                         </div>
                       )}
                     </>

@@ -46,6 +46,15 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const { user } = useAuth();
 
+  const tenant = user?.tenant;
+  const candidatoFoto = tenant?.foto_url;
+  const inicialesCandidato = (tenant?.nombre_candidato || 'C')
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   useEffect(() => {
     const cargarDatos = async () => {
       setLoading(true);
@@ -112,9 +121,24 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-800">Resumen de Campaña</h2>
-        <p className="text-gray-600">Vista general de tu operación territorial</p>
+      <div className="mb-8 flex items-center gap-4">
+        {candidatoFoto ? (
+          <img
+            src={candidatoFoto}
+            alt={tenant?.nombre_candidato || 'Candidato'}
+            className="h-16 w-16 rounded-full object-cover ring-2 ring-primary-200"
+          />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-primary-600 text-lg font-bold ring-2 ring-primary-200">
+            {inicialesCandidato}
+          </div>
+        )}
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">{tenant?.nombre_candidato || 'Resumen de Campaña'}</h2>
+          <p className="text-gray-600">
+            {tenant?.cargo_busca || 'Vista general de tu operación territorial'}
+          </p>
+        </div>
       </div>
 
       {error && (

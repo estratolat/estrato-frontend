@@ -17,7 +17,7 @@ interface Props {
 
 const ETIQUETAS_TIPO: Record<TipoResultadoGlobal | string, { label: string; color: string }> = {
   capa: { label: 'Capa', color: '#D73216' },
-  capa_feature: { label: 'Polígono', color: '#3B82F6' },
+  capa_feature: { label: 'Lugar', color: '#3B82F6' },
   casilla: { label: 'Casilla', color: '#DB2777' },
 };
 
@@ -28,7 +28,7 @@ function etiquetaTipo(tipo: string) {
 const FILTROS: { key: string; label: string }[] = [
   { key: 'todos', label: 'Todas' },
   { key: 'capa', label: 'Capas' },
-  { key: 'capa_feature', label: 'Polígonos' },
+  { key: 'capa_feature', label: 'Lugares' },
   { key: 'casilla', label: 'Casillas' },
 ];
 

@@ -162,3 +162,34 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-400;
 }
+
+/* Etiquetas permanentes para capas de puntos (colonias/localidades) */
+.mapa-point-label-tooltip {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+  padding: 2px 6px !important;
+}
+
+.mapa-point-label-tooltip .leaflet-tooltip-tip {
+  display: none !important;
+}
+
+.mapa-point-label {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: #1f2937 !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+}
+
+/* A partir de zoom 14 las etiquetas de puntos se vuelven más legibles */
+.leaflet-zoom-14 .mapa-point-label,
+.leaflet-zoom-15 .mapa-point-label,
+.leaflet-zoom-16 .mapa-point-label,
+.leaflet-zoom-17 .mapa-point-label,
+.leaflet-zoom-18 .mapa-point-label {
+  font-size: 11px !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9);
+}

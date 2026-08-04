@@ -7,8 +7,8 @@ import { authApi } from '@/lib/api';
 
 export default function BrigadaLoginPage() {
   const router = useRouter();
-  const [telefono, setTelefono] = useState('+521234567893');
-  const [pin, setPin] = useState('1234');
+  const [telefono, setTelefono] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -97,11 +97,6 @@ export default function BrigadaLoginPage() {
           </button>
         </form>
 
-        <div className="mt-5 text-center text-xs text-gray-500">
-          <p className="font-medium mb-1">Demo:</p>
-          <p>Teléfono: +521234567893</p>
-          <p>PIN: 1234</p>
-        </div>
       </div>
     </div>
   );

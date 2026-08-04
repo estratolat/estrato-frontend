@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { lideresApi, votantesApi } from '@/lib/api';
+import { lideresApi, votantesApi, mapaApi } from '@/lib/api';
 import { Lider } from '@/types';
 import { Icon } from '@/components/ui/Icon';
 
@@ -16,12 +16,26 @@ interface Props {
 export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenadasIniciales, liderEditando }: Props) {
   const [tenantId, setTenantId] = useState('');
   const [lideres, setLideres] = useState<Lider[]>([]);
+  const [veredas, setVeredas] = useState<{ id: string; nombre: string }[]>([]);
+  const [comunidades, setComunidades] = useState<{ id: string; nombre: string }[]>([]);
   const [form, setForm] = useState({
     nombre: '',
     telefono: '',
+    email: '',
     seccion_electoral: '',
     colonia: '',
+    vereda: '',
+    comunidad: '',
+    estado: '',
+    municipio: '',
     direccion: '',
+    ocupacion: '',
+    facebook: '',
+    instagram: '',
+    tiktok: '',
+    whatsapp: '',
+    twitter: '',
+    linkedin: '',
     lider_padre_id: '',
     alcance_estimado: '100',
     lat: '',
@@ -35,16 +49,30 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
     const t = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
     if (t) setTenantId(t);
     loadLideres();
+    loadTerritorios();
     setError(null);
 
     if (liderEditando) {
       const c = liderEditando.votante?.coordenadas;
+      const redes = (liderEditando.votante as any)?.redes_sociales || {};
       setForm({
         nombre: liderEditando.votante?.nombre || '',
         telefono: liderEditando.votante?.telefono || '',
+        email: liderEditando.votante?.email || '',
         seccion_electoral: liderEditando.votante?.seccion_electoral || '',
         colonia: liderEditando.votante?.colonia || '',
+        vereda: liderEditando.votante?.vereda || '',
+        comunidad: liderEditando.votante?.comunidad || '',
+        estado: liderEditando.votante?.estado || '',
+        municipio: liderEditando.votante?.municipio || '',
         direccion: (liderEditando.votante as any)?.direccion || '',
+        ocupacion: (liderEditando.votante as any)?.ocupacion || '',
+        facebook: redes.facebook || '',
+        instagram: redes.instagram || '',
+        tiktok: redes.tiktok || '',
+        whatsapp: redes.whatsapp || '',
+        twitter: redes.twitter || redes.x || '',
+        linkedin: redes.linkedin || '',
         lider_padre_id: liderEditando.lider_padre_id || '',
         alcance_estimado: String(liderEditando.alcance_estimado || 100),
         lat: c && typeof c.lat === 'number' ? c.lat.toFixed(6) : '',
@@ -55,9 +83,21 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         ...f,
         nombre: '',
         telefono: '',
+        email: '',
         seccion_electoral: '',
         colonia: '',
+        vereda: '',
+        comunidad: '',
+        estado: '',
+        municipio: '',
         direccion: '',
+        ocupacion: '',
+        facebook: '',
+        instagram: '',
+        tiktok: '',
+        whatsapp: '',
+        twitter: '',
+        linkedin: '',
         lider_padre_id: '',
         alcance_estimado: '100',
         lat: coordenadasIniciales.lat.toFixed(6),
@@ -68,9 +108,21 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         ...f,
         nombre: '',
         telefono: '',
+        email: '',
         seccion_electoral: '',
         colonia: '',
+        vereda: '',
+        comunidad: '',
+        estado: '',
+        municipio: '',
         direccion: '',
+        ocupacion: '',
+        facebook: '',
+        instagram: '',
+        tiktok: '',
+        whatsapp: '',
+        twitter: '',
+        linkedin: '',
         lider_padre_id: '',
         alcance_estimado: '100',
         lat: '',
@@ -86,13 +138,58 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
     } catch {}
   };
 
+  const loadTerritorios = async () => {
+    try {
+      const capasRes = await mapaApi.getCapas();
+      const personalizadas = capasRes.data?.personalizadas || [];
+      const capaVereda = personalizadas.find((c: any) => /veredas?/i.test(c.nombre));
+      const capaComunidad = personalizadas.find((c: any) => /comunidades?/i.test(c.nombre));
+
+      if (capaVereda) {
+        const res = await mapaApi.getFeatures(capaVereda.id, { limit: 500 });
+        const items = (res.data?.items || []).map((it: any) => ({
+          id: it.feature_id,
+          nombre: it.nombre || it.feature_id,
+        }));
+        setVeredas(items);
+      } else {
+        setVeredas([]);
+      }
+
+      if (capaComunidad) {
+        const res = await mapaApi.getFeatures(capaComunidad.id, { limit: 500 });
+        const items = (res.data?.items || []).map((it: any) => ({
+          id: it.feature_id,
+          nombre: it.nombre || it.feature_id,
+        }));
+        setComunidades(items);
+      } else {
+        setComunidades([]);
+      }
+    } catch (e) {
+      console.warn('[NuevoLiderModal] Error cargando territorios:', e);
+    }
+  };
+
   const reset = () => {
     setForm({
       nombre: '',
       telefono: '',
+      email: '',
       seccion_electoral: '',
       colonia: '',
+      vereda: '',
+      comunidad: '',
+      estado: '',
+      municipio: '',
       direccion: '',
+      ocupacion: '',
+      facebook: '',
+      instagram: '',
+      tiktok: '',
+      whatsapp: '',
+      twitter: '',
+      linkedin: '',
       lider_padre_id: '',
       alcance_estimado: '100',
       lat: (!liderEditando && coordenadasIniciales?.lat.toFixed(6)) || '',
@@ -127,13 +224,32 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         throw new Error('Se requieren coordenadas para mostrar al líder en el mapa. Haz clic en el mapa o usa "Usar mi ubicación".');
       }
 
+      const redes_sociales: Record<string, string> = {};
+      const agregarRed = (key: string, value: string) => {
+        const v = value.trim();
+        if (v) redes_sociales[key] = v;
+      };
+      agregarRed('facebook', form.facebook);
+      agregarRed('instagram', form.instagram);
+      agregarRed('tiktok', form.tiktok);
+      agregarRed('whatsapp', form.whatsapp);
+      agregarRed('twitter', form.twitter);
+      agregarRed('linkedin', form.linkedin);
+
       const votanteData: any = {
         tenant_id: tenantId,
         nombre: form.nombre,
         telefono: form.telefono,
+        email: form.email,
         seccion_electoral: form.seccion_electoral,
         colonia: form.colonia,
+        vereda: form.vereda,
+        comunidad: form.comunidad,
+        estado: form.estado,
+        municipio: form.municipio,
         direccion: form.direccion,
+        ocupacion: form.ocupacion,
+        redes_sociales,
         es_lider: true,
         activo: true,
       };
@@ -231,6 +347,50 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
                 placeholder="477 000 0000"
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="label">Correo electrónico</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="input"
+                placeholder="Ej. lider@correo.com"
+              />
+            </div>
+            {veredas.length > 0 && (
+              <div>
+                <label className="label">Vereda</label>
+                <select
+                  value={form.vereda}
+                  onChange={(e) => setForm({ ...form, vereda: e.target.value })}
+                  className="input"
+                >
+                  <option value="">Seleccionar vereda</option>
+                  {veredas.map((v) => (
+                    <option key={v.id} value={v.nombre}>
+                      {v.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {comunidades.length > 0 && (
+              <div>
+                <label className="label">Comunidad</label>
+                <select
+                  value={form.comunidad}
+                  onChange={(e) => setForm({ ...form, comunidad: e.target.value })}
+                  className="input"
+                >
+                  <option value="">Seleccionar comunidad</option>
+                  {comunidades.map((c) => (
+                    <option key={c.id} value={c.nombre}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="label">Sección electoral</label>
               <input
@@ -250,6 +410,36 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
                 onChange={(e) => setForm({ ...form, colonia: e.target.value })}
                 className="input"
                 placeholder="Ej. Jardines del Moral"
+              />
+            </div>
+            <div>
+              <label className="label">Estado / Departamento</label>
+              <input
+                type="text"
+                value={form.estado}
+                onChange={(e) => setForm({ ...form, estado: e.target.value })}
+                className="input"
+                placeholder="Ej. Santander"
+              />
+            </div>
+            <div>
+              <label className="label">Municipio</label>
+              <input
+                type="text"
+                value={form.municipio}
+                onChange={(e) => setForm({ ...form, municipio: e.target.value })}
+                className="input"
+                placeholder="Ej. Capitanejo"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Ocupación / profesión</label>
+              <input
+                type="text"
+                value={form.ocupacion}
+                onChange={(e) => setForm({ ...form, ocupacion: e.target.value })}
+                className="input"
+                placeholder="Ej. Comerciante, docente, líder juvenil"
               />
             </div>
           </div>
@@ -322,6 +512,54 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
                 onChange={(e) => setForm({ ...form, direccion: e.target.value })}
                 className="input"
                 placeholder="Ej. Calle 10 #3-45, Capitanejo"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="label">Redes sociales</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <input
+                type="text"
+                value={form.facebook}
+                onChange={(e) => setForm({ ...form, facebook: e.target.value })}
+                className="input"
+                placeholder="Facebook"
+              />
+              <input
+                type="text"
+                value={form.instagram}
+                onChange={(e) => setForm({ ...form, instagram: e.target.value })}
+                className="input"
+                placeholder="Instagram"
+              />
+              <input
+                type="text"
+                value={form.tiktok}
+                onChange={(e) => setForm({ ...form, tiktok: e.target.value })}
+                className="input"
+                placeholder="TikTok"
+              />
+              <input
+                type="text"
+                value={form.whatsapp}
+                onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+                className="input"
+                placeholder="WhatsApp"
+              />
+              <input
+                type="text"
+                value={form.twitter}
+                onChange={(e) => setForm({ ...form, twitter: e.target.value })}
+                className="input"
+                placeholder="X / Twitter"
+              />
+              <input
+                type="text"
+                value={form.linkedin}
+                onChange={(e) => setForm({ ...form, linkedin: e.target.value })}
+                className="input"
+                placeholder="LinkedIn"
               />
             </div>
           </div>

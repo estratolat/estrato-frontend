@@ -32,9 +32,14 @@ export interface Votante {
   email?: string;
   seccion_electoral?: string;
   colonia?: string;
+  vereda?: string;
+  comunidad?: string;
   municipio?: string;
+  estado?: string;
   coordenadas?: { lat: number; lng: number };
   nivel_apoyo?: 1 | 2 | 3 | 4 | 5;
+  ocupacion?: string;
+  redes_sociales?: Record<string, string>;
   tags: string[];
   origen_qr?: string;
   ultimo_contacto?: string;

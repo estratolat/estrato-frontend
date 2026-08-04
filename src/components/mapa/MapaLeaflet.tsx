@@ -215,7 +215,8 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
   const fitGeometryFallback = useCallback((geometryFallback?: any) => {
     if (!geometryFallback) return;
     try {
-      const fallback = L.geoJSON(geometryFallback);
+      const geoInput = geometryFallback.geometry || geometryFallback;
+      const fallback = L.geoJSON(geoInput);
       const fb = fallback.getBounds();
       fallback.remove();
       if (fb?.isValid?.()) {
@@ -330,16 +331,21 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
     flyTo: (lat, lng, zoom = 16) => map.flyTo([lat, lng], zoom, { duration: 1.2 }),
     fitBounds: (geometryOrBbox) => {
       try {
+        if (!geometryOrBbox) {
+          console.warn('[MapaBridge] fitBounds: entrada vacía');
+          return;
+        }
         console.log('[MapaBridge] fitBounds input:', geometryOrBbox);
         let bounds: L.LatLngBounds | null = null;
-        if (Array.isArray(geometryOrBbox) && geometryOrBbox.length === 4) {
+        if (Array.isArray(geometryOrBbox) && geometryOrBbox.length === 4 && geometryOrBbox.every(n => typeof n === 'number')) {
           const [minLng, minLat, maxLng, maxLat] = geometryOrBbox;
           bounds = L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
-        } else if (geometryOrBbox?.bbox) {
+        } else if (Array.isArray(geometryOrBbox?.bbox) && geometryOrBbox.bbox.length === 4) {
           const [minLng, minLat, maxLng, maxLat] = geometryOrBbox.bbox;
           bounds = L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
-        } else if (geometryOrBbox) {
-          const geo = L.geoJSON(geometryOrBbox);
+        } else {
+          const geoInput = geometryOrBbox.geometry || geometryOrBbox;
+          const geo = L.geoJSON(geoInput);
           bounds = geo.getBounds();
           geo.remove();
         }
@@ -1446,8 +1452,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSele
             l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre, geometryType), {
               maxWidth: 340,
               className: 'capa-popup-sindical',
-              autoPan: true,
-              autoPanPadding: [40, 40],
+              autoPan: false,
             });
 
             // Etiqueta permanente para capas de puntos (colonias / localidades)

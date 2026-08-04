@@ -366,17 +366,15 @@ export default function MapaTerritorial() {
     }
     const featureId = el.featureId || String(el.id.split('-').slice(1).join('-'));
     await asegurarCapaCargada(el.capaId, featureId, el.feature?.geometry);
-    setTimeout(() => {
-      // Hacer zoom al polígono primero para que siempre ocurra
-      if (el.feature?.geometry) {
-        try {
-          mapRef.current?.fitBounds?.(el.feature.geometry);
-        } catch {
-          // ignore
-        }
-      }
+
+    // Reintentar centrar y resaltar: la capa puede tardar en renderizarse tras activarse.
+    const intentarResaltar = (intentos = 0) => {
       mapRef.current?.resaltarFeature?.(el.capaId, featureId, el.feature?.geometry);
-    }, 400);
+      if (intentos < 5) {
+        setTimeout(() => intentarResaltar(intentos + 1), 350);
+      }
+    };
+    setTimeout(() => intentarResaltar(0), 300);
   }, [activas, asegurarCapaCargada]);
 
   const elementoCapaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any): ElementoCapa => {
@@ -416,17 +414,11 @@ export default function MapaTerritorial() {
   const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => {
     abrirFichaDesdeFeature(capaId, featureId, props, geometry);
 
-    // Hacer zoom y resaltar el polígono seleccionado
-    if (geometry) {
-      try {
-        mapRef.current?.fitBounds?.(geometry);
-      } catch {
-        // ignore
-      }
-      setTimeout(() => {
-        mapRef.current?.resaltarFeature?.(capaId, featureId, geometry);
-      }, 400);
-    }
+    // Centrar y resaltar el polígono/elemento seleccionado.
+    // Se delega a resaltarFeature del mapa para unificar zoom + resaltado.
+    setTimeout(() => {
+      mapRef.current?.resaltarFeature?.(capaId, featureId, geometry);
+    }, 150);
 
     const esCapaSindical = /STASE|Sindicales/i.test(
       capasPersonalizadas.find(c => c.id === capaId)?.nombre || ''

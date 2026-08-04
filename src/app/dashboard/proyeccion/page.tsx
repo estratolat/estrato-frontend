@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { proyeccionApi } from '@/lib/api';
+import { proyeccionApi, resultadosHistoricosApi } from '@/lib/api';
 import { ProyeccionSeccion, MetaVotacion } from '@/types';
-import { Target, TrendingUp, TrendingDown, Minus, Save, Trash2, Plus } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, Minus, Save, Trash2, Plus, History, MapPin, Calendar } from 'lucide-react';
 
 const tendenciaColors: Record<string, string> = {
   arriba: 'bg-green-100 text-green-700',
@@ -23,6 +23,7 @@ export default function ProyeccionPage() {
   const [resumen, setResumen] = useState<any>(null);
   const [secciones, setSecciones] = useState<ProyeccionSeccion[]>([]);
   const [metas, setMetas] = useState<MetaVotacion[]>([]);
+  const [historico, setHistorico] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showMetaForm, setShowMetaForm] = useState(false);
   const [metaForm, setMetaForm] = useState({ seccion: '', proceso: '2027', meta_votos: '', meta_lista_nominal: '' });
@@ -35,14 +36,18 @@ export default function ProyeccionPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [res, sec, mets] = await Promise.all([
+      const [res, sec, mets, histRes] = await Promise.all([
         proyeccionApi.getResumen(),
         proyeccionApi.getSecciones(),
         proyeccionApi.getMetas({}),
+        resultadosHistoricosApi.getResumen(),
       ]);
       setResumen(res.data);
       setSecciones(sec.data || []);
       setMetas(mets.data || []);
+
+      const hist = res.data?.historico || null;
+      setHistorico(hist);
 
       const global = (mets.data || []).find((m: MetaVotacion) => !m.seccion && !m.zona_id);
       if (global) {
@@ -51,6 +56,13 @@ export default function ProyeccionPage() {
           meta_votos: String(global.meta_votos || ''),
           meta_lista_nominal: String(global.meta_lista_nominal || ''),
           meta_participacion: String(global.meta_participacion || ''),
+        });
+      } else if (hist) {
+        setPadronForm({
+          proceso: String(hist.anio || '2027'),
+          meta_votos: String(hist.votos_objetivo || ''),
+          meta_lista_nominal: String(hist.lista_nominal || ''),
+          meta_participacion: String(hist.participacion_pct || ''),
         });
       } else {
         setPadronForm({ proceso: '2027', meta_votos: '', meta_lista_nominal: '', meta_participacion: '' });
@@ -156,6 +168,38 @@ export default function ProyeccionPage() {
         </div>
       </div>
 
+      {historico && (
+        <div className="card space-y-4">
+          <div className="flex items-center gap-2">
+            <History size={18} className="text-primary-600" />
+            <h3 className="text-lg font-bold text-secondary-900">
+              Referencia histórica: {historico.municipio} {historico.anio}
+            </h3>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg bg-secondary-50 p-3">
+              <p className="text-xs text-secondary-500">Padrón histórico</p>
+              <p className="text-lg font-bold text-secondary-900">{(historico.lista_nominal || 0).toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-secondary-50 p-3">
+              <p className="text-xs text-secondary-500">Participación histórica</p>
+              <p className="text-lg font-bold text-secondary-900">{historico.participacion_pct ? `${historico.participacion_pct}%` : '-'}</p>
+            </div>
+            <div className="rounded-lg bg-secondary-50 p-3">
+              <p className="text-xs text-secondary-500">Votos históricos objetivo</p>
+              <p className="text-lg font-bold text-secondary-900">{(historico.votos_objetivo || 0).toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-secondary-50 p-3">
+              <p className="text-xs text-secondary-500">Actor de referencia</p>
+              <p className="text-sm font-bold text-secondary-900 truncate" title={historico.actor_objetivo}>{historico.actor_objetivo || '-'}</p>
+            </div>
+          </div>
+          <p className="text-xs text-secondary-500">
+            Estos valores provienen del histórico electoral cargado. Puedes ajustarlos en "Configuración global del padrón".
+          </p>
+        </div>
+      )}
+
       {padronForm && (
         <form onSubmit={handleSavePadron} className="card space-y-4">
           <div className="flex items-center justify-between">
@@ -253,16 +297,17 @@ export default function ProyeccionPage() {
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Meta votos</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Votos estim.</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Faltan</th>
+                <th className="px-4 py-3 text-left font-medium text-secondary-600">Histórico</th>
                 <th className="px-4 py-3 text-left font-medium text-secondary-600">Tendencia</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-secondary-100">
               {secciones.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-secondary-500">No hay datos de proyección.</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-secondary-500">No hay datos de proyección.</td>
                 </tr>
               ) : (
-                secciones.map((s) => {
+                secciones.map((s: any) => {
                   const Icon = tendenciaIcons[s.tendencia] || Minus;
                   return (
                     <tr key={s.seccion}>
@@ -272,6 +317,16 @@ export default function ProyeccionPage() {
                       <td className="px-4 py-3 text-secondary-600">{s.meta_votos?.toLocaleString() || '-'}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.votos_estimados.toLocaleString()}</td>
                       <td className="px-4 py-3 text-secondary-600">{s.faltan_para_ganar?.toLocaleString() || '-'}</td>
+                      <td className="px-4 py-3 text-secondary-600">
+                        {s.votos_historicos ? (
+                          <span className="block">{(s.votos_historicos || 0).toLocaleString()}</span>
+                        ) : (
+                          '-'
+                        )}
+                        {s.actor_historico && s.anio_historico ? (
+                          <span className="block text-xs text-secondary-400">{s.actor_historico} ({s.anio_historico})</span>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${tendenciaColors[s.tendencia]}`}>
                           <Icon size={12} /> {s.tendencia.replace('_', ' ')}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, LayoutGrid, Compass, Layers, Map, X, Lock } from 'lucide-react';
+import { Search, LayoutGrid, Compass, Layers, Map, X, Lock, Pencil } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { MapaData, CapaMapa, MapaPrefs, ResultadoGlobal, DetalleTerritorial, GeoJSONCollection, FeatureCapa } from '@/types/mapa';
 import { Lider, Zona } from '@/types';
@@ -263,16 +263,27 @@ export default function MapaTerritorial() {
     });
   }, []);
 
+  const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo' | 'peticion' | 'votante', coords?: { lat: number; lng: number } | null, registro?: any) => {
+    setPuntoInicial(coords || null);
+    if (tipo === 'lider') setLiderEditando(registro || null);
+    if (tipo === 'evento') setEventoEditando(registro || null);
+    setModalActivo(tipo);
+  }, []);
+
   const verLiderEnMapa = useCallback((l: Lider) => {
     const c = l.votante?.coordenadas;
-    if (!c || typeof c.lat !== 'number' || typeof c.lng !== 'number') return;
+    if (!c || typeof c.lat !== 'number' || typeof c.lng !== 'number') {
+      abrirModal('lider', null, l);
+      return;
+    }
     if (!activas.lideres) {
       setActivas(prev => ({ ...prev, lideres: true }));
     }
     setTimeout(() => {
-      mapRef.current?.flyTo(c.lat, c.lng, 17);
-    }, 150);
-  }, [activas.lideres]);
+      mapRef.current?.flyTo(c.lat, c.lng, 18);
+      window.dispatchEvent(new CustomEvent('mapa:resaltar-lider', { detail: l }));
+    }, 250);
+  }, [activas.lideres, abrirModal]);
 
   const handleBoundsChange = useCallback((bounds: { south: number; west: number; north: number; east: number }) => {
     if (debounceBoundsRef.current) clearTimeout(debounceBoundsRef.current);
@@ -298,13 +309,6 @@ export default function MapaTerritorial() {
   const handleDibujoListo = useCallback((geojson: GeoJSONCollection) => {
     setDibujoGeojson(geojson);
     setModalGuardarDibujo(true);
-  }, []);
-
-  const abrirModal = useCallback((tipo: 'lider' | 'evento' | 'apoyo' | 'peticion' | 'votante', coords?: { lat: number; lng: number } | null, registro?: any) => {
-    setPuntoInicial(coords || null);
-    if (tipo === 'lider') setLiderEditando(registro || null);
-    if (tipo === 'evento') setEventoEditando(registro || null);
-    setModalActivo(tipo);
   }, []);
 
   const cerrarModal = useCallback(() => {
@@ -375,21 +379,22 @@ export default function MapaTerritorial() {
     }, 400);
   }, [activas, asegurarCapaCargada]);
 
-  const elementoCapaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>): ElementoCapa => {
+  const elementoCapaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any): ElementoCapa => {
     const capa = capasPersonalizadas.find(c => c.id === capaId);
+    const nombre = props._feature_nombre || props.NOMBRE_VER || props.NOMBRE || props.nombre || props.name || props.NAME || featureId;
     return {
       id: `${capaId}-${featureId}`,
       featureId,
-      nombre: props._feature_nombre || featureId,
-      feature: { type: 'Feature', properties: props, geometry: props.__geometry || null },
+      nombre,
+      feature: { type: 'Feature', properties: props, geometry: geometry || props.__geometry || null },
       capaId,
       capaNombre: capa?.nombre || 'Capa',
       color: props._feature_color || capa?.color || '#3B82F6',
     };
   }, [capasPersonalizadas]);
 
-  const abrirFichaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
-    setElementoFicha(elementoCapaDesdeFeature(capaId, featureId, props));
+  const abrirFichaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => {
+    setElementoFicha(elementoCapaDesdeFeature(capaId, featureId, props, geometry));
   }, [elementoCapaDesdeFeature]);
 
   const abrirEditorFeature = useCallback((el: ElementoCapa) => {
@@ -408,8 +413,21 @@ export default function MapaTerritorial() {
     });
   }, []);
 
-  const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>) => {
-    abrirFichaDesdeFeature(capaId, featureId, props);
+  const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => {
+    abrirFichaDesdeFeature(capaId, featureId, props, geometry);
+
+    // Hacer zoom y resaltar el polígono seleccionado
+    if (geometry) {
+      try {
+        mapRef.current?.fitBounds?.(geometry);
+      } catch {
+        // ignore
+      }
+      setTimeout(() => {
+        mapRef.current?.resaltarFeature?.(capaId, featureId, geometry);
+      }, 400);
+    }
+
     const esCapaSindical = /STASE|Sindicales/i.test(
       capasPersonalizadas.find(c => c.id === capaId)?.nombre || ''
     );
@@ -1347,26 +1365,38 @@ export default function MapaTerritorial() {
 
               <div className="space-y-1.5 pl-1">
                 {grupo.map((l) => (
-                  <button
+                  <div
                     key={l.id}
-                    onClick={() => verLiderEnMapa(l)}
-                    className="flex w-full items-start gap-2.5 rounded-lg border border-secondary-100 bg-white p-2 text-left transition-all hover:border-primary-300 hover:bg-primary-50 hover:shadow-sm"
+                    className="flex items-start gap-2.5 rounded-lg border border-secondary-100 bg-white p-2 transition-all hover:border-primary-300 hover:bg-primary-50 hover:shadow-sm"
                   >
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600">
-                      <Icon name="lideres" size={14} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-secondary-900">{l.votante?.nombre || 'Líder'}</p>
-                      <p className="truncate text-[11px] text-secondary-500">
-                        {l.votante?.colonia ? `${l.votante.colonia} • ` : ''}
-                        {l.votante?.seccion_electoral ? `Sección ${l.votante.seccion_electoral}` : 'Sin sección'}
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-secondary-600">
-                        <span className="rounded bg-primary-50 px-1 py-0.5 font-medium text-primary-700">{l.score ?? 0} pts</span>
-                        <span className="rounded bg-secondary-100 px-1 py-0.5">{l.alcance_estimado || 0} alc.</span>
+                    <button
+                      onClick={() => verLiderEnMapa(l)}
+                      className="flex min-w-0 flex-1 items-start gap-2.5 text-left"
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600">
+                        <Icon name="lideres" size={14} />
                       </div>
-                    </div>
-                  </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-secondary-900">{l.votante?.nombre || 'Líder'}</p>
+                        <p className="truncate text-[11px] text-secondary-500">
+                          {l.votante?.colonia ? `${l.votante.colonia} • ` : ''}
+                          {l.votante?.seccion_electoral ? `Sección ${l.votante.seccion_electoral}` : 'Sin sección'}
+                        </p>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-secondary-600">
+                          <span className="rounded bg-primary-50 px-1 py-0.5 font-medium text-primary-700">{l.score ?? 0} pts</span>
+                          <span className="rounded bg-secondary-100 px-1 py-0.5">{l.alcance_estimado || 0} alc.</span>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => abrirModal('lider', l.votante?.coordenadas || null, l)}
+                      className="mt-0.5 rounded-md p-1.5 text-secondary-400 hover:bg-primary-100 hover:text-primary-700"
+                      title="Editar líder"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>

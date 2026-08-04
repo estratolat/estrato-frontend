@@ -93,7 +93,7 @@ interface Props {
   modoDibujo?: boolean;
   filtrosApoyos?: Record<string, boolean>;
   seleccion?: { geometry: any; properties?: any; tipo?: string; nombre?: string } | null;
-  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
+  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => void;
   resultadoDestacado?: ResultadoGlobal | null;
   onBoundsChange?: (bounds: { south: number; west: number; north: number; east: number }) => void;
 }
@@ -674,6 +674,36 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
   const layerRef = useRef<L.Layer | null>(null);
 
   useEffect(() => {
+    const handler = (e: any) => {
+      const liderId = e.detail?.id;
+      if (!liderId || !layerRef.current) return;
+      let encontrado: L.Layer | null = null;
+      (layerRef.current as any).eachLayer?.((layer: any) => {
+        if (String(layer._liderId) === String(liderId)) {
+          encontrado = layer;
+        }
+      });
+      if (encontrado) {
+        try {
+          (encontrado as any).openPopup?.();
+          // Resaltar temporalmente aumentando el radio
+          const originalRadius = (encontrado as any).options?.radius || (encontrado as any).getRadius?.();
+          if ((encontrado as any).setStyle) {
+            (encontrado as any).setStyle({ color: '#D73216', fillColor: '#D73216', weight: 3 });
+            setTimeout(() => {
+              (encontrado as any).setStyle?.({ color: '#fff', fillColor: COLORES_CAPA.lideres, weight: 2 });
+            }, 2500);
+          }
+        } catch (err) {
+          console.warn('[CapaLideres] Error resaltando líder:', err);
+        }
+      }
+    };
+    window.addEventListener('mapa:resaltar-lider', handler);
+    return () => window.removeEventListener('mapa:resaltar-lider', handler);
+  }, []);
+
+  useEffect(() => {
     // Limpiar capa anterior
     if (layerRef.current) {
       try { layerRef.current.removeFrom(map); } catch {}
@@ -720,6 +750,10 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
 
     const colorCapa = COLORES_CAPA.lideres;
 
+    const asignarLiderId = (layer: L.Layer, l: Lider) => {
+      (layer as any)._liderId = l.id;
+    };
+
     if (modo === 'circulos') {
       const featureGroup = L.featureGroup();
       conCoords.forEach((l) => {
@@ -732,6 +766,7 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
           weight: 2,
         });
         circle.bindPopup(popupLider(l, onEditar));
+        asignarLiderId(circle, l);
         featureGroup.addLayer(circle);
       });
       layer = featureGroup;
@@ -754,6 +789,7 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
           }
         );
         marker.bindPopup(popupLider(l, onEditar));
+        asignarLiderId(marker, l);
         featureGroup.addLayer(marker);
       });
       layer = featureGroup;
@@ -1214,7 +1250,7 @@ interface CapaPersonalizadaProps {
   data: any;
   capa: { id: string; nombre: string; color: string; bloqueada?: boolean; orden?: number; estilos?: any };
   capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
-  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>) => void;
+  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => void;
   onSeleccionarCoordenada?: (lat: number, lng: number) => void;
   onAccionPunto?: (tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante', lat: number, lng: number) => void;
   onRender?: () => void;
@@ -1250,7 +1286,7 @@ function resultadosHtml(resultados: any): string {
 }
 
 function crearPopupHtml(props: Record<string, any>, capaId: string, capaNombre: string, geometryType?: string): string {
-  const nombre = escaparHtml(String(props._feature_nombre || props.NOMBRE || props.nombre || props.name || 'Sin nombre'));
+  const nombre = escaparHtml(String(props._feature_nombre || props.NOMBRE_VER || props.NOMBRE || props.nombre || props.name || props.NAME || 'Sin nombre'));
   const zona = props.zona_sindical ? escaparHtml(String(props.zona_sindical)) : null;
   const colorZona = props.color_zona ? String(props.color_zona) : null;
   const tipoEntidad = props.tipo_entidad
@@ -1416,7 +1452,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSele
 
             // Etiqueta permanente para capas de puntos (colonias / localidades)
             if (geometryType === 'Point' || geometryType === 'MultiPoint') {
-              const label = escaparHtml(String(props._feature_nombre || props.nombre || props.NOMBRE || props.name || props.NAME || 'Sin nombre'));
+              const label = escaparHtml(String(props._feature_nombre || props.NOMBRE_VER || props.nombre || props.NOMBRE || props.name || props.NAME || 'Sin nombre'));
               l.bindTooltip(
                 `<div class="mapa-point-label">${label}</div>`,
                 {
@@ -1435,7 +1471,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSele
               l.bringToFront();
               l.setStyle({ weight: 4, opacity: 1, fillOpacity: Math.min(1, baseStyle(feature).fillOpacity + 0.2) });
               l.openPopup();
-              if (onFeatureClickRef.current) onFeatureClickRef.current(capa.id, featureId, props);
+              if (onFeatureClickRef.current) onFeatureClickRef.current(capa.id, featureId, props, feature?.geometry);
             });
 
             l.on('popupclose', () => {
@@ -1455,7 +1491,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSele
               if (btnEditar && onFeatureClickRef.current) {
                 btnEditar.onclick = () => {
                   console.log('[CapaPersonalizada] click Editar', capa.id, featureId);
-                  onFeatureClickRef.current?.(capa.id, featureId, props);
+                  onFeatureClickRef.current?.(capa.id, featureId, props, feature?.geometry);
                 };
               }
 

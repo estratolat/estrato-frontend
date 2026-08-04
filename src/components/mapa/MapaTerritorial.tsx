@@ -615,6 +615,7 @@ export default function MapaTerritorial() {
           return { data: [] };
         }),
       ]);
+      console.log('[MapaTerritorial] lideres cargados', lideresRes.data?.length, 'primeros:', lideresRes.data?.slice(0, 3).map((l: any) => ({ id: l.id, nombre: l.votante?.nombre, coordenadas: l.votante?.coordenadas })));
 
       setStats(statsRes.data?.items || []);
       setLideres(lideresRes.data || []);

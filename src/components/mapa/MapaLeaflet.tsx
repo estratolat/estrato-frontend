@@ -733,11 +733,11 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
     );
 
     if (conCoords.length === 0) {
-      console.log('[CapaLideres] Sin líderes con coordenadas válidas');
+      console.log('[CapaLideres] Sin líderes con coordenadas válidas. Input lideres:', lideres.length);
       return;
     }
 
-    console.log('[CapaLideres] Renderizando', conCoords.length, 'líderes modo', modo);
+    console.log('[CapaLideres] Renderizando', conCoords.length, 'líderes modo', modo, 'input:', lideres.length);
 
     let layer: L.Layer | null = null;
 

@@ -27,6 +27,7 @@ export interface AuthUser {
     nombre_candidato: string;
     cargo_busca?: string | null;
     foto_url?: string | null;
+    pais?: string | null;
   };
   zona_id?: string;
   permisos?: string[];
@@ -85,6 +86,7 @@ export function useAuth() {
                   nombre_candidato: data.tenant.nombre_candidato,
                   cargo_busca: data.tenant.cargo_busca,
                   foto_url: data.tenant.foto_url,
+                  pais: data.tenant.pais || 'mx',
                 }
               : undefined,
             zona_id: data.zona_id || undefined,

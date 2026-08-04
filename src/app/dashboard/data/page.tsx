@@ -29,8 +29,11 @@ import {
   ExternalLink,
   Calendar,
   Search,
+  ShieldAlert,
+  MapPin,
 } from 'lucide-react';
 import { dataApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Indicador {
   id: string;
@@ -59,6 +62,37 @@ interface ResumenData {
 
 const COLORS = ['#D73216', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1'];
 
+interface ConfigPais {
+  titulo: string;
+  subtitulo: string;
+  tituloTab: string;
+  fuenteNombre: string;
+  fuenteUrl: string;
+  fuenteCreditos: string;
+  errorCarga: string;
+}
+
+const CONFIG_POR_PAIS: Record<string, ConfigPais> = {
+  mx: {
+    titulo: 'Data México',
+    subtitulo: 'Indicadores oficiales de Dolores Hidalgo, Guanajuato',
+    tituloTab: 'Data México — Dolores Hidalgo Cuna de la Independencia Nacional',
+    fuenteNombre: 'Data México',
+    fuenteUrl: 'https://www.economia.gob.mx/datamexico/es/profile/geo/dolores-hidalgo-cuna-de-la-independencia-nacional?redirect=true',
+    fuenteCreditos: 'Datos curados de INEGI, CONEVAL y Secretaría de Bienestar.',
+    errorCarga: 'Error al cargar los indicadores de Data México',
+  },
+  co: {
+    titulo: 'Data Colombia',
+    subtitulo: 'Indicadores oficiales de Capitanejo, Santander',
+    tituloTab: 'Data Colombia — Capitanejo, Santander',
+    fuenteNombre: 'DANE',
+    fuenteUrl: 'https://www.dane.gov.co/',
+    fuenteCreditos: 'Datos oficiales del Departamento Administrativo Nacional de Estadística (DANE).',
+    errorCarga: 'Error al cargar los indicadores de Data Colombia',
+  },
+};
+
 const CATEGORIA_LABELS: Record<string, string> = {
   poblacion: 'Población',
   vivienda: 'Vivienda',
@@ -66,6 +100,8 @@ const CATEGORIA_LABELS: Record<string, string> = {
   empleo: 'Empleo',
   economia: 'Economía',
   pobreza: 'Pobreza',
+  seguridad: 'Seguridad',
+  territorio: 'Territorio',
   'participacion politica': 'Participación política',
 };
 
@@ -76,6 +112,8 @@ const CATEGORIA_COLORS: Record<string, string> = {
   empleo: '#06B6D4',
   economia: '#8B5CF6',
   pobreza: '#D73216',
+  seguridad: '#DC2626',
+  territorio: '#059669',
   'participacion politica': '#EC4899',
 };
 
@@ -86,6 +124,8 @@ const CATEGORIA_ICONS: Record<string, React.ElementType> = {
   empleo: Briefcase,
   economia: TrendingUp,
   pobreza: AlertTriangle,
+  seguridad: ShieldAlert,
+  territorio: MapPin,
   'participacion politica': Vote,
 };
 
@@ -115,6 +155,11 @@ function maximoGrupo(indicadores: Indicador[], nombreIndicador: string): number 
 }
 
 export default function DataPage() {
+  const { user } = useAuth();
+  const pais = user?.tenant?.pais || 'mx';
+  const esColombia = pais === 'co';
+  const configPais = CONFIG_POR_PAIS[pais] || CONFIG_POR_PAIS['mx'];
+
   const [indicadores, setIndicadores] = useState<Indicador[]>([]);
   const [resumen, setResumen] = useState<ResumenData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,7 +184,7 @@ export default function DataPage() {
         setIndicadores(all || []);
         setResumen(res || null);
       } catch (err: any) {
-        setError(err.response?.data?.message || 'Error al cargar los indicadores de Data México');
+        setError(err.response?.data?.message || configPais.errorCarga);
       } finally {
         setLoading(false);
       }
@@ -208,7 +253,9 @@ export default function DataPage() {
   }, [indicadores]);
 
   const dataEconomia = useMemo(() => {
-    const sectores = ['comercio al por menor', 'otros servicios', 'alojamiento y alimentos', 'industria manufacturera'];
+    const sectores = esColombia
+      ? ['agricultura', 'ganadería', 'comercio', 'servicios']
+      : ['comercio al por menor', 'otros servicios', 'alojamiento y alimentos', 'industria manufacturera'];
     return sectores
       .map((s) => ({
         nombre: s
@@ -218,7 +265,7 @@ export default function DataPage() {
         valor: tarjeta('economia', 'Establecimientos por sector', s),
       }))
       .filter((d) => d.valor !== null) as { nombre: string; valor: number }[];
-  }, [indicadores]);
+  }, [indicadores, esColombia]);
 
   const dataPobreza = useMemo(() => {
     const items = indicadores.filter(
@@ -263,8 +310,8 @@ export default function DataPage() {
       {/* Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-secondary-900 to-secondary-800 p-6 text-white shadow-lg md:p-8">
         <div className="relative z-10">
-          <h2 className="text-3xl font-bold">Data México</h2>
-          <p className="mt-1 text-white/80">Indicadores oficiales de Dolores Hidalgo, Guanajuato</p>
+          <h2 className="text-3xl font-bold">{configPais.titulo}</h2>
+          <p className="mt-1 text-white/80">{configPais.subtitulo}</p>
         </div>
         <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
         <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-white/5" />
@@ -593,14 +640,14 @@ export default function DataPage() {
       <p className="text-xs text-secondary-500">
         Fuente:{' '}
         <a
-          href="https://www.economia.gob.mx/datamexico/es/profile/geo/dolores-hidalgo-cuna-de-la-independencia-nacional?redirect=true"
+          href={configPais.fuenteUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary-600 hover:underline"
         >
-          Data México — Dolores Hidalgo Cuna de la Independencia Nacional
+          {configPais.tituloTab}
         </a>
-        . Datos curados de INEGI, CONEVAL y Secretaría de Bienestar.
+        . {configPais.fuenteCreditos}
       </p>
     </div>
   );

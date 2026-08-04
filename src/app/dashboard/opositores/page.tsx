@@ -207,15 +207,15 @@ export default function OpositoresPage() {
   };
 
   const retador = useMemo(
-    () => opositores.find((o) => o.nivel_rivalidad === 1) || opositores[0],
+    () => opositores.find((o) => o.nivel_rivalidad === 1),
     [opositores]
   );
   const segundo = useMemo(
-    () => opositores.find((o) => o.nivel_rivalidad === 2) || opositores[1],
+    () => opositores.find((o) => o.nivel_rivalidad === 2),
     [opositores]
   );
   const tercero = useMemo(
-    () => opositores.find((o) => o.nivel_rivalidad === 3) || opositores[2],
+    () => opositores.find((o) => o.nivel_rivalidad === 3),
     [opositores]
   );
 
@@ -401,30 +401,9 @@ export default function OpositoresPage() {
       {/* Feeds de Facebook: solo los 3 primeros lugares */}
       {(retador || segundo || tercero) && (
         <div className="grid gap-6 lg:grid-cols-3">
-          {retador && (
-            <FeedBox
-              opositor={retador}
-              feed={feed1}
-              etiqueta="Retador principal"
-              colorClase="bg-red-100 text-red-700"
-            />
-          )}
-          {segundo && (
-            <FeedBox
-              opositor={segundo}
-              feed={feed2}
-              etiqueta="Segundo lugar"
-              colorClase="bg-orange-100 text-orange-700"
-            />
-          )}
-          {tercero && (
-            <FeedBox
-              opositor={tercero}
-              feed={feed3}
-              etiqueta="Tercer lugar"
-              colorClase="bg-amber-100 text-amber-700"
-            />
-          )}
+          {retador && <FeedBox opositor={retador} feed={feed1} />}
+          {segundo && <FeedBox opositor={segundo} feed={feed2} />}
+          {tercero && <FeedBox opositor={tercero} feed={feed3} />}
         </div>
       )}
 
@@ -432,13 +411,13 @@ export default function OpositoresPage() {
       {(retador?.descripcion || retador?.ficha_negativa || segundo?.descripcion || segundo?.ficha_negativa || tercero?.descripcion || tercero?.ficha_negativa) && (
         <div className="grid gap-6 lg:grid-cols-3">
           {retador && (retador.descripcion || retador.ficha_negativa) && (
-            <FichaOpositor opositor={retador} etiqueta="Retador principal" colorClase="bg-red-100 text-red-700" />
+            <FichaOpositor opositor={retador} />
           )}
           {segundo && (segundo.descripcion || segundo.ficha_negativa) && (
-            <FichaOpositor opositor={segundo} etiqueta="Segundo lugar" colorClase="bg-orange-100 text-orange-700" />
+            <FichaOpositor opositor={segundo} />
           )}
           {tercero && (tercero.descripcion || tercero.ficha_negativa) && (
-            <FichaOpositor opositor={tercero} etiqueta="Tercer lugar" colorClase="bg-amber-100 text-amber-700" />
+            <FichaOpositor opositor={tercero} />
           )}
         </div>
       )}
@@ -619,19 +598,16 @@ export default function OpositoresPage() {
 function FeedBox({
   opositor,
   feed,
-  etiqueta,
-  colorClase,
 }: {
   opositor: Opositor;
   feed: string | null;
-  etiqueta: string;
-  colorClase: string;
 }) {
+  const nivel = NIVELES[opositor.nivel_rivalidad] || NIVELES[1];
   return (
     <div className="rounded-xl border border-secondary-200 bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-bold text-secondary-900">Feed de {opositor.nombre}</h3>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorClase}`}>{etiqueta}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${nivel.badge}`}>{nivel.label}</span>
       </div>
       {feed ? (
         <iframe
@@ -658,18 +634,15 @@ function FeedBox({
 
 function FichaOpositor({
   opositor,
-  etiqueta,
-  colorClase,
 }: {
   opositor: Opositor;
-  etiqueta: string;
-  colorClase: string;
 }) {
+  const nivel = NIVELES[opositor.nivel_rivalidad] || NIVELES[1];
   return (
     <div className="rounded-xl border border-secondary-200 bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-bold text-secondary-900">{opositor.nombre}</h3>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorClase}`}>{etiqueta}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${nivel.badge}`}>{nivel.label}</span>
       </div>
 
       {opositor.descripcion && (

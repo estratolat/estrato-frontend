@@ -12,6 +12,7 @@ interface Project {
   id: string;
   slug: string;
   dominio_personalizado?: string;
+  pais?: string;
   nombre_candidato: string;
   cargo_busca?: string;
   slogan?: string;
@@ -40,6 +41,7 @@ export default function AdminProjectsPage() {
     nombre_candidato: '',
     cargo_busca: '',
     slogan: '',
+    pais: 'mx',
     owner_email: '',
     owner_nombre: '',
     owner_password: '',
@@ -58,6 +60,7 @@ export default function AdminProjectsPage() {
     slogan: '',
     dominio_personalizado: '',
     foto_url: '',
+    pais: 'mx',
     plan: 'basico',
     activo: true,
   });
@@ -115,6 +118,7 @@ export default function AdminProjectsPage() {
         nombre_candidato: '',
         cargo_busca: '',
         slogan: '',
+        pais: 'mx',
         owner_email: '',
         owner_nombre: '',
         owner_password: '',
@@ -145,6 +149,7 @@ export default function AdminProjectsPage() {
       slogan: project.slogan || '',
       dominio_personalizado: project.dominio_personalizado || '',
       foto_url: project.foto_url || '',
+      pais: project.pais || 'mx',
       plan: project.plan || 'basico',
       activo: project.activo ?? true,
     });
@@ -294,6 +299,7 @@ export default function AdminProjectsPage() {
         slogan: editForm.slogan,
         dominio_personalizado: editForm.dominio_personalizado,
         foto_url: editForm.foto_url,
+        pais: editForm.pais,
         plan: editForm.plan,
         activo: editForm.activo,
       });
@@ -465,6 +471,9 @@ export default function AdminProjectsPage() {
                 >
                   {p.activo ? 'Activo' : 'Inactivo'}
                 </span>
+                <span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
+                  {p.pais === 'co' ? 'Colombia' : 'México'}
+                </span>
               </div>
 
               <div className="mt-auto grid grid-cols-3 gap-2 border-t border-secondary-100 pt-3 text-center text-xs">
@@ -559,6 +568,18 @@ export default function AdminProjectsPage() {
                     className="input w-full"
                     placeholder="Ej. Juntos por León"
                   />
+                </div>
+
+                <div>
+                  <label className="label">País</label>
+                  <select
+                    value={form.pais}
+                    onChange={(e) => setForm((f) => ({ ...f, pais: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="mx">México</option>
+                    <option value="co">Colombia</option>
+                  </select>
                 </div>
 
                 <div className="md:col-span-2 border-t border-secondary-100 pt-4">
@@ -708,6 +729,18 @@ export default function AdminProjectsPage() {
                     className="input w-full"
                     placeholder="Ej. Juntos por León"
                   />
+                </div>
+
+                <div>
+                  <label className="label">País</label>
+                  <select
+                    value={editForm.pais}
+                    onChange={(e) => setEditForm((f) => ({ ...f, pais: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="mx">México</option>
+                    <option value="co">Colombia</option>
+                  </select>
                 </div>
 
                 <div>

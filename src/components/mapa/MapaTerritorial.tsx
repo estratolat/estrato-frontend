@@ -369,6 +369,10 @@ export default function MapaTerritorial() {
 
     // Reintentar centrar y resaltar: la capa puede tardar en renderizarse tras activarse.
     const intentarResaltar = (intentos = 0) => {
+      console.log('[MapaTerritorial] intentarResaltar explorador', { intentos, capaId: el.capaId, featureId, hasGeometry: !!el.feature?.geometry });
+      if (el.feature?.geometry && mapRef.current?.fitBounds) {
+        try { mapRef.current.fitBounds(el.feature.geometry); } catch {}
+      }
       mapRef.current?.resaltarFeature?.(el.capaId, featureId, el.feature?.geometry);
       if (intentos < 5) {
         setTimeout(() => intentarResaltar(intentos + 1), 350);
@@ -412,11 +416,22 @@ export default function MapaTerritorial() {
   }, []);
 
   const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => {
+    console.log('[MapaTerritorial] handleFeatureClick', { capaId, featureId, hasGeometry: !!geometry, geometryType: geometry?.type, mapRef: !!mapRef.current });
     abrirFichaDesdeFeature(capaId, featureId, props, geometry);
 
     // Centrar y resaltar el polígono/elemento seleccionado.
-    // Se delega a resaltarFeature del mapa para unificar zoom + resaltado.
+    // Primero un fitBounds directo como fallback inmediato, luego resaltarFeature intenta
+    // encontrar el layer real para un highlight preciso.
     setTimeout(() => {
+      if (geometry && mapRef.current?.fitBounds) {
+        try {
+          console.log('[MapaTerritorial] fitBounds directo desde handleFeatureClick');
+          mapRef.current.fitBounds(geometry);
+        } catch (e) {
+          console.warn('[MapaTerritorial] fitBounds directo falló:', e);
+        }
+      }
+      console.log('[MapaTerritorial] llamando resaltarFeature', { capaId, featureId, hasGeometry: !!geometry });
       mapRef.current?.resaltarFeature?.(capaId, featureId, geometry);
     }, 150);
 

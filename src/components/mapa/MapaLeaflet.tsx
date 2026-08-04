@@ -216,11 +216,14 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
     if (!geometryFallback) return;
     try {
       const geoInput = geometryFallback.geometry || geometryFallback;
+      console.log('[MapaBridge] fitGeometryFallback input', { geoInputType: geoInput?.type, hasCoordinates: Array.isArray(geoInput?.coordinates) });
       const fallback = L.geoJSON(geoInput);
       const fb = fallback.getBounds();
       fallback.remove();
+      console.log('[MapaBridge] fitGeometryFallback bounds', { isValid: fb?.isValid?.() });
       if (fb?.isValid?.()) {
         registerProgrammaticMove(1200);
+        console.log('[MapaBridge] fitGeometryFallback haciendo fitBounds');
         map.fitBounds(fb, { padding: [60, 60], maxZoom: 16, animate: true });
       }
     } catch (e) {
@@ -229,8 +232,10 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
   }, [map]);
 
   const resaltarFeature = useCallback((capaId: string, featureId: string, geometryFallback?: any) => {
+    console.log('[MapaBridge] resaltarFeature invocado', { capaId, featureId, hasFallback: !!geometryFallback, fallbackType: geometryFallback?.type || geometryFallback?.geometry?.type });
     try {
       const geoLayer = capasGeoJSONRef?.current?.get(capaId);
+      console.log('[MapaBridge] geoLayer lookup', { capaId, found: !!geoLayer, keys: geoLayer ? Array.from(capasGeoJSONRef!.current!.keys()) : [] });
       if (!geoLayer) {
         console.warn('[MapaBridge] resaltarFeature: capa no encontrada', capaId, '— se reintentará');
         pendingHighlight = { capaId, featureId, intentos: 1 };
@@ -239,9 +244,12 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
       }
 
       const layers = geoLayer.getLayers() as L.Layer[];
+      console.log('[MapaBridge] resaltarFeature: capa tiene', layers.length, 'layers');
       const target = layers.find((l: any) => {
         const p = l.feature?.properties || {};
-        return String(p._feature_id) === String(featureId);
+        const match = String(p._feature_id) === String(featureId);
+        if (!match) console.log('[MapaBridge] comparando', { layerFeatureId: p._feature_id, requestedFeatureId: featureId });
+        return match;
       }) as L.Layer | undefined;
 
       if (!target) {
@@ -254,21 +262,19 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
       pendingHighlight = null;
 
       const bounds = (target as any).getBounds ? (target as any).getBounds() : null;
+      console.log('[MapaBridge] resaltarFeature: bounds del target', { isValid: bounds?.isValid?.() });
       if (bounds?.isValid?.()) {
         // Ajustar el mapa para que el polígono ocupe toda la vista
         registerProgrammaticMove(1200);
+        console.log('[MapaBridge] haciendo fitBounds al target');
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
       } else if (geometryFallback) {
-        const fallback = L.geoJSON(geometryFallback);
-        const fb = fallback.getBounds();
-        fallback.remove();
-        if (fb?.isValid?.()) {
-          registerProgrammaticMove(1200);
-          map.fitBounds(fb, { padding: [60, 60], maxZoom: 16, animate: true });
-        }
+        console.log('[MapaBridge] usando geometryFallback para fitBounds');
+        fitGeometryFallback(geometryFallback);
       } else if ((target as any).getLatLng) {
         const ll = (target as any).getLatLng();
         registerProgrammaticMove(1200);
+        console.log('[MapaBridge] flyTo al latlng del target', ll);
         map.flyTo(ll, 16, { duration: 1.2 });
       }
 
@@ -283,6 +289,7 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
         console.warn('[MapaBridge] resaltarFeature: no hay geometría para resaltar', featureId);
         return;
       }
+      console.log('[MapaBridge] dibujando highlight');
       const highlight = L.geoJSON(featureGeo, {
         style: {
           fillColor: '#D73216',
@@ -1472,6 +1479,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSele
             }
 
             l.on('click', (e: any) => {
+              console.log('[CapaPersonalizada] click en feature', { capaId: capa.id, featureId, geometryType: feature?.geometry?.type });
               L.DomEvent.stopPropagation(e);
               l.bringToFront();
               l.setStyle({ weight: 4, opacity: 1, fillOpacity: Math.min(1, baseStyle(feature).fillOpacity + 0.2) });

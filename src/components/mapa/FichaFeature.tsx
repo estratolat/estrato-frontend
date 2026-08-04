@@ -58,6 +58,10 @@ interface DatosOficiales {
 
 const POS_INICIAL = { x: 16, y: 80 };
 
+function esUuid(valor: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(valor);
+}
+
 export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEditar }: Props) {
   const [cruce, setCruce] = useState<CruceResumen | null>(null);
   const [datosOficiales, setDatosOficiales] = useState<DatosOficiales | null>(null);
@@ -105,23 +109,30 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
       return;
     }
     const featureId = elemento.featureId || elemento.id.split('-').slice(1).join('-') || elemento.id;
+    const capaEsUuid = esUuid(elemento.capaId);
     const cargar = async () => {
       try {
         setCargandoCruce(true);
         setCargandoHistorico(true);
         setErrorCruce(null);
-        const { data } = await mapaApi.cruceFeature(elemento.capaId, featureId);
-        console.log('[FichaFeature] cruceFeature response:', {
-          capaId: elemento.capaId,
-          featureId,
-          seccion: data?.seccion,
-          datos_oficiales: data?.datos_oficiales,
-          numeralia: data?.numeralia,
-          historico_length: data?.historico?.length,
-        });
-        setCruce(data.resumen || null);
-        setDatosOficiales(data.datos_oficiales || null);
-        setNumeralia(data.numeralia || null);
+
+        let data: any = null;
+        if (capaEsUuid) {
+          const res = await mapaApi.cruceFeature(elemento.capaId, featureId);
+          data = res.data;
+          console.log('[FichaFeature] cruceFeature response:', {
+            capaId: elemento.capaId,
+            featureId,
+            seccion: data?.seccion,
+            datos_oficiales: data?.datos_oficiales,
+            numeralia: data?.numeralia,
+            historico_length: data?.historico?.length,
+          });
+        }
+
+        setCruce(data?.resumen || null);
+        setDatosOficiales(data?.datos_oficiales || null);
+        setNumeralia(data?.numeralia || null);
 
         const seccionBusqueda = elemento?.feature?.properties?.seccion || elemento?.feature?.properties?.SECCION || data?.seccion || null;
         if (data?.historico?.length) {
@@ -426,6 +437,8 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                 );
               })}
             </div>
+          ) : !esUuid(elemento.capaId) ? (
+            <p className="text-xs text-secondary-500">No disponible para este tipo de elemento.</p>
           ) : null}
         </div>
 

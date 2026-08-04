@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, memo } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -1379,7 +1379,7 @@ function obtenerCoordenadasFeature(feature: any, layer: any): { lat: number; lng
   return null;
 }
 
-function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSeleccionarCoordenada, onAccionPunto, onRender }: CapaPersonalizadaProps) {
+const CapaPersonalizada = memo(function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSeleccionarCoordenada, onAccionPunto, onRender }: CapaPersonalizadaProps) {
   const map = useMap();
   const capaRef = useRef<L.GeoJSON | null>(null);
   const onFeatureClickRef = useRef(onFeatureClick);
@@ -1480,7 +1480,7 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSele
 
             l.on('click', (e: any) => {
               console.log('[CapaPersonalizada] click en feature', { capaId: capa.id, featureId, geometryType: feature?.geometry?.type });
-              L.DomEvent.stopPropagation(e);
+              if (e?.originalEvent?.stopPropagation) e.originalEvent.stopPropagation();
               l.bringToFront();
               l.setStyle({ weight: 4, opacity: 1, fillOpacity: Math.min(1, baseStyle(feature).fillOpacity + 0.2) });
               l.openPopup();
@@ -1577,7 +1577,26 @@ function CapaPersonalizada({ data, capa, capasGeoJSONRef, onFeatureClick, onSele
   }, [data, capa.id, capa.color, capa.nombre, capa.bloqueada, capa.orden, map, capasGeoJSONRef, onRender]);
 
   return null;
-}
+}, (prev, next) => {
+  // Evitar remontar la capa si los datos son estructuralmente iguales.
+  const equalFeatures = (a: any, b: any) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    const fa = a.features;
+    const fb = b.features;
+    if (!Array.isArray(fa) || !Array.isArray(fb)) return false;
+    if (fa.length !== fb.length) return false;
+    return fa.every((f: any, i: number) => String(f?.properties?._feature_id) === String(fb[i]?.properties?._feature_id));
+  };
+  return (
+    prev.capa.id === next.capa.id &&
+    prev.capa.color === next.capa.color &&
+    prev.capa.nombre === next.capa.nombre &&
+    prev.capa.bloqueada === next.capa.bloqueada &&
+    prev.capa.orden === next.capa.orden &&
+    equalFeatures(prev.data, next.data)
+  );
+});
 
 function CentradorCapas({
   data,

@@ -21,6 +21,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
     telefono: '',
     seccion_electoral: '',
     colonia: '',
+    direccion: '',
     lider_padre_id: '',
     alcance_estimado: '100',
     lat: '',
@@ -43,6 +44,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         telefono: liderEditando.votante?.telefono || '',
         seccion_electoral: liderEditando.votante?.seccion_electoral || '',
         colonia: liderEditando.votante?.colonia || '',
+        direccion: (liderEditando.votante as any)?.direccion || '',
         lider_padre_id: liderEditando.lider_padre_id || '',
         alcance_estimado: String(liderEditando.alcance_estimado || 100),
         lat: c && typeof c.lat === 'number' ? c.lat.toFixed(6) : '',
@@ -55,6 +57,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         telefono: '',
         seccion_electoral: '',
         colonia: '',
+        direccion: '',
         lider_padre_id: '',
         alcance_estimado: '100',
         lat: coordenadasIniciales.lat.toFixed(6),
@@ -67,6 +70,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         telefono: '',
         seccion_electoral: '',
         colonia: '',
+        direccion: '',
         lider_padre_id: '',
         alcance_estimado: '100',
         lat: '',
@@ -88,6 +92,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
       telefono: '',
       seccion_electoral: '',
       colonia: '',
+      direccion: '',
       lider_padre_id: '',
       alcance_estimado: '100',
       lat: (!liderEditando && coordenadasIniciales?.lat.toFixed(6)) || '',
@@ -128,6 +133,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
         telefono: form.telefono,
         seccion_electoral: form.seccion_electoral,
         colonia: form.colonia,
+        direccion: form.direccion,
         es_lider: true,
         activo: true,
       };
@@ -307,6 +313,17 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
             <p className="text-xs text-secondary-500">
               Sin coordenadas el líder se guarda pero no aparece en el mapa. Se toman del punto donde hiciste clic; también puedes usar "Usar mi ubicación" o escribirlas.
             </p>
+
+            <div>
+              <label className="label">Dirección real</label>
+              <input
+                type="text"
+                value={form.direccion}
+                onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+                className="input"
+                placeholder="Ej. Calle 10 #3-45, Capitanejo"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

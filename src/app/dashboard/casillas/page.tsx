@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { casillasApi } from '@/lib/api';
 import { Casilla } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
 import { MapPin, Plus, Trash2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 
 const statusLabels: Record<string, string> = {
@@ -28,6 +29,7 @@ const statusIcons: Record<string, any> = {
 };
 
 export default function CasillasPage() {
+  const { user, loading: authLoading } = useAuth();
   const [casillas, setCasillas] = useState<Casilla[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +37,10 @@ export default function CasillasPage() {
   const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
+    if (authLoading || !user) return;
     loadCasillas();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
 
   const loadCasillas = async () => {
     try {

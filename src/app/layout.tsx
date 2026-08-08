@@ -33,6 +33,40 @@ export const metadata: Metadata = {
   title: 'ESTRATO - Cuartel Digital para Campañas Políticas',
   description:
     'Mapa territorial, histórico electoral, CRM, app de brigada y control de campaña en una sola plataforma para México.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+      { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: '/favicon.ico',
+  },
+  metadataBase: new URL('https://estrato.lat'),
+  openGraph: {
+    type: 'website',
+    locale: 'es_MX',
+    url: 'https://estrato.lat',
+    siteName: 'ESTRATO',
+    title: 'ESTRATO - Cuartel Digital para Campañas Políticas',
+    description:
+      'Mapa territorial, histórico electoral, CRM, app de brigada y control de campaña en una sola plataforma para México.',
+    images: [
+      {
+        url: 'https://estrato.lat/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'ESTRATO - Cuartel Digital para Campañas Políticas',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ESTRATO - Cuartel Digital para Campañas Políticas',
+    description:
+      'Mapa territorial, histórico electoral, CRM, app de brigada y control de campaña en una sola plataforma para México.',
+    images: ['https://estrato.lat/og-image.png'],
+  },
 };
 
 export default function RootLayout({

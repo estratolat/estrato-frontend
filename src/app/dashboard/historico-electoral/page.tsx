@@ -499,13 +499,22 @@ function HistoricoElectoralPageInner() {
 
   const agrupadosFiltrados = useMemo(() => {
     if (!resumen?.agrupados) return [];
-    return resumen.agrupados.filter((g) => {
+    const filtrados = resumen.agrupados.filter((g) => {
       if (filtros.tipo_historico && g.tipo_historico !== filtros.tipo_historico)
         return false;
       if (filtros.tipo_eleccion && g.tipo_eleccion !== filtros.tipo_eleccion)
         return false;
       if (filtros.anio && String(g.anio) !== filtros.anio) return false;
       return true;
+    });
+    return filtrados.sort((a, b) => {
+      // Principales primero, luego complementarios
+      if (a.tipo_historico === "principal" && b.tipo_historico !== "principal")
+        return -1;
+      if (a.tipo_historico !== "principal" && b.tipo_historico === "principal")
+        return 1;
+      // Dentro del mismo tipo: año descendente
+      return (b.anio || 0) - (a.anio || 0);
     });
   }, [resumen, filtros]);
 
@@ -2791,11 +2800,37 @@ function HistoricoElectoralPageInner() {
 
         {/* Grilla de tarjetas */}
         <div className="card p-4">
-          <div className="mb-4 flex items-center gap-2">
-            <Table2 size={20} className="text-primary-600" />
-            <h3 className="text-lg font-bold text-secondary-900">
-              Históricos cargados
-            </h3>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Table2 size={20} className="text-primary-600" />
+              <h3 className="text-lg font-bold text-secondary-900">
+                Históricos cargados
+              </h3>
+            </div>
+
+            <div className="flex rounded-lg border border-secondary-200 bg-white p-1">
+              {[
+                { key: '', label: 'Ambos' },
+                { key: 'principal', label: 'Principales' },
+                { key: 'complementario', label: 'Complementarios' },
+              ].map((opt) => {
+                const activo = filtros.tipo_historico === opt.key;
+                return (
+                  <button
+                    key={opt.key || 'todos'}
+                    type="button"
+                    onClick={() => setFiltros({ ...filtros, tipo_historico: opt.key })}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                      activo
+                        ? 'bg-primary-600 text-white shadow-sm'
+                        : 'text-secondary-600 hover:bg-secondary-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {agrupadosFiltrados.length === 0 ? (
@@ -3137,7 +3172,9 @@ function HistoricoElectoralPageInner() {
                                           className="inline-block h-2.5 w-2.5 rounded-full"
                                           style={{ backgroundColor: color }}
                                         />
-                                        {actor.partido}
+                                        {actor.candidato
+                                          ? `${actor.candidato} (${actor.partido})`
+                                          : actor.partido}
                                         {actor.partido ===
                                           g.partido_principal && (
                                           <span className="rounded bg-primary-100 px-1 py-0 text-[9px] text-primary-700">
@@ -4524,20 +4561,32 @@ function HistoricoElectoralPageInner() {
       <div className="space-y-6">
         {/* Filtros */}
         <div className="card p-4">
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-4 items-end">
             <div>
-              <label className="label">Tipo histórico</label>
-              <select
-                value={filtros.tipo_historico}
-                onChange={(e) =>
-                  setFiltros({ ...filtros, tipo_historico: e.target.value })
-                }
-                className="input"
-              >
-                <option value="">Todos</option>
-                <option value="principal">Principal</option>
-                <option value="complementario">Complementario</option>
-              </select>
+              <label className="label mb-1.5 block">Tipo histórico</label>
+              <div className="flex rounded-lg border border-secondary-200 bg-white p-1">
+                {[
+                  { key: '', label: 'Ambos' },
+                  { key: 'principal', label: 'Principales' },
+                  { key: 'complementario', label: 'Complementarios' },
+                ].map((opt) => {
+                  const activo = filtros.tipo_historico === opt.key;
+                  return (
+                    <button
+                      key={opt.key || 'todos'}
+                      type="button"
+                      onClick={() => setFiltros({ ...filtros, tipo_historico: opt.key })}
+                      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                        activo
+                          ? 'bg-primary-600 text-white shadow-sm'
+                          : 'text-secondary-600 hover:bg-secondary-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <label className="label">Tipo elección</label>

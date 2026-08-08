@@ -364,8 +364,11 @@ export const inteligenciaElectoralApi = {
       estado_id?: number;
       municipio_id?: number;
     };
+    rival?: { nombre?: string; partido?: string; votos_historicos?: number };
   }) => api.post('/inteligencia-electoral/consultar-ia', data),
   getHistoricosDisponibles: () => api.get('/inteligencia-electoral/historicos-disponibles'),
+  getHistoricoResumen: (params?: { anio?: number; tipo_historico?: string; tipo_eleccion?: string; estado_id?: number; municipio_id?: number }) =>
+    api.get('/inteligencia-electoral/historico-resumen', { params }),
 };
 
 // === API de Fichas Seccionales ===

@@ -26,6 +26,8 @@ import {
   Filter,
   Database,
   MapPin,
+  Target,
+  Check,
 } from 'lucide-react';
 
 interface Partido {
@@ -139,7 +141,18 @@ export default function InteligenciaElectoralPage() {
     municipio_id?: number;
   }>({});
   const [filtroTerritorialIA, setFiltroTerritorialIA] = useState<{ tipo: 'todos' | 'zona' | 'seccion' | 'municipio'; valor: string }>({ tipo: 'todos', valor: '' });
+  const [rival, setRival] = useState<{ nombre?: string; partido?: string; votos_historicos?: number }>({});
+  const [rivalesDisponibles, setRivalesDisponibles] = useState<Array<{ partido: string; votos: number; candidato?: string }>>([]);
   const [zonasDisponibles, setZonasDisponibles] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [guardadoLocal, setGuardadoLocal] = useState(false);
+  const [historialIA, setHistorialIA] = useState<Array<{
+    id: string;
+    fecha: string;
+    pregunta: string;
+    respuesta: string;
+    contexto_resumen?: Record<string, any>;
+  }>>([]);
+  const [historialExpandidoId, setHistorialExpandidoId] = useState<string | null>(null);
 
   // Formularios
   const [partidoForm, setPartidoForm] = useState<Partial<Partido>>({});
@@ -216,6 +229,98 @@ export default function InteligenciaElectoralPage() {
       // No crítico: módulo histórico puede no estar cargado
     }
   };
+
+  const cargarRivalesDesdeHistorico = async (sel?: typeof historicoSeleccion) => {
+    if (!sel || !sel.anio) {
+      setRivalesDisponibles([]);
+      return;
+    }
+    try {
+      const { data } = await inteligenciaElectoralApi.getHistoricoResumen(sel);
+      const resumen = Array.isArray(data) ? data[0] : data;
+      const partidos = (resumen?.partidos || [])
+        .sort((a: any, b: any) => b.votos - a.votos)
+        .slice(0, 8);
+      setRivalesDisponibles(partidos);
+    } catch (err) {
+      setRivalesDisponibles([]);
+    }
+  };
+
+  const claveContextoIA = (id: string) => `estrato:consultor-ia:${id}`;
+  const claveHistorialIA = (id: string) => `estrato:consultor-ia-historial:${id}`;
+
+  const guardarContextoLocal = (id: string) => {
+    const payload = {
+      contextoCampana,
+      fuentesIA,
+      actorPrincipalId,
+      historicoSeleccion,
+      filtroTerritorialIA,
+      rival,
+    };
+    localStorage.setItem(claveContextoIA(id), JSON.stringify(payload));
+    setGuardadoLocal(true);
+    setTimeout(() => setGuardadoLocal(false), 1500);
+  };
+
+  const cargarContextoLocal = (id: string) => {
+    try {
+      const raw = localStorage.getItem(claveContextoIA(id));
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved.contextoCampana) setContextoCampana(saved.contextoCampana);
+      if (saved.fuentesIA) setFuentesIA(saved.fuentesIA);
+      if (saved.actorPrincipalId) setActorPrincipalId(saved.actorPrincipalId);
+      if (saved.historicoSeleccion) setHistoricoSeleccion(saved.historicoSeleccion);
+      if (saved.filtroTerritorialIA) setFiltroTerritorialIA(saved.filtroTerritorialIA);
+      if (saved.rival) setRival(saved.rival);
+    } catch (err) {
+      // Ignorar corruptos
+    }
+  };
+
+  const cargarHistorialLocal = (id: string) => {
+    try {
+      const raw = localStorage.getItem(claveHistorialIA(id));
+      if (raw) setHistorialIA(JSON.parse(raw));
+    } catch (err) {
+      setHistorialIA([]);
+    }
+  };
+
+  const agregarAlHistorial = (id: string, item: { pregunta: string; respuesta: string; contexto_resumen?: Record<string, any> }) => {
+    const nuevo = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fecha: new Date().toISOString(),
+      ...item,
+    };
+    const actualizado = [nuevo, ...historialIA];
+    setHistorialIA(actualizado);
+    localStorage.setItem(claveHistorialIA(id), JSON.stringify(actualizado.slice(0, 50)));
+  };
+
+  const eliminarDelHistorial = (id: string, itemId: string) => {
+    const actualizado = historialIA.filter((h) => h.id !== itemId);
+    setHistorialIA(actualizado);
+    localStorage.setItem(claveHistorialIA(id), JSON.stringify(actualizado));
+  };
+
+  useEffect(() => {
+    if (!eleccionId) return;
+    cargarContextoLocal(eleccionId);
+    cargarHistorialLocal(eleccionId);
+  }, [eleccionId]);
+
+  useEffect(() => {
+    if (!eleccionId) return;
+    const timer = setTimeout(() => guardarContextoLocal(eleccionId), 800);
+    return () => clearTimeout(timer);
+  }, [contextoCampana, fuentesIA, actorPrincipalId, historicoSeleccion, filtroTerritorialIA, rival, eleccionId]);
+
+  useEffect(() => {
+    cargarRivalesDesdeHistorico(historicoSeleccion);
+  }, [historicoSeleccion.anio, historicoSeleccion.tipo_historico, historicoSeleccion.tipo_eleccion, historicoSeleccion.estado_id, historicoSeleccion.municipio_id]);
 
   const cargarEleccion = async (id: string) => {
     try {
@@ -1001,9 +1106,19 @@ export default function InteligenciaElectoralPage() {
       {activeTab === 'consultor' && (
         <div className="space-y-6">
           <div className="card p-6">
-            <div className="mb-4 flex items-center gap-2">
-              <Sparkles size={22} className="text-primary-600" />
-              <h3 className="text-lg font-bold text-secondary-900">Consultor IA de Campaña</h3>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={22} className="text-primary-600" />
+                <h3 className="text-lg font-bold text-secondary-900">Consultor IA de Campaña</h3>
+              </div>
+              <span
+                className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-opacity ${
+                  guardadoLocal ? 'bg-green-100 text-green-700 opacity-100' : 'bg-secondary-100 text-secondary-500 opacity-0'
+                }`}
+                aria-live="polite"
+              >
+                <Check size={14} /> Guardado
+              </span>
             </div>
             <p className="mb-4 text-sm text-secondary-600">
               Escribe lo que quieres saber o decidir. La IA cruza proyección, histórico, votantes, líderes, eventos,
@@ -1049,16 +1164,20 @@ export default function InteligenciaElectoralPage() {
                       onChange={(e) => {
                         if (!e.target.value) {
                           setHistoricoSeleccion({});
+                          setRival({});
                           return;
                         }
                         const [tipo_historico, tipo_eleccion, anio, estado_id, municipio_id] = e.target.value.split('|');
-                        setHistoricoSeleccion({
+                        const sel = {
                           tipo_historico,
                           tipo_eleccion,
                           anio: Number(anio),
                           estado_id: estado_id ? Number(estado_id) : undefined,
                           municipio_id: municipio_id ? Number(municipio_id) : undefined,
-                        });
+                        };
+                        setHistoricoSeleccion(sel);
+                        setRival({});
+                        cargarRivalesDesdeHistorico(sel);
                       }}
                       className="input"
                     >
@@ -1073,6 +1192,41 @@ export default function InteligenciaElectoralPage() {
                     </select>
                     <p className="text-xs text-secondary-500">
                       Selecciona un histórico específico para que la IA use solo esos registros y secciones.
+                    </p>
+                  </div>
+                )}
+
+                {fuentesIA.historico && rivalesDisponibles.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="label flex items-center gap-2">
+                      <Target size={16} className="text-primary-600" /> Rival principal a vencer
+                    </label>
+                    <select
+                      value={rival.partido || ''}
+                      onChange={(e) => {
+                        const partido = e.target.value;
+                        if (!partido) {
+                          setRival({});
+                          return;
+                        }
+                        const r = rivalesDisponibles.find((x) => x.partido === partido);
+                        setRival({
+                          partido: r?.partido,
+                          nombre: r?.candidato || r?.partido,
+                          votos_historicos: r?.votos,
+                        });
+                      }}
+                      className="input"
+                    >
+                      <option value="">Seleccionar rival...</option>
+                      {rivalesDisponibles.map((r) => (
+                        <option key={r.partido} value={r.partido}>
+                          {r.partido} {r.candidato ? `(${r.candidato})` : ''} — {r.votos.toLocaleString()} votos
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-secondary-500">
+                      Tomado del histórico electoral. La IA enfocará la estrategia para vencer a este actor.
                     </p>
                   </div>
                 )}
@@ -1261,9 +1415,23 @@ export default function InteligenciaElectoralPage() {
                         fuentes: fuentesIA,
                         filtroTerritorial: filtroTerritorialIA,
                         historicoSeleccion: Object.keys(historicoSeleccion).length ? historicoSeleccion : undefined,
+                        rival: Object.keys(rival).length ? rival : undefined,
                       });
                       setRespuestaIA(data.respuesta);
                       setResumenContextoIA(data.contexto_resumen || null);
+                      if (eleccionId) {
+                        const nuevoItem = {
+                          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                          fecha: new Date().toISOString(),
+                          pregunta,
+                          respuesta: data.respuesta,
+                          contexto_resumen: data.contexto_resumen,
+                        };
+                        const actualizado = [nuevoItem, ...historialIA];
+                        setHistorialIA(actualizado);
+                        setHistorialExpandidoId(nuevoItem.id);
+                        localStorage.setItem(claveHistorialIA(eleccionId), JSON.stringify(actualizado.slice(0, 50)));
+                      }
                     } catch (err: any) {
                       setError(err.response?.data?.message || 'Error al consultar la IA');
                     } finally {
@@ -1288,62 +1456,124 @@ export default function InteligenciaElectoralPage() {
             </div>
           </div>
 
-          {respuestaIA && (
-            <div className="card p-6">
-              <div className="mb-3 flex items-center gap-2">
-                <MessageSquare size={20} className="text-primary-600" />
-                <h4 className="font-bold text-secondary-900">Respuesta</h4>
+          {historialIA.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="flex items-center gap-2 font-bold text-secondary-900">
+                  <MessageSquare size={20} className="text-primary-600" />
+                  Historial de análisis
+                </h4>
+                {historialIA.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm('¿Borrar todo el historial de análisis de esta elección?')) {
+                        setHistorialIA([]);
+                        setHistorialExpandidoId(null);
+                        if (eleccionId) localStorage.removeItem(claveHistorialIA(eleccionId));
+                      }
+                    }}
+                    className="text-xs font-medium text-red-600 hover:text-red-700"
+                  >
+                    Borrar historial
+                  </button>
+                )}
               </div>
-              {resumenContextoIA && (
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {[
-                    { key: 'actor_principal', label: 'Actor principal' },
-                    { key: 'data', label: 'Indicadores municipales' },
-                    { key: 'proyeccion', label: 'Proyección' },
-                    { key: 'historicos', label: 'Histórico', active: (v: any) => typeof v === 'number' ? v > 0 : !!v },
-                    { key: 'historico_resumen', label: 'Resumen histórico' },
-                    { key: 'votantes', label: 'Votantes' },
-                    { key: 'lideres', label: 'Líderes' },
-                    { key: 'eventos', label: 'Eventos' },
-                    { key: 'encuestas', label: 'Encuestas' },
-                    { key: 'sedes', label: 'Sedes' },
-                    { key: 'monitoreo', label: 'Monitoreo' },
-                    { key: 'candidato', label: 'Candidato' },
-                    { key: 'eleccion', label: 'Elección' },
-                  ].map((chip) => {
-                    const raw = resumenContextoIA[chip.key];
-                    const isActive = chip.active ? chip.active(raw) : !!raw;
-                    return (
-                      <span
-                        key={chip.key}
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                          isActive
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        {chip.label}
-                      </span>
-                    );
-                  })}
-                  {resumenContextoIA.filtro_territorial?.tipo !== 'todos' && (
-                    <span className="inline-flex rounded-full bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700">
-                      Filtro: {resumenContextoIA.filtro_territorial.tipo} · {resumenContextoIA.filtro_territorial.valor}
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="prose prose-sm max-w-none text-secondary-800">
-                {respuestaIA.split('\n').map((line, i) => {
-                  if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold">{line.replace('# ', '')}</h1>;
-                  if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold">{line.replace('## ', '')}</h2>;
-                  if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold">{line.replace('### ', '')}</h3>;
-                  if (line.startsWith('- ')) return <li key={i}>{line.replace('- ', '')}</li>;
-                  if (line.match(/^\d+\. /)) return <li key={i}>{line.replace(/^\d+\. /, '')}</li>;
-                  if (line.trim() === '') return <br key={i} />;
-                  return <p key={i}>{line}</p>;
-                })}
-              </div>
+
+              {historialIA.map((item, idx) => {
+                const esUltimo = idx === 0;
+                const expandido = historialExpandidoId === item.id || (historialExpandidoId === null && esUltimo);
+                return (
+                  <div key={item.id} className={`card overflow-hidden ${esUltimo ? 'border-primary-300' : 'border-gray-200'}`}>
+                    <button
+                      onClick={() => setHistorialExpandidoId(expandido ? null : item.id)}
+                      className="flex w-full items-center justify-between p-4 text-left hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-700">
+                          {historialIA.length - idx}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-secondary-900">{item.pregunta}</p>
+                          <p className="text-xs text-secondary-500">{new Date(item.fecha).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-secondary-500">{expandido ? 'Ocultar' : 'Ver respuesta'}</span>
+                        <svg
+                          className={`h-4 w-4 text-secondary-500 transition-transform ${expandido ? 'rotate-180' : ''}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </button>
+                    {expandido && (
+                      <div className="border-t border-gray-100 p-4">
+                        {item.contexto_resumen && (
+                          <div className="mb-4 flex flex-wrap gap-2">
+                            {[
+                              { key: 'actor_principal', label: 'Actor principal' },
+                              { key: 'data', label: 'Indicadores municipales' },
+                              { key: 'proyeccion', label: 'Proyección' },
+                              { key: 'historicos', label: 'Histórico', active: (v: any) => typeof v === 'number' ? v > 0 : !!v },
+                              { key: 'historico_resumen', label: 'Resumen histórico' },
+                              { key: 'votantes', label: 'Votantes' },
+                              { key: 'lideres', label: 'Líderes' },
+                              { key: 'eventos', label: 'Eventos' },
+                              { key: 'encuestas', label: 'Encuestas' },
+                              { key: 'sedes', label: 'Sedes' },
+                              { key: 'monitoreo', label: 'Monitoreo' },
+                              { key: 'candidato', label: 'Candidato' },
+                              { key: 'eleccion', label: 'Elección' },
+                            ].map((chip) => {
+                              const raw = item.contexto_resumen?.[chip.key];
+                              const isActive = chip.active ? chip.active(raw) : !!raw;
+                              return (
+                                <span
+                                  key={chip.key}
+                                  className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                                    isActive
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  {chip.label}
+                                </span>
+                              );
+                            })}
+                            {item.contexto_resumen?.filtro_territorial?.tipo !== 'todos' && (
+                              <span className="inline-flex rounded-full bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700">
+                                Filtro: {item.contexto_resumen?.filtro_territorial?.tipo} · {item.contexto_resumen?.filtro_territorial?.valor}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="prose prose-sm max-w-none text-secondary-800">
+                          {item.respuesta.split('\n').map((line, i) => {
+                            if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold">{line.replace('# ', '')}</h1>;
+                            if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold">{line.replace('## ', '')}</h2>;
+                            if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold">{line.replace('### ', '')}</h3>;
+                            if (line.startsWith('- ')) return <li key={i}>{line.replace('- ', '')}</li>;
+                            if (line.match(/^\d+\. /)) return <li key={i}>{line.replace(/^\d+\. /, '')}</li>;
+                            if (line.trim() === '') return <br key={i} />;
+                            return <p key={i}>{line}</p>;
+                          })}
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            onClick={() => eliminarDelHistorial(eleccionId || '', item.id)}
+                            className="text-xs font-medium text-red-600 hover:text-red-700"
+                          >
+                            Eliminar esta respuesta
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

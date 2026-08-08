@@ -37,7 +37,7 @@ function extraerIdFeature(feature: any): string {
 function extraerNombreFeature(feature: any, capaNombre?: string): string {
   const p = feature?.properties || {};
   return String(
-    p._feature_nombre || p.NOMBRE || p.nombre || p.name || p.seccion || p.casilla || p.clave || p.ubicacion || p.direccion || capaNombre || 'Elemento'
+    p._feature_nombre || p.NOMBRE_VER || p.NOMBRE || p.nombre || p.name || p.NAME || p.seccion || p.casilla || p.clave || p.ubicacion || p.direccion || capaNombre || 'Elemento'
   );
 }
 

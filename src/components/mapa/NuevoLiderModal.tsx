@@ -307,8 +307,8 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
-      <div className="relative z-[10000] w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="relative z-[10000] flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-secondary-200 px-6 py-4">
           <h2 className="text-lg font-bold text-secondary-900">{liderEditando ? 'Editar líder territorial' : 'Nuevo líder territorial'}</h2>
           <button
             onClick={onCerrar}
@@ -318,7 +318,7 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form id="lider-form" onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
           {error && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
@@ -564,24 +564,26 @@ export default function NuevoLiderModal({ abierto, onCerrar, onExito, coordenada
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onCerrar}
-              className="btn-secondary"
-              disabled={loading}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !form.lat || !form.lng}
-              className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? 'Guardando...' : liderEditando ? 'Guardar cambios' : 'Guardar líder'}
-            </button>
-          </div>
         </form>
+
+        <div className="flex shrink-0 justify-end gap-3 border-t border-secondary-200 bg-white px-6 py-4">
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="btn-secondary"
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="lider-form"
+            disabled={loading || !form.lat || !form.lng}
+            className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? 'Guardando...' : liderEditando ? 'Guardar cambios' : 'Guardar líder'}
+          </button>
+        </div>
       </div>
     </div>
   );

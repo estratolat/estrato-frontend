@@ -97,6 +97,7 @@ export default function InteligenciaElectoralPage() {
   const [pregunta, setPregunta] = useState('');
   const [consultando, setConsultando] = useState(false);
   const [respuestaIA, setRespuestaIA] = useState<string | null>(null);
+  const [resumenContextoIA, setResumenContextoIA] = useState<Record<string, any> | null>(null);
   const [contextoCampana, setContextoCampana] = useState<Record<string, string>>({
     objetivo: '',
     escenario: '',
@@ -115,7 +116,9 @@ export default function InteligenciaElectoralPage() {
     monitoreo: true,
     candidato: true,
     eleccion: true,
+    data: false,
   });
+  const [actorPrincipalId, setActorPrincipalId] = useState<string>('');
   const [filtroTerritorialIA, setFiltroTerritorialIA] = useState<{ tipo: 'todos' | 'zona' | 'seccion' | 'municipio'; valor: string }>({ tipo: 'todos', valor: '' });
   const [zonasDisponibles, setZonasDisponibles] = useState<Array<{ id: string; nombre: string }>>([]);
 
@@ -140,6 +143,7 @@ export default function InteligenciaElectoralPage() {
       setActores([]);
       setSecciones([]);
       setGeojsonMapa(null);
+      setActorPrincipalId('');
     }
   }, [eleccionId]);
 
@@ -179,7 +183,9 @@ export default function InteligenciaElectoralPage() {
     try {
       const { data } = await inteligenciaElectoralApi.getEleccion(id);
       setEleccion(data);
-      setActores(data.actores || []);
+      const actoresCargados = data.actores || [];
+      setActores(actoresCargados);
+      setActorPrincipalId((prev) => prev || actoresCargados[0]?.id || '');
       const [sec] = await Promise.all([
         inteligenciaElectoralApi.getSecciones(id),
       ]);
@@ -872,11 +878,34 @@ export default function InteligenciaElectoralPage() {
             </div>
             <p className="mb-4 text-sm text-secondary-600">
               Escribe lo que quieres saber o decidir. La IA cruza proyección, histórico, votantes, líderes, eventos,
-              encuestas, sedes, monitoreo de casillas y perfil del candidato. Selecciona abajo qué datos incluir.
+              encuestas, sedes, monitoreo de casillas, perfil del candidato, indicadores municipales de Data y la
+              perspectiva del actor principal. Selecciona abajo qué datos incluir.
             </p>
 
             <div className="mb-4 grid gap-4 lg:grid-cols-3">
               <div className="space-y-3 lg:col-span-1">
+                <div className="space-y-2">
+                  <label className="label flex items-center gap-2">
+                    <Users size={16} className="text-primary-600" /> Actor principal / perspectiva del análisis
+                  </label>
+                  <select
+                    value={actorPrincipalId}
+                    onChange={(e) => setActorPrincipalId(e.target.value)}
+                    className="input"
+                    disabled={!eleccionId || actores.length === 0}
+                  >
+                    <option value="">{eleccionId ? (actores.length ? 'Seleccionar actor...' : 'Sin actores') : 'Selecciona una elección'}</option>
+                    {actores.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre_visual} {a.partido?.siglas ? `(${a.partido.siglas})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-secondary-500">
+                    La IA analizará la estrategia desde la perspectiva de este actor.
+                  </p>
+                </div>
+
                 <label className="label flex items-center gap-2">
                   <Database size={16} className="text-primary-600" /> Fuentes de datos a vincular
                 </label>
@@ -892,6 +921,7 @@ export default function InteligenciaElectoralPage() {
                     { key: 'monitoreo', label: 'Casillas monitoreo' },
                     { key: 'candidato', label: 'Perfil del candidato' },
                     { key: 'eleccion', label: 'Elección y actores' },
+                    { key: 'data', label: 'Data / Indicadores municipales' },
                   ].map((f) => (
                     <label
                       key={f.key}
@@ -994,10 +1024,12 @@ export default function InteligenciaElectoralPage() {
                         pregunta,
                         contextoCampana,
                         eleccionId: eleccionId || undefined,
+                        actorPrincipalId: actorPrincipalId || undefined,
                         fuentes: fuentesIA,
                         filtroTerritorial: filtroTerritorialIA,
                       });
                       setRespuestaIA(data.respuesta);
+                      setResumenContextoIA(data.contexto_resumen || null);
                     } catch (err: any) {
                       setError(err.response?.data?.message || 'Error al consultar la IA');
                     } finally {
@@ -1028,6 +1060,44 @@ export default function InteligenciaElectoralPage() {
                 <MessageSquare size={20} className="text-primary-600" />
                 <h4 className="font-bold text-secondary-900">Respuesta</h4>
               </div>
+              {resumenContextoIA && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {[
+                    { key: 'actor_principal', label: 'Actor principal' },
+                    { key: 'data', label: 'Indicadores municipales' },
+                    { key: 'proyeccion', label: 'Proyección' },
+                    { key: 'historicos', label: 'Histórico', active: (v: any) => typeof v === 'number' ? v > 0 : !!v },
+                    { key: 'votantes', label: 'Votantes' },
+                    { key: 'lideres', label: 'Líderes' },
+                    { key: 'eventos', label: 'Eventos' },
+                    { key: 'encuestas', label: 'Encuestas' },
+                    { key: 'sedes', label: 'Sedes' },
+                    { key: 'monitoreo', label: 'Monitoreo' },
+                    { key: 'candidato', label: 'Candidato' },
+                    { key: 'eleccion', label: 'Elección' },
+                  ].map((chip) => {
+                    const raw = resumenContextoIA[chip.key];
+                    const isActive = chip.active ? chip.active(raw) : !!raw;
+                    return (
+                      <span
+                        key={chip.key}
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                          isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {chip.label}
+                      </span>
+                    );
+                  })}
+                  {resumenContextoIA.filtro_territorial?.tipo !== 'todos' && (
+                    <span className="inline-flex rounded-full bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700">
+                      Filtro: {resumenContextoIA.filtro_territorial.tipo} · {resumenContextoIA.filtro_territorial.valor}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="prose prose-sm max-w-none text-secondary-800">
                 {respuestaIA.split('\n').map((line, i) => {
                   if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold">{line.replace('# ', '')}</h1>;

@@ -179,6 +179,8 @@ export const boletinesApi = {
   create: (data: any) => api.post('/boletines', data),
   generar: (tipo: 'boletin' | 'redes', contexto: ContextoGeneracion) =>
     api.post('/boletines/generar', { tipo, ...contexto }),
+  update: (id: string, data: any) => api.patch(`/boletines/${id}`, data),
+  delete: (id: string) => api.delete(`/boletines/${id}`),
   aprobar: (id: string) => api.patch(`/boletines/${id}/aprobar`),
   rechazar: (id: string) => api.patch(`/boletines/${id}/rechazar`),
 };
@@ -346,8 +348,14 @@ export const inteligenciaElectoralApi = {
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/analizar-seccion/${seccion}`),
 
   // Consultor IA
-  consultarIA: (data: { pregunta: string; contextoCampana?: Record<string, any>; eleccionId?: string; fuentes?: Record<string, boolean>; filtroTerritorial?: { tipo: string; valor: string } }) =>
-    api.post('/inteligencia-electoral/consultar-ia', data),
+  consultarIA: (data: {
+    pregunta: string;
+    contextoCampana?: Record<string, any>;
+    eleccionId?: string;
+    actorPrincipalId?: string;
+    fuentes?: Record<string, boolean>;
+    filtroTerritorial?: { tipo: string; valor: string };
+  }) => api.post('/inteligencia-electoral/consultar-ia', data),
 };
 
 // === API de Fichas Seccionales ===

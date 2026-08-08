@@ -343,6 +343,8 @@ export const inteligenciaElectoralApi = {
 
   // Análisis
   getSecciones: (eleccionId: string) => api.get(`/inteligencia-electoral/elecciones/${eleccionId}/secciones`),
+  getSeccionesDesdeHistorico: (eleccionId: string, params?: { anio?: number; tipo_historico?: string; tipo_eleccion?: string; estado_id?: number; municipio_id?: number }) =>
+    api.get(`/inteligencia-electoral/elecciones/${eleccionId}/historico-secciones`, { params }),
   getMapaSecciones: (eleccionId: string) => api.get(`/inteligencia-electoral/elecciones/${eleccionId}/mapa-secciones`),
   analizarSeccion: (eleccionId: string, seccion: string) =>
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/analizar-seccion/${seccion}`),

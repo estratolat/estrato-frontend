@@ -83,6 +83,8 @@ export default function InteligenciaElectoralPage() {
   const [eleccion, setEleccion] = useState<Eleccion | null>(null);
   const [actores, setActores] = useState<Actor[]>([]);
   const [secciones, setSecciones] = useState<SeccionData[]>([]);
+  const [seccionesDesdeHistorico, setSeccionesDesdeHistorico] = useState<any[]>([]);
+  const [modoHistoricoEnAnalisis, setModoHistoricoEnAnalisis] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'catalogos' | 'carga' | 'analisis' | 'mapa' | 'consultor'>('catalogos');
@@ -170,6 +172,15 @@ export default function InteligenciaElectoralPage() {
       cargarMapaSecciones(eleccionId);
     }
   }, [activeTab, eleccionId]);
+
+  useEffect(() => {
+    if (activeTab === 'analisis' && eleccionId && !secciones.length) {
+      const hist = historicosDisponibles[0];
+      if (hist) {
+        cargarSeccionesDesdeHistorico(hist);
+      }
+    }
+  }, [activeTab, eleccionId, secciones.length, historicosDisponibles.length]);
 
   const cargarInicial = async () => {
     try {
@@ -368,6 +379,24 @@ export default function InteligenciaElectoralPage() {
       setError(err.response?.data?.message || 'Error al cargar mapa de secciones');
     } finally {
       setCargandoMapa(false);
+    }
+  };
+
+  const cargarSeccionesDesdeHistorico = async (hist?: typeof historicosDisponibles[0]) => {
+    if (!eleccionId || !hist) return;
+    try {
+      const { data } = await inteligenciaElectoralApi.getSeccionesDesdeHistorico(eleccionId, {
+        anio: hist.anio,
+        tipo_historico: hist.tipo_historico,
+        tipo_eleccion: hist.tipo_eleccion,
+        estado_id: hist.estado_id,
+        municipio_id: hist.municipio_id,
+      });
+      setSeccionesDesdeHistorico(data || []);
+      setModoHistoricoEnAnalisis(true);
+    } catch (err: any) {
+      setSeccionesDesdeHistorico([]);
+      setModoHistoricoEnAnalisis(false);
     }
   };
 
@@ -795,10 +824,60 @@ export default function InteligenciaElectoralPage() {
         <div className="space-y-6">
           <div className="card overflow-hidden">
             <div className="p-4">
-              <h3 className="mb-2 text-lg font-bold text-secondary-900 flex items-center gap-2">
-                <BarChart3 size={20} className="text-primary-600" /> Resumen por sección
-              </h3>
-              <p className="text-sm text-secondary-500">{secciones.length} secciones procesadas</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="mb-2 text-lg font-bold text-secondary-900 flex items-center gap-2">
+                    <BarChart3 size={20} className="text-primary-600" /> Resumen por sección
+                  </h3>
+                  <p className="text-sm text-secondary-500">
+                    {secciones.length > 0
+                      ? `${secciones.length} secciones procesadas`
+                      : modoHistoricoEnAnalisis
+                        ? `${seccionesDesdeHistorico.length} secciones desde Histórico Electoral`
+                        : '0 secciones procesadas'}
+                  </p>
+                </div>
+                {secciones.length === 0 && historicosDisponibles.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={
+                        historicoSeleccion.anio
+                          ? `${historicoSeleccion.tipo_historico || 'principal'}|${historicoSeleccion.tipo_eleccion || 'ayuntamiento'}|${historicoSeleccion.anio}|${historicoSeleccion.estado_id || ''}|${historicoSeleccion.municipio_id || ''}`
+                          : ''
+                      }
+                      onChange={(e) => {
+                        if (!e.target.value) {
+                          setHistoricoSeleccion({});
+                          setModoHistoricoEnAnalisis(false);
+                          setSeccionesDesdeHistorico([]);
+                          return;
+                        }
+                        const [tipo_historico, tipo_eleccion, anio, estado_id, municipio_id] = e.target.value.split('|');
+                        const sel = {
+                          tipo_historico,
+                          tipo_eleccion,
+                          anio: Number(anio),
+                          estado_id: estado_id ? Number(estado_id) : undefined,
+                          municipio_id: municipio_id ? Number(municipio_id) : undefined,
+                        };
+                        setHistoricoSeleccion(sel);
+                        const hist = historicosDisponibles.find((h) =>
+                          `${h.tipo_historico}|${h.tipo_eleccion}|${h.anio}|${h.estado_id || ''}|${h.municipio_id || ''}` === e.target.value
+                        );
+                        cargarSeccionesDesdeHistorico(hist);
+                      }}
+                      className="input"
+                    >
+                      <option value="">Ver desde histórico electoral...</option>
+                      {historicosDisponibles.map((h) => {
+                        const key = `${h.tipo_historico}|${h.tipo_eleccion}|${h.anio}|${h.estado_id || ''}|${h.municipio_id || ''}`;
+                        const label = `${h.anio} · ${h.tipo_historico === 'principal' ? 'Principal' : 'Complementario'} · ${h.tipo_eleccion.replace(/_/g, ' ')}${h.municipio_nombre ? ` · ${h.municipio_nombre}` : ''}`;
+                        return <option key={key} value={key}>{label}</option>;
+                      })}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -815,7 +894,7 @@ export default function InteligenciaElectoralPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {secciones.map((s) => (
+                  {secciones.length > 0 && secciones.map((s) => (
                     <tr key={s.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-900">{s.seccion}</td>
                       <td className="px-4 py-3">
@@ -845,10 +924,33 @@ export default function InteligenciaElectoralPage() {
                       </td>
                     </tr>
                   ))}
-                  {secciones.length === 0 && (
+                  {secciones.length === 0 && modoHistoricoEnAnalisis && seccionesDesdeHistorico.map((s: any, idx: number) => (
+                    <tr key={`hist-${idx}`} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{s.seccion}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.actor_ganador?.color_hex || '#ccc' }} />
+                          <span>{s.actor_ganador?.nombre_visual || 'Sin ganador'}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{(s.total_votos_total || 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-gray-600">{(s.lista_nominal_total || 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-gray-600">{(s.porcentaje_participacion || 0).toFixed(2)}%</td>
+                      <td className="px-4 py-3 text-gray-600">{(s.porcentaje_votos_nulos || 0).toFixed(2)}%</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-medium ${colorClasificacion(s.clasificacion_estrategica)}`}>
+                          {s.clasificacion_estrategica}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-secondary-500">Histórico</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {secciones.length === 0 && !modoHistoricoEnAnalisis && (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                        No hay secciones cargadas. Ve a la pestaña <strong>Cargar</strong> y sube un Excel.
+                        No hay secciones cargadas. Ve a la pestaña <strong>Cargar</strong> y sube un Excel, o selecciona un histórico electoral arriba.
                       </td>
                     </tr>
                   )}

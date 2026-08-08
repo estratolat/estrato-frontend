@@ -107,6 +107,11 @@
   z-index: auto !important;
 }
 
+/* El popup debe permanecer por encima de todo; sin esto no se abre al hacer clic en el mapa */
+.leaflet-popup-pane {
+  z-index: 900 !important;
+}
+
 .leaflet-control {
   z-index: 800 !important;
 }

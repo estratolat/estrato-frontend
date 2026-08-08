@@ -185,6 +185,7 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
 
       {puntoSeleccionado && onAccionPunto && onCerrarPunto && (
         <MarcadorPuntoSeleccionado
+          key={`punto-${puntoSeleccionado.lat}-${puntoSeleccionado.lng}`}
           lat={puntoSeleccionado.lat}
           lng={puntoSeleccionado.lng}
           onAccion={onAccionPunto}
@@ -1654,6 +1655,66 @@ function CentradorCapas({
   return null;
 }
 
+function popupAccionesHtml(
+  onAccion: (tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante', lat: number, lng: number) => void,
+  onCerrar: () => void,
+  lat: number,
+  lng: number
+): HTMLElement {
+  const opciones: Array<{ id: 'apoyo' | 'peticion' | 'evento' | 'lider' | 'votante'; label: string; color: string; bg: string; hover: string; text: string; svg: string }> = [
+    { id: 'apoyo', label: 'Apoyo', color: COLORES_CAPA.apoyos, bg: 'bg-amber-50', hover: 'hover:bg-amber-100', text: 'text-amber-700', svg: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z' },
+    { id: 'peticion', label: 'Petición', color: COLORES_CAPA.peticiones, bg: 'bg-sky-50', hover: 'hover:bg-sky-100', text: 'text-sky-700', svg: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z' },
+    { id: 'evento', label: 'Evento', color: COLORES_CAPA.eventos, bg: 'bg-red-50', hover: 'hover:bg-red-100', text: 'text-red-700', svg: 'M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z' },
+    { id: 'lider', label: 'Líder', color: COLORES_CAPA.lideres, bg: 'bg-green-50', hover: 'hover:bg-green-100', text: 'text-green-700', svg: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' },
+    { id: 'votante', label: 'Votante', color: COLORES_CAPA.votantes, bg: 'bg-red-50', hover: 'hover:bg-red-100', text: 'text-red-700', svg: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' },
+  ];
+
+  const root = document.createElement('div');
+  root.className = 'w-64 p-1 font-sans';
+  root.innerHTML = `
+    <div class="mb-3 flex items-center gap-2">
+      <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </div>
+      <div>
+        <p class="text-sm font-bold text-secondary-900">¿Qué registrar aquí?</p>
+        <p class="text-[10px] text-secondary-500">Selecciona el tipo de registro</p>
+      </div>
+    </div>
+    <div class="space-y-2">
+      <div class="grid grid-cols-3 gap-2">
+        ${opciones.slice(0, 3).map(op => `
+          <button data-accion="${op.id}" class="accion-btn flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" style="color:${op.color}"><path d="${op.svg}"/></svg>
+            <span class="text-[11px] font-semibold ${op.text}">${op.label}</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="grid grid-cols-2 gap-2 px-4">
+        ${opciones.slice(3).map(op => `
+          <button data-accion="${op.id}" class="accion-btn flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" style="color:${op.color}"><path d="${op.svg}"/></svg>
+            <span class="text-[11px] font-semibold ${op.text}">${op.label}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+    <button id="cerrar-popup-acciones" class="mt-3 w-full rounded-lg py-1.5 text-xs font-medium text-secondary-500 transition hover:bg-secondary-50">Cancelar</button>
+  `;
+
+  root.querySelectorAll('button[data-accion]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tipo = btn.getAttribute('data-accion') as any;
+      onAccion(tipo, lat, lng);
+    });
+  });
+
+  const cerrar = root.querySelector('#cerrar-popup-acciones');
+  cerrar?.addEventListener('click', onCerrar);
+
+  return root;
+}
+
 function MarcadorPuntoSeleccionado({
   lat,
   lng,
@@ -1665,164 +1726,68 @@ function MarcadorPuntoSeleccionado({
   onAccion: (tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante', lat: number, lng: number) => void;
   onCerrar: () => void;
 }) {
-  const opciones = [
-    {
-      id: 'apoyo',
-      label: 'Apoyo',
-      sub: 'Entrega / beneficio',
-      icono: (
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-        </svg>
-      ),
-      color: COLORES_CAPA.apoyos,
-      bg: 'bg-amber-50',
-      hover: 'hover:bg-amber-100',
-      text: 'text-amber-700',
-    },
-    {
-      id: 'peticion',
-      label: 'Petición',
-      sub: 'Solicitud ciudadana',
-      icono: (
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-        </svg>
-      ),
-      color: COLORES_CAPA.peticiones,
-      bg: 'bg-sky-50',
-      hover: 'hover:bg-sky-100',
-      text: 'text-sky-700',
-    },
-    {
-      id: 'evento',
-      label: 'Evento',
-      sub: 'Reunión / mitin',
-      icono: (
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" />
-        </svg>
-      ),
-      color: COLORES_CAPA.eventos,
-      bg: 'bg-red-50',
-      hover: 'hover:bg-red-100',
-      text: 'text-red-700',
-    },
-    {
-      id: 'lider',
-      label: 'Líder',
-      sub: 'Estructura territorial',
-      icono: (
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-        </svg>
-      ),
-      color: COLORES_CAPA.lideres,
-      bg: 'bg-green-50',
-      hover: 'hover:bg-green-100',
-      text: 'text-green-700',
-    },
-    {
-      id: 'votante',
-      label: 'Votante',
-      sub: 'Simpatizante',
-      icono: (
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-        </svg>
-      ),
-      color: COLORES_CAPA.votantes,
-      bg: 'bg-red-50',
-      hover: 'hover:bg-red-100',
-      text: 'text-red-700',
-    },
-  ] as const;
-
+  const map = useMap();
   const markerRef = useRef<L.Marker | null>(null);
+  const onAccionRef = useRef(onAccion);
+  const onCerrarRef = useRef(onCerrar);
+  onAccionRef.current = onAccion;
+  onCerrarRef.current = onCerrar;
 
   useEffect(() => {
-    const marker = markerRef.current;
-    if (!marker) return;
-    const t = setTimeout(() => {
-      try { marker.openPopup(); } catch {}
-    }, 50);
-    return () => clearTimeout(t);
-  }, []);
-
-  return (
-    <Marker
-      ref={markerRef}
-      position={[lat, lng]}
-      icon={L.divIcon({
+    if (!map) return;
+    const marker = L.marker([lat, lng], {
+      icon: L.divIcon({
         className: 'custom-pin-seleccion',
         html: `<div style="width:28px;height:28px;border-radius:50%;background:${COLORES_CAPA.eventos};border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:bold;">+</div>`,
         iconSize: [28, 28],
         iconAnchor: [14, 28],
-      })}
-    >
-      <Popup closeButton={false} className="rounded-2xl popup-acciones-mapa" autoPan autoPanPadding={[16, 16]}>
-        <div className="w-64 p-1">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-bold text-secondary-900">¿Qué registrar aquí?</p>
-              <p className="text-[10px] text-secondary-500">Selecciona el tipo de registro</p>
-            </div>
-          </div>
+      }),
+    });
+    markerRef.current = marker;
 
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2">
-              {opciones.slice(0, 3).map((op) => (
-                <button
-                  key={op.id}
-                  onClick={() => onAccion(op.id as any, lat, lng)}
-                  className={`flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition`}
-                >
-                  <span style={{ color: op.color }}>{op.icono}</span>
-                  <span className={`text-[11px] font-semibold ${op.text}`}>{op.label}</span>
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2 px-4">
-              {opciones.slice(3).map((op) => (
-                <button
-                  key={op.id}
-                  onClick={() => onAccion(op.id as any, lat, lng)}
-                  className={`flex flex-col items-center gap-1 rounded-xl border border-secondary-100 ${op.bg} ${op.hover} p-2.5 transition`}
-                >
-                  <span style={{ color: op.color }}>{op.icono}</span>
-                  <span className={`text-[11px] font-semibold ${op.text}`}>{op.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+    const content = popupAccionesHtml(
+      (tipo, llat, llng) => onAccionRef.current(tipo, llat, llng),
+      () => onCerrarRef.current(),
+      lat,
+      lng
+    );
 
-          <button
-            onClick={onCerrar}
-            className="mt-3 w-full rounded-lg py-1.5 text-xs font-medium text-secondary-500 transition hover:bg-secondary-50"
-          >
-            Cancelar
-          </button>
-        </div>
-      </Popup>
-    </Marker>
-  );
-}
+    marker.bindPopup(content, {
+      closeButton: false,
+      className: 'rounded-2xl popup-acciones-mapa',
+      autoPan: true,
+      autoPanPadding: [16, 16],
+      minWidth: 260,
+      autoClose: false,
+      closeOnClick: false,
+      offset: [0, -10],
+    });
 
-function abrirPopupMarker(marker: L.Marker | null) {
-  if (!marker) return;
-  const intentar = (intentos = 0) => {
-    try {
-      marker.openPopup();
-    } catch {
-      if (intentos < 5) setTimeout(() => intentar(intentos + 1), 100);
-    }
-  };
-  intentar();
+    marker.addTo(map);
+
+    const open = (intentos = 0) => {
+      try {
+        marker.openPopup();
+        console.log('[MarcadorPuntoSeleccionado] popup abierto', { lat, lng, intentos });
+      } catch (err) {
+        console.warn('[MarcadorPuntoSeleccionado] error abriendo popup', err);
+        if (intentos < 8) setTimeout(() => open(intentos + 1), 80);
+      }
+    };
+    open();
+
+    marker.on('popupclose', () => {
+      console.log('[MarcadorPuntoSeleccionado] popup cerrado');
+      onCerrarRef.current();
+    });
+
+    return () => {
+      try { marker.removeFrom(map); } catch {}
+      markerRef.current = null;
+    };
+  }, [map, lat, lng]);
+
+  return null;
 }
 
 function CapaSeleccionada({ seleccion }: { seleccion: any }) {

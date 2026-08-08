@@ -954,6 +954,7 @@ export default function InteligenciaElectoralPage() {
                     <option value="seccion">Sección electoral</option>
                     <option value="municipio">Municipio / Delegación</option>
                   </select>
+
                   {filtroTerritorialIA.tipo === 'zona' && zonasDisponibles.length > 0 && (
                     <select
                       value={filtroTerritorialIA.valor}
@@ -966,16 +967,70 @@ export default function InteligenciaElectoralPage() {
                       ))}
                     </select>
                   )}
-                  {filtroTerritorialIA.tipo !== 'todos' && filtroTerritorialIA.tipo !== 'zona' && (
+
+                  {filtroTerritorialIA.tipo === 'seccion' && (
+                    <div className="rounded-lg border border-gray-200 bg-white p-2">
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-xs font-medium text-secondary-700">Selecciona las secciones a analizar</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const todas = secciones.map((s) => s.seccion);
+                            const actuales = filtroTerritorialIA.valor.split(',').map((v) => v.trim()).filter(Boolean);
+                            const todasSeleccionadas = actuales.length === todas.length && todas.every((t) => actuales.includes(t));
+                            setFiltroTerritorialIA({
+                              ...filtroTerritorialIA,
+                              valor: todasSeleccionadas ? '' : todas.join(','),
+                            });
+                          }}
+                          className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                        >
+                          {filtroTerritorialIA.valor.split(',').filter(Boolean).length === secciones.length ? 'Quitar todas' : 'Seleccionar todas'}
+                        </button>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto">
+                        <div className="grid grid-cols-3 gap-2">
+                          {secciones.map((s) => {
+                            const seleccionadas = filtroTerritorialIA.valor.split(',').map((v) => v.trim()).filter(Boolean);
+                            const checked = seleccionadas.includes(s.seccion);
+                            return (
+                              <label
+                                key={s.id}
+                                className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition ${
+                                  checked ? 'border-primary-300 bg-primary-50 text-secondary-900' : 'border-gray-200 bg-white text-secondary-600'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const nuevas = e.target.checked
+                                      ? [...seleccionadas, s.seccion].filter((v, i, arr) => arr.indexOf(v) === i)
+                                      : seleccionadas.filter((v) => v !== s.seccion);
+                                    setFiltroTerritorialIA({ ...filtroTerritorialIA, valor: nuevas.join(',') });
+                                  }}
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                                {s.seccion}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {filtroTerritorialIA.valor && (
+                        <p className="mt-2 text-xs text-secondary-500">
+                          {filtroTerritorialIA.valor.split(',').filter(Boolean).length} sección(es) seleccionada(s)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {filtroTerritorialIA.tipo === 'municipio' && (
                     <input
                       type="text"
                       value={filtroTerritorialIA.valor}
                       onChange={(e) => setFiltroTerritorialIA({ ...filtroTerritorialIA, valor: e.target.value })}
-                      placeholder={
-                        filtroTerritorialIA.tipo === 'seccion'
-                          ? 'Ej. 0123'
-                          : 'Ej. Culiacán'
-                      }
+                      placeholder="Ej. Dolores Hidalgo"
                       className="input"
                     />
                   )}

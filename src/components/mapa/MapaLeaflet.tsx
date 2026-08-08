@@ -1738,9 +1738,29 @@ function MarcadorPuntoSeleccionado({
     },
   ] as const;
 
+  const markerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker) return;
+    const t = setTimeout(() => {
+      try { marker.openPopup(); } catch {}
+    }, 50);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
-    <Marker position={[lat, lng]}>
-      <Popup closeButton={false} className="rounded-2xl">
+    <Marker
+      ref={markerRef}
+      position={[lat, lng]}
+      icon={L.divIcon({
+        className: 'custom-pin-seleccion',
+        html: `<div style="width:28px;height:28px;border-radius:50%;background:${COLORES_CAPA.eventos};border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:bold;">+</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      })}
+    >
+      <Popup closeButton={false} className="rounded-2xl popup-acciones-mapa" autoPan autoPanPadding={[16, 16]}>
         <div className="w-64 p-1">
           <div className="mb-3 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
@@ -1791,6 +1811,18 @@ function MarcadorPuntoSeleccionado({
       </Popup>
     </Marker>
   );
+}
+
+function abrirPopupMarker(marker: L.Marker | null) {
+  if (!marker) return;
+  const intentar = (intentos = 0) => {
+    try {
+      marker.openPopup();
+    } catch {
+      if (intentos < 5) setTimeout(() => intentar(intentos + 1), 100);
+    }
+  };
+  intentar();
 }
 
 function CapaSeleccionada({ seleccion }: { seleccion: any }) {

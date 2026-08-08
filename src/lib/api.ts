@@ -355,7 +355,15 @@ export const inteligenciaElectoralApi = {
     actorPrincipalId?: string;
     fuentes?: Record<string, boolean>;
     filtroTerritorial?: { tipo: string; valor: string };
+    historicoSeleccion?: {
+      anio?: number;
+      tipo_historico?: string;
+      tipo_eleccion?: string;
+      estado_id?: number;
+      municipio_id?: number;
+    };
   }) => api.post('/inteligencia-electoral/consultar-ia', data),
+  getHistoricosDisponibles: () => api.get('/inteligencia-electoral/historicos-disponibles'),
 };
 
 // === API de Fichas Seccionales ===

@@ -119,6 +119,23 @@ export default function InteligenciaElectoralPage() {
     data: false,
   });
   const [actorPrincipalId, setActorPrincipalId] = useState<string>('');
+  const [historicosDisponibles, setHistoricosDisponibles] = useState<Array<{
+    tipo_historico: string;
+    tipo_eleccion: string;
+    anio: number;
+    estado_id?: number;
+    estado_nombre?: string;
+    municipio_id?: number;
+    municipio_nombre?: string;
+    partido_principal?: string;
+  }>>([]);
+  const [historicoSeleccion, setHistoricoSeleccion] = useState<{
+    anio?: number;
+    tipo_historico?: string;
+    tipo_eleccion?: string;
+    estado_id?: number;
+    municipio_id?: number;
+  }>({});
   const [filtroTerritorialIA, setFiltroTerritorialIA] = useState<{ tipo: 'todos' | 'zona' | 'seccion' | 'municipio'; valor: string }>({ tipo: 'todos', valor: '' });
   const [zonasDisponibles, setZonasDisponibles] = useState<Array<{ id: string; nombre: string }>>([]);
 
@@ -133,6 +150,7 @@ export default function InteligenciaElectoralPage() {
   useEffect(() => {
     cargarInicial();
     cargarZonas();
+    cargarHistoricosDisponibles();
   }, []);
 
   useEffect(() => {
@@ -176,6 +194,15 @@ export default function InteligenciaElectoralPage() {
       setZonasDisponibles((data || []).map((z: any) => ({ id: z.id, nombre: z.nombre })));
     } catch (err) {
       // No crítico: algunos tenants no usan zonas
+    }
+  };
+
+  const cargarHistoricosDisponibles = async () => {
+    try {
+      const { data } = await inteligenciaElectoralApi.getHistoricosDisponibles();
+      setHistoricosDisponibles(data || []);
+    } catch (err) {
+      // No crítico: módulo histórico puede no estar cargado
     }
   };
 
@@ -906,6 +933,48 @@ export default function InteligenciaElectoralPage() {
                   </p>
                 </div>
 
+                {fuentesIA.historico && historicosDisponibles.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="label flex items-center gap-2">
+                      <BarChart3 size={16} className="text-primary-600" /> Histórico electoral a usar
+                    </label>
+                    <select
+                      value={
+                        historicoSeleccion.anio
+                          ? `${historicoSeleccion.tipo_historico || 'principal'}|${historicoSeleccion.tipo_eleccion || 'ayuntamiento'}|${historicoSeleccion.anio}|${historicoSeleccion.estado_id || ''}|${historicoSeleccion.municipio_id || ''}`
+                          : ''
+                      }
+                      onChange={(e) => {
+                        if (!e.target.value) {
+                          setHistoricoSeleccion({});
+                          return;
+                        }
+                        const [tipo_historico, tipo_eleccion, anio, estado_id, municipio_id] = e.target.value.split('|');
+                        setHistoricoSeleccion({
+                          tipo_historico,
+                          tipo_eleccion,
+                          anio: Number(anio),
+                          estado_id: estado_id ? Number(estado_id) : undefined,
+                          municipio_id: municipio_id ? Number(municipio_id) : undefined,
+                        });
+                      }}
+                      className="input"
+                    >
+                      <option value="">Usar todos los históricos disponibles</option>
+                      {historicosDisponibles.map((h) => {
+                        const key = `${h.tipo_historico}|${h.tipo_eleccion}|${h.anio}|${h.estado_id || ''}|${h.municipio_id || ''}`;
+                        const label = `${h.anio} · ${h.tipo_historico === 'principal' ? 'Principal' : 'Complementario'} · ${h.tipo_eleccion.replace(/_/g, ' ')}${h.municipio_nombre ? ` · ${h.municipio_nombre}` : ''}${h.partido_principal ? ` · ${h.partido_principal}` : ''}`;
+                        return (
+                          <option key={key} value={key}>{label}</option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-xs text-secondary-500">
+                      Selecciona un histórico específico para que la IA use solo esos registros y secciones.
+                    </p>
+                  </div>
+                )}
+
                 <label className="label flex items-center gap-2">
                   <Database size={16} className="text-primary-600" /> Fuentes de datos a vincular
                 </label>
@@ -1026,13 +1095,20 @@ export default function InteligenciaElectoralPage() {
                   )}
 
                   {filtroTerritorialIA.tipo === 'municipio' && (
-                    <input
-                      type="text"
-                      value={filtroTerritorialIA.valor}
-                      onChange={(e) => setFiltroTerritorialIA({ ...filtroTerritorialIA, valor: e.target.value })}
-                      placeholder="Ej. Dolores Hidalgo"
-                      className="input"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={filtroTerritorialIA.valor}
+                        onChange={(e) => setFiltroTerritorialIA({ ...filtroTerritorialIA, valor: e.target.value })}
+                        placeholder="Ej. Dolores Hidalgo"
+                        className="input"
+                      />
+                      {historicosDisponibles.length > 0 && (
+                        <p className="text-xs text-secondary-500">
+                          Tip: si seleccionas un histórico electoral arriba, la IA usará automáticamente las secciones de ese municipio.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1082,6 +1158,7 @@ export default function InteligenciaElectoralPage() {
                         actorPrincipalId: actorPrincipalId || undefined,
                         fuentes: fuentesIA,
                         filtroTerritorial: filtroTerritorialIA,
+                        historicoSeleccion: Object.keys(historicoSeleccion).length ? historicoSeleccion : undefined,
                       });
                       setRespuestaIA(data.respuesta);
                       setResumenContextoIA(data.contexto_resumen || null);
@@ -1122,6 +1199,7 @@ export default function InteligenciaElectoralPage() {
                     { key: 'data', label: 'Indicadores municipales' },
                     { key: 'proyeccion', label: 'Proyección' },
                     { key: 'historicos', label: 'Histórico', active: (v: any) => typeof v === 'number' ? v > 0 : !!v },
+                    { key: 'historico_resumen', label: 'Resumen histórico' },
                     { key: 'votantes', label: 'Votantes' },
                     { key: 'lideres', label: 'Líderes' },
                     { key: 'eventos', label: 'Eventos' },

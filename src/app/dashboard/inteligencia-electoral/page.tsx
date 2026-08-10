@@ -1947,7 +1947,7 @@ Escenario simulado: ${nombreBloqueA} vs ${nombreBloqueB}`.trim(),
                         key: 'eleccion',
                         label: '1. Define tu elección',
                         desc: 'Cargo y año que vas a contender.',
-                        listo: !!eleccion?.id && !!eleccion?.nombre && !!eleccion?.puesto,
+                        listo: !!eleccionId && !!eleccion?.id && !!eleccion?.puesto,
                       },
                       {
                         key: 'competidores',

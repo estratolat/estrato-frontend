@@ -341,6 +341,10 @@ export const inteligenciaElectoralApi = {
   cargarExcel: (eleccionId: string, formData: FormData) =>
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/cargar-excel`, formData),
 
+  // Vincular histórico ya cargado a una elección
+  vincularHistorico: (eleccionId: string, data: { anio?: number; tipo_historico?: string; tipo_eleccion?: string; estado_id?: number; municipio_id?: number }) =>
+    api.post(`/inteligencia-electoral/elecciones/${eleccionId}/vincular-historico`, data),
+
   // Análisis
   getSecciones: (eleccionId: string) => api.get(`/inteligencia-electoral/elecciones/${eleccionId}/secciones`),
   getSeccionesDesdeHistorico: (eleccionId: string, params?: { anio?: number; tipo_historico?: string; tipo_eleccion?: string; estado_id?: number; municipio_id?: number }) =>

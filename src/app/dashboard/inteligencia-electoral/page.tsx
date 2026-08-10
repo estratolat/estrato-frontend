@@ -97,10 +97,10 @@ export default function InteligenciaElectoralPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "catalogos" | "carga" | "analisis" | "mapa" | "consultor"
+    "consultor" | "analisis" | "mapa"
   >("consultor");
   const [mostrarConfigAvanzada, setMostrarConfigAvanzada] = useState(false);
-  const [pasoDrawer, setPasoDrawer] = useState<'catalogos' | 'carga' | 'analisis' | 'mapa'>('catalogos');
+  const [pasoDrawer, setPasoDrawer] = useState<'eleccion' | 'competidores' | 'fuentes'>('eleccion');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [analizando, setAnalizando] = useState<string | null>(null);
@@ -224,6 +224,7 @@ export default function InteligenciaElectoralPage() {
   const [eleccionEdit, setEleccionEdit] = useState<string | null>(null);
   const [actorForm, setActorForm] = useState<Partial<Actor>>({});
   const [actorEdit, setActorEdit] = useState<string | null>(null);
+  const [mostrarOpcionesAvanzadasActor, setMostrarOpcionesAvanzadasActor] = useState(false);
 
   useEffect(() => {
     cargarInicial();
@@ -297,6 +298,51 @@ export default function InteligenciaElectoralPage() {
       setHistoricosDisponibles(data || []);
     } catch (err) {
       // No crítico: módulo histórico puede no estar cargado
+    }
+  };
+
+  const historicosCompatibles = useMemo(() => {
+    if (!eleccion) return [];
+    const puestoMap: Record<string, string> = {
+      Alcalde: "ayuntamiento",
+      "Diputaciones Federales": "diputado_federal",
+      "Diputaciones Locales": "diputado_local",
+      "Presidente República": "presidente_republica",
+    };
+    const tipoEsperado = puestoMap[eleccion.puesto];
+    return historicosDisponibles.filter((h) => {
+      const tipoOk = !tipoEsperado || h.tipo_eleccion === tipoEsperado;
+      const anioOk = !eleccion.anio || Math.abs(h.anio - eleccion.anio) <= 12;
+      return tipoOk && anioOk;
+    });
+  }, [eleccion, historicosDisponibles]);
+
+  const tieneDatosParaVistas = useMemo(() => {
+    const fuente = estadoInteligencia?.datos?.fuente;
+    return (
+      secciones.length > 0 ||
+      modoHistoricoEnAnalisis ||
+      (!!fuente && fuente !== "ninguna")
+    );
+  }, [secciones, modoHistoricoEnAnalisis, estadoInteligencia]);
+
+  const vincularHistoricoSugerido = async (sel: any) => {
+    if (!eleccionId || !sel?.anio) return;
+    try {
+      setImporting(true);
+      await inteligenciaElectoralApi.vincularHistorico(eleccionId, {
+        anio: sel.anio,
+        tipo_historico: sel.tipo_historico,
+        tipo_eleccion: sel.tipo_eleccion,
+        estado_id: sel.estado_id,
+        municipio_id: sel.municipio_id,
+      });
+      await cargarEstadoInteligencia(eleccionId);
+      setHistoricoSeleccion(sel);
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Error al vincular histórico");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -551,20 +597,27 @@ export default function InteligenciaElectoralPage() {
 
   const guardarActor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !actorForm.nombre_visual ||
-      !actorForm.columna_excel_alias ||
-      !eleccionId
-    )
-      return;
+    const payload = { ...actorForm };
+    if (!payload.nombre_visual || !eleccionId) return;
+    if (!payload.columna_excel_alias) {
+      payload.columna_excel_alias = payload.nombre_visual
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 30) || "actor";
+    }
+    if (!payload.tipo_voto) payload.tipo_voto = "TOTAL";
     try {
       if (actorEdit) {
-        await inteligenciaElectoralApi.updateActor(actorEdit, actorForm);
+        await inteligenciaElectoralApi.updateActor(actorEdit, payload);
       } else {
-        await inteligenciaElectoralApi.createActor(eleccionId, actorForm);
+        await inteligenciaElectoralApi.createActor(eleccionId, payload);
       }
       setActorForm({});
       setActorEdit(null);
+      setMostrarOpcionesAvanzadasActor(false);
       cargarEleccion(eleccionId);
     } catch (err: any) {
       setError(err.response?.data?.message || "Error al guardar actor");
@@ -747,7 +800,7 @@ export default function InteligenciaElectoralPage() {
 
           <button
             onClick={() => {
-              setPasoDrawer('catalogos');
+              setPasoDrawer('eleccion');
               setMostrarConfigAvanzada(true);
             }}
             className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-secondary-700 transition hover:bg-secondary-50"
@@ -784,7 +837,7 @@ export default function InteligenciaElectoralPage() {
             {elecciones.length === 0 && (
               <button
                 onClick={() => {
-                  setPasoDrawer('catalogos');
+                  setPasoDrawer('eleccion');
                   setMostrarConfigAvanzada(true);
                 }}
                 className="btn-primary flex items-center gap-2"
@@ -823,7 +876,7 @@ export default function InteligenciaElectoralPage() {
                 </div>
                 <button
                   onClick={() => {
-                    setPasoDrawer('catalogos');
+                    setPasoDrawer('eleccion');
                     setMostrarConfigAvanzada(true);
                   }}
                   className="text-xs font-medium text-primary-600 hover:text-primary-700"
@@ -1458,6 +1511,398 @@ export default function InteligenciaElectoralPage() {
                   })}
                 </div>
               )}
+
+            {/* Acceso rápido a Análisis y Mapa */}
+            {eleccionId && tieneDatosParaVistas && (
+              <div className="card p-4">
+                <h4 className="mb-3 flex items-center gap-2 font-bold text-secondary-900">
+                  <BarChart3 size={18} className="text-primary-600" /> Vistas de resultado
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    onClick={() => setActiveTab(activeTab === 'analisis' ? 'consultor' : 'analisis')}
+                    className={`flex items-center justify-between rounded-lg border p-4 text-left transition ${activeTab === 'analisis' ? 'border-primary-500 bg-primary-50' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}
+                  >
+                    <div>
+                      <p className="font-bold text-secondary-900">Ver análisis por sección</p>
+                      <p className="text-xs text-secondary-500">Resumen, ganador por sección y simulador de alianzas.</p>
+                    </div>
+                    <ChevronRight size={18} className="text-secondary-400" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (activeTab !== 'mapa') {
+                        cargarMapaSecciones(eleccionId);
+                      }
+                      setActiveTab(activeTab === 'mapa' ? 'consultor' : 'mapa');
+                    }}
+                    className={`flex items-center justify-between rounded-lg border p-4 text-left transition ${activeTab === 'mapa' ? 'border-primary-500 bg-primary-50' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}
+                  >
+                    <div>
+                      <p className="font-bold text-secondary-900">Ver mapa territorial</p>
+                      <p className="text-xs text-secondary-500">Secciones coloreadas por ganador y clasificación.</p>
+                    </div>
+                    <ChevronRight size={18} className="text-secondary-400" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'analisis' && eleccionId && (
+              <div className="space-y-6">
+                {estadoInteligencia?.pasos?.datos?.listo && actores.length > 0 && (
+                  <div className="card p-5">
+                    <h4 className="mb-3 flex items-center gap-2 text-lg font-bold text-secondary-900">
+                      <Layers size={18} className="text-primary-600" /> Simulador de alianzas
+                    </h4>
+                    <p className="mb-4 text-sm text-secondary-600">
+                      Arma dos bloques con los actores de esta elección y pregúntale a la IA cómo quedaría el escenario.
+                    </p>
+
+                    <div className="mb-4 grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="label">Nombre del bloque A</label>
+                        <input
+                          value={nombreBloqueA}
+                          onChange={(e) => setNombreBloqueA(e.target.value)}
+                          className="input"
+                          placeholder="Ej. Alianza Va por México"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="label">Nombre del bloque B</label>
+                        <input
+                          value={nombreBloqueB}
+                          onChange={(e) => setNombreBloqueB(e.target.value)}
+                          className="input"
+                          placeholder="Ej. Juntos Hacemos Historia"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {actores.map((a) => {
+                        const enA = bloqueA.includes(a.id);
+                        const enB = bloqueB.includes(a.id);
+                        return (
+                          <div key={a.id} className="rounded-lg border border-gray-200 bg-white p-3">
+                            <div className="mb-2 flex items-center gap-2">
+                              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: a.color_hex || a.partido?.color_hex || '#ccc' }} />
+                              <span className="text-sm font-medium text-secondary-900">{a.nombre_visual}</span>
+                              <span className="text-xs text-secondary-500">{a.partido?.siglas || a.tipo_actor}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBloqueA((prev) => prev.filter((id) => id !== a.id).concat(enA ? [] : [a.id]));
+                                  setBloqueB((prev) => prev.filter((id) => id !== a.id));
+                                }}
+                                className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition ${enA ? 'bg-primary-600 text-white' : 'bg-gray-100 text-secondary-600 hover:bg-gray-200'}`}
+                              >
+                                Bloque A
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBloqueB((prev) => prev.filter((id) => id !== a.id).concat(enB ? [] : [a.id]));
+                                  setBloqueA((prev) => prev.filter((id) => id !== a.id));
+                                }}
+                                className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition ${enB ? 'bg-secondary-700 text-white' : 'bg-gray-100 text-secondary-600 hover:bg-gray-200'}`}
+                              >
+                                Bloque B
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBloqueA((prev) => prev.filter((id) => id !== a.id));
+                                  setBloqueB((prev) => prev.filter((id) => id !== a.id));
+                                }}
+                                className="flex-1 rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-secondary-600 hover:bg-gray-200"
+                              >
+                                Neutral
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {bloqueA.length === 0 || bloqueB.length === 0 ? (
+                      <p className="text-sm text-amber-600">Selecciona al menos un actor para cada bloque.</p>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          const nombresA = actores.filter((a) => bloqueA.includes(a.id)).map((a) => a.nombre_visual).join(', ');
+                          const nombresB = actores.filter((a) => bloqueB.includes(a.id)).map((a) => a.nombre_visual).join(', ');
+                          const preguntaAlianza = `Simula un escenario electoral donde "${nombreBloqueA}" (${nombresA}) compite como un solo bloque contra "${nombreBloqueB}" (${nombresB}). Basándote en los datos cargados (histórico/sábanas), dime: ¿quién ganaría el territorio total?, ¿en qué secciones cambiaría el ganador?, ¿cuál sería el margen aproximado de votos? y ¿qué secciones debería priorizar cada bloque?`;
+                          setPregunta(preguntaAlianza);
+                          setSimulandoAlianza(true);
+                          setActiveTab('consultor');
+                          setRespuestaIA(null);
+                          setConsultando(true);
+                          setError(null);
+                          try {
+                            const { data } = await inteligenciaElectoralApi.consultarIA({
+                              pregunta: preguntaAlianza,
+                              contextoCampana: {
+                                ...contextoCampana,
+                                escenario: `${contextoCampana.escenario || ''}
+
+Escenario simulado: ${nombreBloqueA} vs ${nombreBloqueB}`.trim(),
+                              },
+                              eleccionId: eleccionId || undefined,
+                              actorPrincipalId: actorPrincipalId || undefined,
+                              fuentes: fuentesIA,
+                              filtroTerritorial: filtroTerritorialIA,
+                              historicoSeleccion: Object.keys(historicoSeleccion).length ? historicoSeleccion : undefined,
+                              rival: Object.keys(rival).length ? rival : undefined,
+                            });
+                            setRespuestaIA(data.respuesta);
+                            setResumenContextoIA(data.contexto_resumen || null);
+                            if (eleccionId) {
+                              const nuevoItem = {
+                                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                                fecha: new Date().toISOString(),
+                                pregunta: preguntaAlianza,
+                                respuesta: data.respuesta,
+                                contexto_resumen: data.contexto_resumen,
+                              };
+                              const actualizado = [nuevoItem, ...historialIA];
+                              setHistorialIA(actualizado);
+                              setHistorialExpandidoId(nuevoItem.id);
+                              localStorage.setItem(claveHistorialIA(eleccionId), JSON.stringify(actualizado.slice(0, 50)));
+                            }
+                          } catch (err: any) {
+                            setError(err.response?.data?.message || 'Error al simular la alianza');
+                          } finally {
+                            setConsultando(false);
+                            setSimulandoAlianza(false);
+                          }
+                        }}
+                        disabled={simulandoAlianza}
+                        className="btn-primary flex items-center justify-center gap-2 disabled:opacity-60"
+                      >
+                        {simulandoAlianza ? (
+                          <>
+                            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+                            Simulando...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={16} /> Preguntar a la IA cómo quedaría
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  <div className="card overflow-hidden">
+                    <div className="p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-secondary-900">
+                            <BarChart3 size={20} className="text-primary-600" /> Resumen por sección
+                          </h3>
+                          <p className="text-sm text-secondary-500">
+                            {secciones.length > 0
+                              ? `${secciones.length} secciones procesadas`
+                              : modoHistoricoEnAnalisis
+                                ? `${seccionesDesdeHistorico.length} secciones desde Histórico Electoral`
+                                : "0 secciones procesadas"}
+                          </p>
+                        </div>
+                        {secciones.length === 0 && historicosDisponibles.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={
+                                historicoSeleccion.anio
+                                  ? `${historicoSeleccion.tipo_historico || "principal"}|${historicoSeleccion.tipo_eleccion || "ayuntamiento"}|${historicoSeleccion.anio}|${historicoSeleccion.estado_id || ""}|${historicoSeleccion.municipio_id || ""}`
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                if (!e.target.value) {
+                                  setHistoricoSeleccion({});
+                                  setModoHistoricoEnAnalisis(false);
+                                  setSeccionesDesdeHistorico([]);
+                                  return;
+                                }
+                                const [tipo_historico, tipo_eleccion, anio, estado_id, municipio_id] = e.target.value.split("|");
+                                const sel = {
+                                  tipo_historico,
+                                  tipo_eleccion,
+                                  anio: Number(anio),
+                                  estado_id: estado_id ? Number(estado_id) : undefined,
+                                  municipio_id: municipio_id ? Number(municipio_id) : undefined,
+                                };
+                                setHistoricoSeleccion(sel);
+                                const hist = historicosDisponibles.find(
+                                  (h) =>
+                                    `${h.tipo_historico}|${h.tipo_eleccion}|${h.anio}|${h.estado_id || ""}|${h.municipio_id || ""}` ===
+                                    e.target.value,
+                                );
+                                cargarSeccionesDesdeHistorico(hist);
+                              }}
+                              className="input"
+                            >
+                              <option value="">Ver desde histórico electoral...</option>
+                              {historicosDisponibles.map((h) => {
+                                const key = `${h.tipo_historico}|${h.tipo_eleccion}|${h.anio}|${h.estado_id || ""}|${h.municipio_id || ""}`;
+                                const label = `${h.anio} · ${h.tipo_historico === "principal" ? "Principal" : "Complementario"} · ${h.tipo_eleccion.replace(/_/g, " ")}${h.municipio_nombre ? ` · ${h.municipio_nombre}` : ""}`;
+                                return (
+                                  <option key={key} value={key}>
+                                    {label}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="border-b border-gray-200 bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Sección</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Ganador</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Votos</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Lista Nominal</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Participación</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">% Nulos</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Clasificación</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {secciones.length > 0 &&
+                            secciones.map((s) => (
+                              <tr key={s.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-medium text-gray-900">{s.seccion}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.actor?.color_hex || s.actor?.partido?.color_hex || "#ccc" }} />
+                                    <span>{s.actor?.nombre_visual || "Sin ganador"}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-gray-600">{s.total_votos_total.toLocaleString()}</td>
+                                <td className="px-4 py-3 text-gray-600">{s.lista_nominal_total.toLocaleString()}</td>
+                                <td className="px-4 py-3 text-gray-600">{s.porcentaje_participacion.toFixed(2)}%</td>
+                                <td className="px-4 py-3 text-gray-600">{s.porcentaje_votos_nulos.toFixed(2)}%</td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-medium ${colorClasificacion(s.clasificacion_estrategica)}`}>
+                                    {s.clasificacion_estrategica}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <button
+                                    onClick={() => analizarSeccion(s.seccion)}
+                                    disabled={analizando === s.seccion}
+                                    className="flex items-center gap-1 rounded-md bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+                                  >
+                                    <BrainCircuit size={14} />
+                                    {analizando === s.seccion ? "Analizando..." : "Analizar con IA"}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          {secciones.length === 0 && modoHistoricoEnAnalisis &&
+                            seccionesDesdeHistorico.map((s: any, idx: number) => (
+                              <tr key={`hist-${idx}`} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-medium text-gray-900">{s.seccion}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.actor_ganador?.color_hex || "#ccc" }} />
+                                    <span>{s.actor_ganador?.nombre_visual || "Sin ganador"}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-gray-600">{(s.total_votos_total || 0).toLocaleString()}</td>
+                                <td className="px-4 py-3 text-gray-600">{(s.lista_nominal_total || 0).toLocaleString()}</td>
+                                <td className="px-4 py-3 text-gray-600">{(s.porcentaje_participacion || 0).toFixed(2)}%</td>
+                                <td className="px-4 py-3 text-gray-600">{(s.porcentaje_votos_nulos || 0).toFixed(2)}%</td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-medium ${colorClasificacion(s.clasificacion_estrategica)}`}>
+                                    {s.clasificacion_estrategica}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className="text-xs text-secondary-500">Histórico</span>
+                                </td>
+                              </tr>
+                            ))}
+                          {secciones.length === 0 && !modoHistoricoEnAnalisis && (
+                            <tr>
+                              <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                                No hay secciones cargadas. Elige una fuente de votos en Preparar datos.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {analisisResult && (
+                    <div className="card p-5">
+                      <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-secondary-900">
+                        <BrainCircuit size={20} className="text-primary-600" />
+                        Análisis IA · Sección {analisisResult.seccion}
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="rounded-lg border border-primary-100 bg-primary-50 p-3">
+                          <p className="text-xs text-secondary-500">Proyección de votos mínimos</p>
+                          <p className="text-xl font-bold text-primary-700">{analisisResult.proyeccion_votos?.toLocaleString() || "—"}</p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <p className="text-xs text-secondary-500">Nivel de riesgo</p>
+                          <p className={`text-xl font-bold ${analisisResult.nivel_riesgo === "ALTO" ? "text-red-600" : analisisResult.nivel_riesgo === "BAJO" ? "text-green-600" : "text-yellow-600"}`}>
+                            {analisisResult.nivel_riesgo}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <p className="text-xs text-secondary-500">Actor ganador</p>
+                          <p className="text-xl font-bold text-secondary-800">{analisisResult.actor_ganador}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-sm font-medium text-secondary-900">Auditoría / Defensa electoral</p>
+                        <p className="text-sm text-secondary-600">{analisisResult.auditoria_nulos_observaciones}</p>
+                      </div>
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-secondary-900">Estrategia recomendada</p>
+                        <ul className="mt-1 list-inside list-disc text-sm text-secondary-600">
+                          {analisisResult.estrategia?.map((s: string, i: number) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'mapa' && eleccionId && (
+              <div className="space-y-4">
+                <div className="card p-4">
+                  <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-secondary-900">
+                    <Icon name="mapa" size={20} className="text-primary-600" /> Mapa territorial por ganador
+                  </h3>
+                  <p className="text-sm text-secondary-500">
+                    {eleccion
+                      ? `Elección: ${eleccion.nombre} · Secciones coloreadas según el actor ganador y clasificación estratégica.`
+                      : "Selecciona una elección para ver el mapa."}
+                  </p>
+                </div>
+                {eleccion && (
+                  <div className="card overflow-hidden p-2">
+                    <MapaSecciones geojson={geojsonMapa} cargando={cargandoMapa} />
+                  </div>
+                )}
+              </div>
+            )}
             </div>
           </>
         )}
@@ -1494,1065 +1939,500 @@ export default function InteligenciaElectoralPage() {
                   </button>
                 </div>
 
-                {/* Wizard steps */}
-                <div className="grid grid-cols-4 gap-2">
+                {/* Checklist de 3 pasos */}
+                <div className="space-y-2">
                   {(
                     [
-                      { key: 'catalogos', label: 'Define tu elección', desc: 'Partidos, cargo/año y actores/coaliciones', icon: Users },
-                      { key: 'carga', label: 'Cargar resultados', desc: 'Sábanas de casilla o histórico electoral', icon: Upload },
-                      { key: 'analisis', label: 'Analizar secciones', desc: 'Revisa secciones y simula alianzas', icon: BarChart3 },
-                      { key: 'mapa', label: 'Ver mapa', desc: 'Visualización territorial por ganador', icon: MapPin },
+                      {
+                        key: 'eleccion',
+                        label: '1. Define tu elección',
+                        desc: 'Cargo y año que vas a contender.',
+                        listo: !!eleccion?.id && !!eleccion?.nombre && !!eleccion?.puesto,
+                      },
+                      {
+                        key: 'competidores',
+                        label: '2. ¿Quién compite?',
+                        desc: 'Tú, tu rival, partidos, coaliciones o independientes.',
+                        listo: actores.length > 0,
+                        bloqueado: !eleccion?.id,
+                      },
+                      {
+                        key: 'fuentes',
+                        label: '3. ¿De dónde vienen los votos?',
+                        desc: 'Histórico ya cargado, sábana oficial o empezar en blanco.',
+                        listo: !!estadoInteligencia?.datos?.fuente && estadoInteligencia.datos.fuente !== 'ninguna',
+                        bloqueado: !eleccion?.id || actores.length === 0,
+                      },
                     ] as {
-                      key: 'catalogos' | 'carga' | 'analisis' | 'mapa';
+                      key: 'eleccion' | 'competidores' | 'fuentes';
                       label: string;
                       desc: string;
-                      icon: any;
+                      listo: boolean;
+                      bloqueado?: boolean;
                     }[]
-                  ).map((s) => {
-                    const clavePaso = s.key === 'carga' ? 'datos' : s.key;
-                    const pasoBackend = estadoInteligencia?.pasos?.[clavePaso as keyof NonNullable<typeof estadoInteligencia.pasos>];
-                    const eleccionSeleccionada = eleccionId || eleccion?.id;
-                    // Fallback local si el backend aún no devuelve pasos
-                    const completo = pasoBackend?.listo ?? (
-                      s.key === 'catalogos'
-                        ? partidos.length > 0 && elecciones.length > 0 && (actores.length > 0 || !!eleccionSeleccionada)
-                        : s.key === 'carga'
-                          ? Number(estadoInteligencia?.datos?.sábanas || 0) > 0 || Number(estadoInteligencia?.datos?.históricos || 0) > 0
-                          : s.key === 'analisis'
-                            ? Number(estadoInteligencia?.datos?.secciones || 0) > 0 || seccionesDesdeHistorico.length > 0
-                            : !!geojsonMapa
-                    );
-                    const mensaje = pasoBackend?.mensaje || s.desc;
-                    return (
-                      <button
-                        key={s.key}
-                        onClick={() => { setPasoDrawer(s.key as any); setActiveTab(s.key as any); }}
-                        className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition ${
-                          pasoDrawer === s.key
-                            ? 'border-primary-500 bg-primary-50'
+                  ).map((s) => (
+                    <button
+                      key={s.key}
+                      disabled={s.bloqueado}
+                      onClick={() => setPasoDrawer(s.key)}
+                      className={`flex w-full items-center justify-between rounded-lg border p-3 text-left transition ${
+                        pasoDrawer === s.key
+                          ? 'border-primary-500 bg-primary-50'
+                          : s.bloqueado
+                            ? 'cursor-not-allowed border-secondary-100 bg-secondary-50 opacity-60'
                             : 'border-secondary-200 bg-white hover:bg-secondary-50'
-                        }`}
-                      >
-                        <div className="flex w-full items-center justify-between">
-                          <span className="flex items-center gap-1 text-sm font-bold text-secondary-900">
-                            <s.icon size={16} className="text-primary-600" /> {s.label}
-                          </span>
-                          {completo ? (
-                            <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">✓ LISTO</span>
-                          ) : (
-                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">PEND</span>
-                          )}
-                        </div>
-                        <span className="text-xs text-secondary-500">{mensaje}</span>
-                      </button>
-                    );
-                  })}
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-bold text-secondary-900">{s.label}</p>
+                        <p className="text-xs text-secondary-500">{s.desc}</p>
+                      </div>
+                      {s.listo ? (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">✓ LISTO</span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">PEND</span>
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Drawer body */}
               <div className="flex-1 overflow-y-auto p-6">
-                {pasoDrawer === 'catalogos' && (
-                  <div className="space-y-4">
+                {pasoDrawer === 'eleccion' && (
+                  <div className="space-y-5">
                     <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
-                      <p className="font-bold">¿Para qué sirve este paso?</p>
-                      <p>
-                        Antes de que la IA te asesore, necesita saber <strong>quiénes compiten</strong> y por qué cargo. Aquí defines los partidos (con siglas y color), la elección (año y puesto, ej. Alcalde 2027) y los actores o coaliciones que buscan votos.
-                      </p>
-                      <p className="mt-2 flex items-center gap-2 font-medium">
-                        {estadoInteligencia?.pasos?.catalogos?.listo ? (
-                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.catalogos.mensaje}</>
-                        ) : (
-                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.catalogos?.mensaje || 'Completa partidos, elección y actores'}</>
-                        )}
-                      </p>
-                    </div>
-                        <div className="grid gap-6 lg:grid-cols-2">
-                          {/* Partidos */}
-                          <div className="card p-4">
-                            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-secondary-900">
-                              <Award size={20} className="text-primary-600" /> Partidos
-                              Políticos
-                            </h2>
-
-                            <form
-                              onSubmit={guardarPartido}
-                              className="mb-4 grid gap-3 sm:grid-cols-4"
-                            >
-                              <input
-                                placeholder="Nombre"
-                                value={partidoForm.nombre || ""}
-                                onChange={(e) =>
-                                  setPartidoForm({ ...partidoForm, nombre: e.target.value })
-                                }
-                                className="input"
-                                required
-                              />
-                              <input
-                                placeholder="Siglas"
-                                value={partidoForm.siglas || ""}
-                                onChange={(e) =>
-                                  setPartidoForm({ ...partidoForm, siglas: e.target.value })
-                                }
-                                className="input"
-                                required
-                              />
-                              <input
-                                type="color"
-                                placeholder="Color"
-                                value={partidoForm.color_hex || "#3B82F6"}
-                                onChange={(e) =>
-                                  setPartidoForm({ ...partidoForm, color_hex: e.target.value })
-                                }
-                                className="input h-10 px-2"
-                              />
-                              <button
-                                type="submit"
-                                className="btn-primary flex items-center justify-center gap-1"
-                              >
-                                <Plus size={16} /> {partidoEdit ? "Actualizar" : "Agregar"}
-                              </button>
-                            </form>
-
-                            <div className="divide-y divide-gray-100">
-                              {partidos.map((p) => (
-                                <div
-                                  key={p.id}
-                                  className="flex items-center justify-between py-2"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className="h-4 w-4 rounded-full"
-                                      style={{ backgroundColor: p.color_hex || "#ccc" }}
-                                    />
-                                    <span className="font-medium">{p.nombre}</span>
-                                    <span className="text-xs text-secondary-500">
-                                      ({p.siglas})
-                                    </span>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() => {
-                                        setPartidoEdit(p.id);
-                                        setPartidoForm(p);
-                                      }}
-                                      className="rounded p-1 text-secondary-500 hover:bg-secondary-100"
-                                    >
-                                      <Edit2 size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => eliminarPartido(p.id)}
-                                      className="rounded p-1 text-red-500 hover:bg-red-50"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Elecciones */}
-                          <div className="card p-4">
-                            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-secondary-900">
-                              <Calendar size={20} className="text-primary-600" /> Eventos
-                              Electorales
-                            </h2>
-
-                            <form
-                              onSubmit={guardarEleccion}
-                              className="mb-4 grid gap-3 sm:grid-cols-5"
-                            >
-                              <input
-                                placeholder="Nombre (opcional)"
-                                value={eleccionForm.nombre || ""}
-                                onChange={(e) =>
-                                  setEleccionForm({ ...eleccionForm, nombre: e.target.value })
-                                }
-                                className="input"
-                              />
-                              <input
-                                type="number"
-                                placeholder="Año"
-                                value={eleccionForm.anio || ""}
-                                onChange={(e) =>
-                                  setEleccionForm({
-                                    ...eleccionForm,
-                                    anio: Number(e.target.value),
-                                  })
-                                }
-                                className="input"
-                                required
-                              />
-                              <select
-                                value={eleccionForm.puesto || ""}
-                                onChange={(e) =>
-                                  setEleccionForm({ ...eleccionForm, puesto: e.target.value })
-                                }
-                                className="input"
-                                required
-                              >
-                                <option value="">Seleccionar cargo...</option>
-                                <option value="Presidente República">
-                                  Presidente República
-                                </option>
-                                <option value="Diputaciones Federales">
-                                  Diputaciones Federales
-                                </option>
-                                <option value="Diputaciones Locales">
-                                  Diputaciones Locales
-                                </option>
-                                <option value="Alcalde">Alcalde</option>
-                                <option value="Otro">Otro</option>
-                              </select>
-                              <select
-                                value={eleccionForm.activa ? "true" : "false"}
-                                onChange={(e) =>
-                                  setEleccionForm({
-                                    ...eleccionForm,
-                                    activa: e.target.value === "true",
-                                  })
-                                }
-                                className="input"
-                              >
-                                <option value="true">Activa</option>
-                                <option value="false">Inactiva</option>
-                              </select>
-                              <button
-                                type="submit"
-                                className="btn-primary flex items-center justify-center gap-1"
-                              >
-                                <Plus size={16} /> {eleccionEdit ? "Actualizar" : "Agregar"}
-                              </button>
-                            </form>
-
-                            <div className="divide-y divide-gray-100">
-                              {elecciones.map((e) => (
-                                <div
-                                  key={e.id}
-                                  className="flex items-center justify-between py-2"
-                                >
-                                  <div>
-                                    <span className="font-medium">{e.nombre}</span>
-                                    <span className="ml-2 text-xs text-secondary-500">
-                                      {e.anio} · {e.puesto} · {e._count?.actores || 0} actores
-                                    </span>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() => {
-                                        setEleccionEdit(e.id);
-                                        setEleccionForm(e);
-                                      }}
-                                      className="rounded p-1 text-secondary-500 hover:bg-secondary-100"
-                                    >
-                                      <Edit2 size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => eliminarEleccion(e.id)}
-                                      className="rounded p-1 text-red-500 hover:bg-red-50"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Actores */}
-                          <div className="card p-4 lg:col-span-2">
-                            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-secondary-900">
-                              <Users size={20} className="text-primary-600" /> Actores y
-                              Coaliciones
-                              {eleccion && (
-                                <span className="text-sm font-normal text-secondary-500">
-                                  · {eleccion.nombre}
-                                </span>
-                              )}
-                            </h2>
-
-                                {(!eleccionId || !eleccion) && (
-                                  <p className="mb-3 text-sm text-amber-600">
-                                    ⚠️ No hay una elección seleccionada. Selecciona una arriba para guardar actores correctamente.
-                                  </p>
-                                )}
-                                <form
-                                  onSubmit={guardarActor}
-                                  className="mb-4 grid gap-3 sm:grid-cols-8"
-                                >
-                                  <select
-                                    value={actorForm.partido_id || ""}
-                                    onChange={(e) =>
-                                      setActorForm({
-                                        ...actorForm,
-                                        partido_id: e.target.value || undefined,
-                                      })
-                                    }
-                                    className="input"
-                                  >
-                                    <option value="">Sin partido</option>
-                                    {partidos.map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.siglas}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <select
-                                    value={actorForm.tipo_actor || "PARTIDO"}
-                                    onChange={(e) =>
-                                      setActorForm({
-                                        ...actorForm,
-                                        tipo_actor: e.target.value as any,
-                                      })
-                                    }
-                                    className="input"
-                                    title="Tipo de actor"
-                                  >
-                                    <option value="PARTIDO">Partido</option>
-                                    <option value="CANDIDATO">Candidato</option>
-                                    <option value="COALICION">Coalición</option>
-                                    <option value="INDEPENDIENTE">Independiente</option>
-                                  </select>
-                                  <input
-                                    placeholder="Nombre visual"
-                                    value={actorForm.nombre_visual || ""}
-                                    onChange={(e) =>
-                                      setActorForm({
-                                        ...actorForm,
-                                        nombre_visual: e.target.value,
-                                      })
-                                    }
-                                    className="input"
-                                    required
-                                  />
-                                  <input
-                                    placeholder="Nombre coalición"
-                                    value={actorForm.nombre_coalicion || ""}
-                                    onChange={(e) =>
-                                      setActorForm({
-                                        ...actorForm,
-                                        nombre_coalicion: e.target.value,
-                                      })
-                                    }
-                                    className="input"
-                                    title="Solo si es coalición"
-                                  />
-                                  <input
-                                    type="color"
-                                    value={actorForm.color_hex || "#3B82F6"}
-                                    onChange={(e) =>
-                                      setActorForm({ ...actorForm, color_hex: e.target.value })
-                                    }
-                                    className="input h-10 px-2"
-                                  />
-                                  <input
-                                    placeholder="Alias Excel"
-                                    value={actorForm.columna_excel_alias || ""}
-                                    onChange={(e) =>
-                                      setActorForm({
-                                        ...actorForm,
-                                        columna_excel_alias: e.target.value,
-                                      })
-                                    }
-                                    className="input"
-                                    required
-                                  />
-                                  <select
-                                    value={actorForm.tipo_voto || "TOTAL"}
-                                    onChange={(e) =>
-                                      setActorForm({
-                                        ...actorForm,
-                                        tipo_voto: e.target.value as any,
-                                      })
-                                    }
-                                    className="input"
-                                    title="¿Voto total o diferenciado?"
-                                  >
-                                    <option value="TOTAL">Voto total</option>
-                                    <option value="DIFERENCIADO">Voto diferenciado</option>
-                                  </select>
-                                  <button
-                                    type="submit"
-                                    className="btn-primary flex items-center justify-center gap-1"
-                                  >
-                                    <Plus size={16} /> {actorEdit ? "Actualizar" : "Agregar"}
-                                  </button>
-                                </form>
-
-                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                  {actores.map((a) => (
-                                    <div
-                                      key={a.id}
-                                      className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-3"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span
-                                          className="h-4 w-4 rounded-full"
-                                          style={{
-                                            backgroundColor:
-                                              a.color_hex || a.partido?.color_hex || "#ccc",
-                                          }}
-                                        />
-                                        <div>
-                                          <p className="font-medium">{a.nombre_visual}</p>
-                                          <p className="text-xs text-secondary-500">
-                                            {a.tipo_actor === "COALICION"
-                                              ? `Coalición: ${a.nombre_coalicion || "—"}`
-                                              : a.partido?.siglas || a.tipo_actor}{" "}
-                                            ·{" "}
-                                            {a.tipo_voto === "DIFERENCIADO"
-                                              ? "Voto diferenciado"
-                                              : "Voto total"}{" "}
-                                            · Excel: {a.columna_excel_alias}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <div className="flex gap-1">
-                                        <button
-                                          onClick={() => {
-                                            setActorEdit(a.id);
-                                            setActorForm(a);
-                                          }}
-                                          className="rounded p-1 text-secondary-500 hover:bg-secondary-100"
-                                        >
-                                          <Edit2 size={14} />
-                                        </button>
-                                        <button
-                                          onClick={() => eliminarActor(a.id)}
-                                          className="rounded p-1 text-red-500 hover:bg-red-50"
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                          </div>
-                        </div>
-                  </div>
-                )}
-
-                {pasoDrawer === 'carga' && (
-                  <div className="space-y-4">
-                    <div className="rounded-lg bg-green-50 p-4 text-sm text-green-800">
-                      <p className="font-bold">¿Para qué sirve este paso?</p>
-                      <p>
-                        Aquí le dices a la IA <strong>de dónde sacar los votos</strong>. Puedes subir una <strong>sábana oficial</strong> (resultados por casilla) o importar un <strong>histórico electoral</strong> que ya tengas cargado en ESTRATO. Con eso la IA calcula el ganador por sección, votos nulos, participación y puede proyectar escenarios.
-                      </p>
-                      <p className="mt-2 flex items-center gap-2 font-medium">
-                        {estadoInteligencia?.pasos?.datos?.listo ? (
-                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.datos.mensaje}</>
-                        ) : (
-                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.datos?.mensaje || 'Sube una sábana o importa un histórico'}</>
-                        )}
-                      </p>
-                    </div>
-                        <div className="card p-6">
-                          {!eleccion ? (
-                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                              <strong>Paso 1:</strong> selecciona o crea una elección arriba
-                              para poder cargar sábanas.
-                            </div>
-                          ) : (
-                            <>
-                              <h3 className="mb-2 text-lg font-bold text-secondary-900">
-                                Cargar sábanas de votación
-                              </h3>
-                              <p className="mb-4 text-sm text-secondary-500">
-                                Elección: <strong>{eleccion.nombre}</strong> · {actores.length}{" "}
-                                actores configurados · {secciones.length} secciones cargadas
-                              </p>
-
-                              <div className="mb-6 flex flex-wrap gap-3">
-                                <button
-                                  onClick={descargarPlantilla}
-                                  className="btn-secondary flex items-center gap-2"
-                                >
-                                  <Download size={16} /> Plantilla para carga
-                                </button>
-                                <button
-                                  onClick={descargarSabana}
-                                  disabled={secciones.length === 0}
-                                  className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-                                  title={
-                                    secciones.length === 0 ? "Carga resultados primero" : ""
-                                  }
-                                >
-                                  <Download size={16} /> Sábana completa
-                                </button>
-                              </div>
-
-                              <form onSubmit={cargarExcel} className="space-y-4">
-                                <div>
-                                  <label className="label">
-                                    Archivo Excel (.xlsx, .xls o .csv)
-                                  </label>
-                                  <input
-                                    type="file"
-                                    name="archivo"
-                                    accept=".xlsx,.xls,.csv"
-                                    className="input"
-                                    required
-                                  />
-                                </div>
-                                <button
-                                  type="submit"
-                                  disabled={importing || actores.length === 0}
-                                  className="btn-primary flex items-center gap-2 disabled:opacity-60"
-                                  title={
-                                    actores.length === 0
-                                      ? "Configura actores antes de cargar"
-                                      : ""
-                                  }
-                                >
-                                  <Upload size={18} />
-                                  {importing ? "Procesando..." : "Cargar sábanas"}
-                                </button>
-                                {actores.length === 0 && (
-                                  <p className="text-sm text-amber-700">
-                                    Configura al menos un actor/coalición en la pestaña
-                                    Catálogos para poder cargar votos.
-                                  </p>
-                                )}
-                              </form>
-                            </>
-                          )}
-
-                          {importResult && (
-                            <div
-                              className={`mt-6 rounded-lg border p-4 ${importResult.error ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}
-                            >
-                              <div className="flex items-start gap-3">
-                                {importResult.error ? (
-                                  <AlertCircle className="mt-0.5 h-5 w-5 text-red-600" />
-                                ) : (
-                                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-green-600" />
-                                )}
-                                <div className="text-sm">
-                                  {importResult.error ? (
-                                    <p className="font-medium text-red-700">
-                                      {importResult.error}
-                                    </p>
-                                  ) : (
-                                    <>
-                                      <p className="font-medium text-green-700">
-                                        Carga completada: {importResult.insertados} de{" "}
-                                        {importResult.filasLeidas} casillas.
-                                      </p>
-                                      {importResult.errores > 0 && (
-                                        <p className="mt-1 text-red-600">
-                                          Errores: {importResult.errores}
-                                        </p>
-                                      )}
-                                      {importResult.detallesErrores?.length > 0 && (
-                                        <ul className="mt-2 max-h-40 overflow-y-auto list-inside list-disc text-red-600">
-                                          {importResult.detallesErrores.map(
-                                            (e: any, i: number) => (
-                                              <li key={i}>
-                                                Fila {e.fila}: {e.error}
-                                              </li>
-                                            ),
-                                          )}
-                                        </ul>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                  </div>
-                )}
-
-                {pasoDrawer === 'analisis' && (
-                  <div className="space-y-4">
-                    <div className="rounded-lg bg-purple-50 p-4 text-sm text-purple-800">
-                      <p className="font-bold">¿Para qué sirve este paso?</p>
-                      <p>
-                        Aquí revisas el <strong>ganador por sección</strong>, los votos, la participación, los votos nulos y la clasificación estratégica. También puedes usar el <strong>simulador de alianzas</strong> para preguntarle a la IA: "¿qué pasaría si estos partidos se unen contra estos otros?"
-                      </p>
-                      <p className="mt-2 flex items-center gap-2 font-medium">
-                        {estadoInteligencia?.pasos?.analisis?.listo ? (
-                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.analisis.mensaje}</>
-                        ) : (
-                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.analisis?.mensaje || 'Primero carga resultados'}</>
-                        )}
-                      </p>
+                      <p className="font-bold">Paso 1 — Define tu elección</p>
+                      <p>Primero le dices a la IA qué cargo y año vas a contender. Esto le da contexto a todo el consultor, el mapa y el histórico.</p>
                     </div>
 
-                    {/* Simulador de alianzas */}
-                    {estadoInteligencia?.pasos?.datos?.listo && actores.length > 0 && (
-                      <div className="card p-5">
-                        <h4 className="mb-3 flex items-center gap-2 text-lg font-bold text-secondary-900">
-                          <Layers size={18} className="text-primary-600" /> Simulador de alianzas
-                        </h4>
-                        <p className="mb-4 text-sm text-secondary-600">
-                          Arma dos bloques con los actores de esta elección y pregúntale a la IA cómo quedaría el escenario. La IA cruzará los votos por sección según el histórico o las sábanas cargadas.
-                        </p>
+                    <div className="card p-4">
+                      <h4 className="mb-3 flex items-center gap-2 font-bold text-secondary-900">
+                        <Calendar size={18} className="text-primary-600" /> {eleccionEdit ? 'Editar elección' : 'Nueva elección'}
+                      </h4>
+                      <form onSubmit={guardarEleccion} className="mb-4 grid gap-3 sm:grid-cols-5">
+                        <input
+                          placeholder="Nombre (opcional)"
+                          value={eleccionForm.nombre || ""}
+                          onChange={(e) => setEleccionForm({ ...eleccionForm, nombre: e.target.value })}
+                          className="input"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Año"
+                          value={eleccionForm.anio || ""}
+                          onChange={(e) => setEleccionForm({ ...eleccionForm, anio: Number(e.target.value) })}
+                          className="input"
+                          required
+                        />
+                        <select
+                          value={eleccionForm.puesto || ""}
+                          onChange={(e) => setEleccionForm({ ...eleccionForm, puesto: e.target.value })}
+                          className="input"
+                          required
+                        >
+                          <option value="">Cargo...</option>
+                          <option value="Presidente República">Presidente República</option>
+                          <option value="Diputaciones Federales">Diputaciones Federales</option>
+                          <option value="Diputaciones Locales">Diputaciones Locales</option>
+                          <option value="Alcalde">Alcalde</option>
+                          <option value="Otro">Otro</option>
+                        </select>
+                        <select
+                          value={eleccionForm.activa ? "true" : "false"}
+                          onChange={(e) => setEleccionForm({ ...eleccionForm, activa: e.target.value === "true" })}
+                          className="input"
+                        >
+                          <option value="true">Activa</option>
+                          <option value="false">Inactiva</option>
+                        </select>
+                        <button type="submit" className="btn-primary flex items-center justify-center gap-1">
+                          <Save size={16} /> {eleccionEdit ? "Actualizar" : "Agregar"}
+                        </button>
+                      </form>
 
-                        <div className="mb-4 grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <label className="label">Nombre del bloque A</label>
-                            <input
-                              value={nombreBloqueA}
-                              onChange={(e) => setNombreBloqueA(e.target.value)}
-                              className="input"
-                              placeholder="Ej. Alianza Va por México"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="label">Nombre del bloque B</label>
-                            <input
-                              value={nombreBloqueB}
-                              onChange={(e) => setNombreBloqueB(e.target.value)}
-                              className="input"
-                              placeholder="Ej. Juntos Hacemos Historia"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          {actores.map((a) => {
-                            const enA = bloqueA.includes(a.id);
-                            const enB = bloqueB.includes(a.id);
-                            return (
-                              <div key={a.id} className="rounded-lg border border-gray-200 bg-white p-3">
-                                <div className="mb-2 flex items-center gap-2">
-                                  <span
-                                    className="h-3 w-3 rounded-full"
-                                    style={{ backgroundColor: a.color_hex || a.partido?.color_hex || '#ccc' }}
-                                  />
-                                  <span className="text-sm font-medium text-secondary-900">{a.nombre_visual}</span>
-                                  <span className="text-xs text-secondary-500">{a.partido?.siglas || a.tipo_actor}</span>
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold uppercase tracking-wide text-secondary-500">Elecciones creadas</p>
+                        {elecciones.length === 0 ? (
+                          <p className="text-sm text-secondary-500">Aún no hay elecciones. Crea la primera arriba.</p>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {elecciones.map((e) => (
+                              <div key={e.id} className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className={`h-2.5 w-2.5 rounded-full ${e.activa ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                  <span className="font-medium">{e.nombre || `${e.puesto} ${e.anio}`}</span>
+                                  <span className="text-xs text-secondary-500">{e.anio} · {e.puesto} · {e._count?.actores || 0} actores</span>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-1">
                                   <button
-                                    type="button"
-                                    onClick={() => {
-                                      setBloqueA((prev) => prev.filter((id) => id !== a.id).concat(enA ? [] : [a.id]));
-                                      setBloqueB((prev) => prev.filter((id) => id !== a.id));
-                                    }}
-                                    className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition ${
-                                      enA ? 'bg-primary-600 text-white' : 'bg-gray-100 text-secondary-600 hover:bg-gray-200'
-                                    }`}
+                                    onClick={() => { setEleccionEdit(e.id); setEleccionForm(e); }}
+                                    className="rounded p-1 text-secondary-500 hover:bg-secondary-100"
                                   >
-                                    Bloque A
+                                    <Edit2 size={14} />
                                   </button>
                                   <button
-                                    type="button"
-                                    onClick={() => {
-                                      setBloqueB((prev) => prev.filter((id) => id !== a.id).concat(enB ? [] : [a.id]));
-                                      setBloqueA((prev) => prev.filter((id) => id !== a.id));
-                                    }}
-                                    className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition ${
-                                      enB ? 'bg-secondary-700 text-white' : 'bg-gray-100 text-secondary-600 hover:bg-gray-200'
-                                    }`}
+                                    onClick={() => { setEleccionId(e.id); setMostrarConfigAvanzada(false); }}
+                                    className="rounded p-1 text-primary-600 hover:bg-primary-50"
+                                    title="Usar esta elección"
                                   >
-                                    Bloque B
+                                    <Check size={14} />
                                   </button>
                                   <button
-                                    type="button"
-                                    onClick={() => {
-                                      setBloqueA((prev) => prev.filter((id) => id !== a.id));
-                                      setBloqueB((prev) => prev.filter((id) => id !== a.id));
-                                    }}
-                                    className="flex-1 rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-secondary-600 hover:bg-gray-200"
+                                    onClick={() => eliminarEleccion(e.id)}
+                                    className="rounded p-1 text-red-500 hover:bg-red-50"
                                   >
-                                    Neutral
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-
-                        {bloqueA.length === 0 || bloqueB.length === 0 ? (
-                          <p className="text-sm text-amber-600">Selecciona al menos un actor para cada bloque.</p>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              const nombresA = actores
-                                .filter((a) => bloqueA.includes(a.id))
-                                .map((a) => a.nombre_visual)
-                                .join(', ');
-                              const nombresB = actores
-                                .filter((a) => bloqueB.includes(a.id))
-                                .map((a) => a.nombre_visual)
-                                .join(', ');
-                              const preguntaAlianza = `Simula un escenario electoral donde "${nombreBloqueA}" (${nombresA}) compite como un solo bloque contra "${nombreBloqueB}" (${nombresB}). Basándote en los datos cargados (histórico/sábanas), dime: ¿quién ganaría el territorio total?, ¿en qué secciones cambiaría el ganador?, ¿cuál sería el margen aproximado de votos? y ¿qué secciones debería priorizar cada bloque?`;
-                              setPregunta(preguntaAlianza);
-                              setSimulandoAlianza(true);
-                              setMostrarConfigAvanzada(false);
-                              setActiveTab('consultor');
-                              setRespuestaIA(null);
-                              setConsultando(true);
-                              setError(null);
-                              try {
-                                const { data } = await inteligenciaElectoralApi.consultarIA({
-                                  pregunta: preguntaAlianza,
-                                  contextoCampana: {
-                                    ...contextoCampana,
-                                    escenario: `${contextoCampana.escenario || ''}\n\nEscenario simulado: ${nombreBloqueA} vs ${nombreBloqueB}`.trim(),
-                                  },
-                                  eleccionId: eleccionId || undefined,
-                                  actorPrincipalId: actorPrincipalId || undefined,
-                                  fuentes: fuentesIA,
-                                  filtroTerritorial: filtroTerritorialIA,
-                                  historicoSeleccion: Object.keys(historicoSeleccion).length ? historicoSeleccion : undefined,
-                                  rival: Object.keys(rival).length ? rival : undefined,
-                                });
-                                setRespuestaIA(data.respuesta);
-                                setResumenContextoIA(data.contexto_resumen || null);
-                                if (eleccionId) {
-                                  const nuevoItem = {
-                                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                                    fecha: new Date().toISOString(),
-                                    pregunta: preguntaAlianza,
-                                    respuesta: data.respuesta,
-                                    contexto_resumen: data.contexto_resumen,
-                                  };
-                                  const actualizado = [nuevoItem, ...historialIA];
-                                  setHistorialIA(actualizado);
-                                  setHistorialExpandidoId(nuevoItem.id);
-                                  localStorage.setItem(claveHistorialIA(eleccionId), JSON.stringify(actualizado.slice(0, 50)));
-                                }
-                              } catch (err: any) {
-                                setError(err.response?.data?.message || 'Error al simular la alianza');
-                              } finally {
-                                setConsultando(false);
-                                setSimulandoAlianza(false);
-                              }
-                            }}
-                            disabled={simulandoAlianza}
-                            className="btn-primary flex items-center justify-center gap-2 disabled:opacity-60"
-                          >
-                            {simulandoAlianza ? (
-                              <>
-                                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
-                                Simulando...
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles size={16} /> Preguntar a la IA cómo quedaría
-                              </>
-                            )}
-                          </button>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    )}
-
-                        <div className="space-y-6">
-                          <div className="card overflow-hidden">
-                            <div className="p-4">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                  <h3 className="mb-2 text-lg font-bold text-secondary-900 flex items-center gap-2">
-                                    <BarChart3 size={20} className="text-primary-600" /> Resumen
-                                    por sección
-                                  </h3>
-                                  <p className="text-sm text-secondary-500">
-                                    {secciones.length > 0
-                                      ? `${secciones.length} secciones procesadas`
-                                      : modoHistoricoEnAnalisis
-                                        ? `${seccionesDesdeHistorico.length} secciones desde Histórico Electoral`
-                                        : "0 secciones procesadas"}
-                                  </p>
-                                </div>
-                                {secciones.length === 0 && historicosDisponibles.length > 0 && (
-                                  <div className="flex items-center gap-2">
-                                    <select
-                                      value={
-                                        historicoSeleccion.anio
-                                          ? `${historicoSeleccion.tipo_historico || "principal"}|${historicoSeleccion.tipo_eleccion || "ayuntamiento"}|${historicoSeleccion.anio}|${historicoSeleccion.estado_id || ""}|${historicoSeleccion.municipio_id || ""}`
-                                          : ""
-                                      }
-                                      onChange={(e) => {
-                                        if (!e.target.value) {
-                                          setHistoricoSeleccion({});
-                                          setModoHistoricoEnAnalisis(false);
-                                          setSeccionesDesdeHistorico([]);
-                                          return;
-                                        }
-                                        const [
-                                          tipo_historico,
-                                          tipo_eleccion,
-                                          anio,
-                                          estado_id,
-                                          municipio_id,
-                                        ] = e.target.value.split("|");
-                                        const sel = {
-                                          tipo_historico,
-                                          tipo_eleccion,
-                                          anio: Number(anio),
-                                          estado_id: estado_id ? Number(estado_id) : undefined,
-                                          municipio_id: municipio_id
-                                            ? Number(municipio_id)
-                                            : undefined,
-                                        };
-                                        setHistoricoSeleccion(sel);
-                                        const hist = historicosDisponibles.find(
-                                          (h) =>
-                                            `${h.tipo_historico}|${h.tipo_eleccion}|${h.anio}|${h.estado_id || ""}|${h.municipio_id || ""}` ===
-                                            e.target.value,
-                                        );
-                                        cargarSeccionesDesdeHistorico(hist);
-                                      }}
-                                      className="input"
-                                    >
-                                      <option value="">Ver desde histórico electoral...</option>
-                                      {historicosDisponibles.map((h) => {
-                                        const key = `${h.tipo_historico}|${h.tipo_eleccion}|${h.anio}|${h.estado_id || ""}|${h.municipio_id || ""}`;
-                                        const label = `${h.anio} · ${h.tipo_historico === "principal" ? "Principal" : "Complementario"} · ${h.tipo_eleccion.replace(/_/g, " ")}${h.municipio_nombre ? ` · ${h.municipio_nombre}` : ""}`;
-                                        return (
-                                          <option key={key} value={key}>
-                                            {label}
-                                          </option>
-                                        );
-                                      })}
-                                    </select>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full">
-                                <thead className="border-b border-gray-200 bg-gray-50">
-                                  <tr>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      Sección
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      Ganador
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      Votos
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      Lista Nominal
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      Participación
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      % Nulos
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      Clasificación
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                                      Acciones
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                  {secciones.length > 0 &&
-                                    secciones.map((s) => (
-                                      <tr key={s.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-medium text-gray-900">
-                                          {s.seccion}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center gap-2">
-                                            <span
-                                              className="h-3 w-3 rounded-full"
-                                              style={{
-                                                backgroundColor:
-                                                  s.actor?.color_hex ||
-                                                  s.actor?.partido?.color_hex ||
-                                                  "#ccc",
-                                              }}
-                                            />
-                                            <span>
-                                              {s.actor?.nombre_visual || "Sin ganador"}
-                                            </span>
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {s.total_votos_total.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {s.lista_nominal_total.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {s.porcentaje_participacion.toFixed(2)}%
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {s.porcentaje_votos_nulos.toFixed(2)}%
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <span
-                                            className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-medium ${colorClasificacion(s.clasificacion_estrategica)}`}
-                                          >
-                                            {s.clasificacion_estrategica}
-                                          </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <button
-                                            onClick={() => analizarSeccion(s.seccion)}
-                                            disabled={analizando === s.seccion}
-                                            className="flex items-center gap-1 rounded-md bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50"
-                                          >
-                                            <BrainCircuit size={14} />
-                                            {analizando === s.seccion
-                                              ? "Analizando..."
-                                              : "Analizar con IA"}
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  {secciones.length === 0 &&
-                                    modoHistoricoEnAnalisis &&
-                                    seccionesDesdeHistorico.map((s: any, idx: number) => (
-                                      <tr key={`hist-${idx}`} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-medium text-gray-900">
-                                          {s.seccion}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center gap-2">
-                                            <span
-                                              className="h-3 w-3 rounded-full"
-                                              style={{
-                                                backgroundColor:
-                                                  s.actor_ganador?.color_hex || "#ccc",
-                                              }}
-                                            />
-                                            <span>
-                                              {s.actor_ganador?.nombre_visual || "Sin ganador"}
-                                            </span>
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {(s.total_votos_total || 0).toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {(s.lista_nominal_total || 0).toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {(s.porcentaje_participacion || 0).toFixed(2)}%
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                          {(s.porcentaje_votos_nulos || 0).toFixed(2)}%
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <span
-                                            className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-medium ${colorClasificacion(s.clasificacion_estrategica)}`}
-                                          >
-                                            {s.clasificacion_estrategica}
-                                          </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <span className="text-xs text-secondary-500">
-                                            Histórico
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  {secciones.length === 0 && !modoHistoricoEnAnalisis && (
-                                    <tr>
-                                      <td
-                                        colSpan={8}
-                                        className="px-4 py-8 text-center text-gray-500"
-                                      >
-                                        No hay secciones cargadas. Ve a la pestaña{" "}
-                                        <strong>Cargar</strong> y sube un Excel, o selecciona un
-                                        histórico electoral arriba.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-
-                          {analisisResult && (
-                            <div className="card p-5">
-                              <h3 className="mb-3 text-lg font-bold text-secondary-900 flex items-center gap-2">
-                                <BrainCircuit size={20} className="text-primary-600" />
-                                Análisis IA · Sección {analisisResult.seccion}
-                              </h3>
-                              <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="rounded-lg border border-primary-100 bg-primary-50 p-3">
-                                  <p className="text-xs text-secondary-500">
-                                    Proyección de votos mínimos
-                                  </p>
-                                  <p className="text-xl font-bold text-primary-700">
-                                    {analisisResult.proyeccion_votos?.toLocaleString() || "—"}
-                                  </p>
-                                </div>
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                  <p className="text-xs text-secondary-500">Nivel de riesgo</p>
-                                  <p
-                                    className={`text-xl font-bold ${analisisResult.nivel_riesgo === "ALTO" ? "text-red-600" : analisisResult.nivel_riesgo === "BAJO" ? "text-green-600" : "text-yellow-600"}`}
-                                  >
-                                    {analisisResult.nivel_riesgo}
-                                  </p>
-                                </div>
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                  <p className="text-xs text-secondary-500">Actor ganador</p>
-                                  <p className="text-xl font-bold text-secondary-800">
-                                    {analisisResult.actor_ganador}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="mt-4">
-                                <p className="text-sm font-medium text-secondary-900">
-                                  Auditoría / Defensa electoral
-                                </p>
-                                <p className="text-sm text-secondary-600">
-                                  {analisisResult.auditoria_nulos_observaciones}
-                                </p>
-                              </div>
-                              <div className="mt-3">
-                                <p className="text-sm font-medium text-secondary-900">
-                                  Estrategia recomendada
-                                </p>
-                                <ul className="mt-1 list-inside list-disc text-sm text-secondary-600">
-                                  {analisisResult.estrategia?.map((s: string, i: number) => (
-                                    <li key={i}>{s}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                    </div>
                   </div>
                 )}
 
-                {pasoDrawer === 'mapa' && (
-                  <div className="space-y-4">
-                    <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-                      <p className="font-bold">¿Para qué sirve este paso?</p>
-                      <p>
-                        El mapa te permite <strong>ver el territorio coloreado por ganador</strong>, detectar bastiones, zonas en riesgo y dónde concentrar esfuerzos. Requiere que ya hayas cargado resultados y, idealmente, que exista una capa geográfica en el Mapa Territorial.
-                      </p>
-                      <p className="mt-2 flex items-center gap-2 font-medium">
-                        {estadoInteligencia?.pasos?.mapa?.listo ? (
-                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.mapa.mensaje}</>
-                        ) : (
-                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.mapa?.mensaje || 'Primero carga resultados y análisis'}</>
-                        )}
-                      </p>
+                {pasoDrawer === 'competidores' && (
+                  <div className="space-y-5">
+                    <div className="rounded-lg bg-purple-50 p-4 text-sm text-purple-800">
+                      <p className="font-bold">Paso 2 — ¿Quién compite?</p>
+                      <p>Aquí defines a los que buscan votos: tú, tu rival, partidos, coaliciones o independientes. No te preocupes por la sábana todavía.</p>
                     </div>
-                        <div className="space-y-4">
-                          <div className="card p-4">
-                            <h3 className="mb-2 text-lg font-bold text-secondary-900 flex items-center gap-2">
-                              <Icon name="mapa" size={20} className="text-primary-600" /> Mapa
-                              territorial por ganador
-                            </h3>
-                            <p className="text-sm text-secondary-500">
-                              {eleccion
-                                ? `Elección: ${eleccion.nombre} · Se muestran las secciones coloreadas según el actor ganador y clasificación estratégica.`
-                                : "Selecciona una elección para ver el mapa."}
-                            </p>
-                          </div>
-                          {eleccion && (
-                            <div className="card overflow-hidden p-2">
-                              <MapaSecciones geojson={geojsonMapa} cargando={cargandoMapa} />
-                            </div>
+
+                    <div className="card p-4">
+                      <h4 className="mb-3 flex items-center gap-2 font-bold text-secondary-900">
+                        <Users size={18} className="text-primary-600" /> {actorEdit ? 'Editar competidor' : 'Agregar competidor'}
+                        {eleccion && <span className="text-sm font-normal text-secondary-500">· {eleccion.nombre}</span>}
+                      </h4>
+                      {(!eleccionId || !eleccion) && (
+                        <p className="mb-3 text-sm text-amber-600">Selecciona una elección en el paso 1 para guardar competidores.</p>
+                      )}
+                      <form onSubmit={guardarActor} className="mb-4 space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <input
+                            placeholder="Nombre visual"
+                            value={actorForm.nombre_visual || ""}
+                            onChange={(e) => setActorForm({ ...actorForm, nombre_visual: e.target.value })}
+                            className="input"
+                            required
+                          />
+                          <input
+                            type="color"
+                            value={actorForm.color_hex || "#3B82F6"}
+                            onChange={(e) => setActorForm({ ...actorForm, color_hex: e.target.value })}
+                            className="input h-10 px-2"
+                          />
+                          <select
+                            value={actorForm.tipo_actor || "PARTIDO"}
+                            onChange={(e) => setActorForm({ ...actorForm, tipo_actor: e.target.value as any })}
+                            className="input"
+                          >
+                            <option value="PARTIDO">Partido</option>
+                            <option value="CANDIDATO">Candidato</option>
+                            <option value="COALICION">Coalición</option>
+                            <option value="INDEPENDIENTE">Independiente</option>
+                          </select>
+                          <select
+                            value={actorForm.partido_id || ""}
+                            onChange={(e) => setActorForm({ ...actorForm, partido_id: e.target.value || undefined })}
+                            className="input"
+                          >
+                            <option value="">Sin partido (opcional)</option>
+                            {partidos.map((p) => (
+                              <option key={p.id} value={p.id}>{p.siglas}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <label className="flex cursor-pointer items-center gap-2 text-sm text-secondary-700">
+                            <input
+                              type="checkbox"
+                              checked={!!actorForm.es_coalicion}
+                              onChange={(e) => setActorForm({ ...actorForm, es_coalicion: e.target.checked })}
+                              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            Es coalición
+                          </label>
+                          {actorForm.es_coalicion && (
+                            <input
+                              placeholder="Nombre de la coalición"
+                              value={actorForm.nombre_coalicion || ""}
+                              onChange={(e) => setActorForm({ ...actorForm, nombre_coalicion: e.target.value })}
+                              className="input max-w-xs"
+                            />
                           )}
                         </div>
+
+                        {(actorEdit || mostrarOpcionesAvanzadasActor) && (
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <input
+                              placeholder="Alias Excel"
+                              value={actorForm.columna_excel_alias || ""}
+                              onChange={(e) => setActorForm({ ...actorForm, columna_excel_alias: e.target.value })}
+                              className="input"
+                            />
+                            <select
+                              value={actorForm.tipo_voto || "TOTAL"}
+                              onChange={(e) => setActorForm({ ...actorForm, tipo_voto: e.target.value as any })}
+                              className="input"
+                            >
+                              <option value="TOTAL">Voto total</option>
+                              <option value="DIFERENCIADO">Voto diferenciado</option>
+                            </select>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-3">
+                          <button type="submit" className="btn-primary flex items-center gap-1">
+                            <Plus size={16} /> {actorEdit ? "Actualizar" : "Agregar"}
+                          </button>
+                          {actorEdit && (
+                            <button
+                              type="button"
+                              onClick={() => { setActorForm({}); setActorEdit(null); setMostrarOpcionesAvanzadasActor(false); }}
+                              className="text-sm text-secondary-500 hover:text-secondary-700"
+                            >
+                              Cancelar
+                            </button>
+                          )}
+                          {!actorEdit && (
+                            <button
+                              type="button"
+                              onClick={() => setMostrarOpcionesAvanzadasActor((v) => !v)}
+                              className="text-sm text-primary-600 hover:text-primary-700"
+                            >
+                              {mostrarOpcionesAvanzadasActor ? "Ocultar opciones avanzadas para sábana" : "Opciones avanzadas para sábana"}
+                            </button>
+                          )}
+                        </div>
+                      </form>
+
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {actores.map((a) => (
+                          <div key={a.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-3">
+                            <div className="flex items-center gap-2">
+                              <span className="h-4 w-4 rounded-full" style={{ backgroundColor: a.color_hex || a.partido?.color_hex || "#ccc" }} />
+                              <div>
+                                <p className="font-medium">{a.nombre_visual}</p>
+                                <p className="text-xs text-secondary-500">
+                                  {a.es_coalicion ? `Coalición: ${a.nombre_coalicion || "—"}` : a.partido?.siglas || a.tipo_actor}
+                                  {" · "}{a.tipo_voto === "DIFERENCIADO" ? "Diferenciado" : "Total"}
+                                  {a.columna_excel_alias && ` · Excel: ${a.columna_excel_alias}`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => { setActorEdit(a.id); setActorForm(a); setMostrarOpcionesAvanzadasActor(true); }}
+                                className="rounded p-1 text-secondary-500 hover:bg-secondary-100"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => eliminarActor(a.id)}
+                                className="rounded p-1 text-red-500 hover:bg-red-50"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="card p-4">
+                      <h4 className="mb-3 flex items-center gap-2 font-bold text-secondary-900">
+                        <Award size={18} className="text-primary-600" /> Partidos globales
+                      </h4>
+                      <form onSubmit={guardarPartido} className="mb-4 grid gap-3 sm:grid-cols-4">
+                        <input
+                          placeholder="Nombre"
+                          value={partidoForm.nombre || ""}
+                          onChange={(e) => setPartidoForm({ ...partidoForm, nombre: e.target.value })}
+                          className="input"
+                          required
+                        />
+                        <input
+                          placeholder="Siglas"
+                          value={partidoForm.siglas || ""}
+                          onChange={(e) => setPartidoForm({ ...partidoForm, siglas: e.target.value })}
+                          className="input"
+                          required
+                        />
+                        <input
+                          type="color"
+                          value={partidoForm.color_hex || "#3B82F6"}
+                          onChange={(e) => setPartidoForm({ ...partidoForm, color_hex: e.target.value })}
+                          className="input h-10 px-2"
+                        />
+                        <button type="submit" className="btn-primary flex items-center justify-center gap-1">
+                          <Plus size={16} /> {partidoEdit ? "Actualizar" : "Agregar"}
+                        </button>
+                      </form>
+                      <div className="flex flex-wrap gap-2">
+                        {partidos.length === 0 ? (
+                          <p className="text-sm text-secondary-500">Sin partidos creados. Agrega los que vayas a usar.</p>
+                        ) : (
+                          partidos.map((p) => (
+                            <span
+                              key={p.id}
+                              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-sm"
+                            >
+                              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: p.color_hex || "#ccc" }} />
+                              {p.siglas}
+                              <button
+                                onClick={() => { setPartidoEdit(p.id); setPartidoForm(p); }}
+                                className="text-secondary-400 hover:text-secondary-600"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button
+                                onClick={() => eliminarPartido(p.id)}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                <X size={12} />
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {pasoDrawer === 'fuentes' && (
+                  <div className="space-y-5">
+                    <div className="rounded-lg bg-green-50 p-4 text-sm text-green-800">
+                      <p className="font-bold">Paso 3 — ¿De dónde vienen los votos?</p>
+                      <p>Elige UNA fuente de datos. La IA puede usar un histórico ya cargado, una sábana oficial o partir de cero con otras fuentes.</p>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-3">
+                      {/* Tarjeta 1: histórico */}
+                      <div className="card flex flex-col p-5">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                          <Database size={20} className="text-blue-600" />
+                        </div>
+                        <h4 className="mb-1 font-bold text-secondary-900">Usar histórico ya cargado</h4>
+                        <p className="mb-4 flex-1 text-sm text-secondary-500">
+                          El sistema detecta automáticamente elecciones pasadas que coincidan con el cargo y año de tu campaña.
+                        </p>
+
+                        {(estadoInteligencia?.sugerencias?.historicoAutoSeleccion || historicosCompatibles.length === 1) ? (
+                          (() => {
+                            const sugerido = estadoInteligencia?.sugerencias?.historicoAutoSeleccion || historicosCompatibles[0];
+                            return (
+                              <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm">
+                                <p className="font-bold text-blue-800">Histórico sugerido</p>
+                                <p className="text-blue-700">
+                                  {sugerido.anio} · {sugerido.tipo_historico === "principal" ? "Principal" : "Complementario"} · {sugerido.tipo_eleccion?.replace(/_/g, " ")}
+                                  {sugerido.municipio_nombre && ` · ${sugerido.municipio_nombre}`}
+                                </p>
+                                <button
+                                  onClick={() => vincularHistoricoSugerido(sugerido)}
+                                  disabled={importing}
+                                  className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                >
+                                  {importing ? "Vinculando..." : "Usar este histórico"}
+                                </button>
+                              </div>
+                            );
+                          })()
+                        ) : historicosCompatibles.length > 1 ? (
+                          <div className="mb-4 space-y-2">
+                            <p className="text-xs font-medium text-secondary-700">Históricos compatibles</p>
+                            {historicosCompatibles.map((h) => (
+                              <div key={`${h.tipo_historico}-${h.anio}-${h.municipio_id || ""}`} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2 text-sm">
+                                <span>
+                                  {h.anio} · {h.tipo_historico === "principal" ? "Principal" : "Complementario"}
+                                  {h.municipio_nombre && ` · ${h.municipio_nombre}`}
+                                </span>
+                                <button
+                                  onClick={() => vincularHistoricoSugerido(h)}
+                                  disabled={importing}
+                                  className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+                                >
+                                  Usar
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                            No hay históricos compatibles cargados. Puedes subir uno desde el módulo Histórico Electoral o elegir otra fuente.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tarjeta 2: sábana */}
+                      <div className="card flex flex-col p-5">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                          <FileSpreadsheet size={20} className="text-green-600" />
+                        </div>
+                        <h4 className="mb-1 font-bold text-secondary-900">Subir sábana oficial</h4>
+                        <p className="mb-4 flex-1 text-sm text-secondary-500">
+                          Carga los resultados por casilla en Excel. Aquí sí necesitarás los alias Excel y tipo de voto de cada actor.
+                        </p>
+
+                        {!eleccion ? (
+                          <p className="text-sm text-amber-600">Selecciona una elección primero.</p>
+                        ) : (
+                          <form onSubmit={cargarExcel} className="space-y-3">
+                            <button
+                              type="button"
+                              onClick={descargarPlantilla}
+                              className="btn-secondary flex w-full items-center justify-center gap-2"
+                            >
+                              <Download size={16} /> Descargar plantilla
+                            </button>
+                            <div>
+                              <label className="label text-xs">Archivo Excel / CSV</label>
+                              <input type="file" name="archivo" accept=".xlsx,.xls,.csv" className="input" required />
+                            </div>
+                            <button
+                              type="submit"
+                              disabled={importing || actores.length === 0}
+                              className="btn-primary flex w-full items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                              <Upload size={16} /> {importing ? "Procesando..." : "Cargar sábana"}
+                            </button>
+                            {actores.length === 0 && (
+                              <p className="text-xs text-amber-700">Agrega al menos un competidor antes de cargar votos.</p>
+                            )}
+                          </form>
+                        )}
+                        {importResult && (
+                          <div className={`mt-3 rounded-lg border p-3 text-sm ${importResult.error ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}>
+                            {importResult.error ? (
+                              <p className="font-medium text-red-700">{importResult.error}</p>
+                            ) : (
+                              <p className="font-medium text-green-700">
+                                Cargadas {importResult.insertados} de {importResult.filasLeidas} casillas.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tarjeta 3: en blanco */}
+                      <div className="card flex flex-col p-5">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-100">
+                          <Sparkles size={20} className="text-secondary-600" />
+                        </div>
+                        <h4 className="mb-1 font-bold text-secondary-900">Empezar en blanco</h4>
+                        <p className="mb-4 flex-1 text-sm text-secondary-500">
+                          Continúa sin datos de votos. La IA usará votantes, líderes, encuestas, eventos y otras fuentes para asesorarte.
+                        </p>
+                        <button
+                          onClick={() => setMostrarConfigAvanzada(false)}
+                          className="btn-secondary flex w-full items-center justify-center gap-2"
+                        >
+                          <ChevronRight size={16} /> Continuar sin votos
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

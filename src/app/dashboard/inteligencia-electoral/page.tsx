@@ -1511,10 +1511,11 @@ export default function InteligenciaElectoralPage() {
                   ).map((s) => {
                     const clavePaso = s.key === 'carga' ? 'datos' : s.key;
                     const pasoBackend = estadoInteligencia?.pasos?.[clavePaso as keyof NonNullable<typeof estadoInteligencia.pasos>];
+                    const eleccionSeleccionada = eleccionId || eleccion?.id;
                     // Fallback local si el backend aún no devuelve pasos
                     const completo = pasoBackend?.listo ?? (
                       s.key === 'catalogos'
-                        ? partidos.length > 0 && elecciones.length > 0 && actores.length > 0
+                        ? partidos.length > 0 && elecciones.length > 0 && (actores.length > 0 || !!eleccionSeleccionada)
                         : s.key === 'carga'
                           ? Number(estadoInteligencia?.datos?.sábanas || 0) > 0 || Number(estadoInteligencia?.datos?.históricos || 0) > 0
                           : s.key === 'analisis'
@@ -1771,8 +1772,11 @@ export default function InteligenciaElectoralPage() {
                               )}
                             </h2>
 
-                            {eleccionId ? (
-                              <>
+                                {(!eleccionId || !eleccion) && (
+                                  <p className="mb-3 text-sm text-amber-600">
+                                    ⚠️ No hay una elección seleccionada. Selecciona una arriba para guardar actores correctamente.
+                                  </p>
+                                )}
                                 <form
                                   onSubmit={guardarActor}
                                   className="mb-4 grid gap-3 sm:grid-cols-8"
@@ -1924,12 +1928,6 @@ export default function InteligenciaElectoralPage() {
                                     </div>
                                   ))}
                                 </div>
-                              </>
-                            ) : (
-                              <p className="text-sm text-secondary-500">
-                                Selecciona una elección arriba para configurar sus actores.
-                              </p>
-                            )}
                           </div>
                         </div>
                   </div>

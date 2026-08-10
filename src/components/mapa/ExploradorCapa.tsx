@@ -14,6 +14,7 @@ interface ElementoCapa {
   capaNombre: string;
   color?: string;
   bloqueado?: boolean;
+  coords?: { lat: number; lng: number };
 }
 
 interface Props {

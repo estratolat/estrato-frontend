@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fichasApi } from '@/lib/api';
 import { FichaSeccional } from '@/types';
-import { Users, HandHeart, Crown, Calendar, MessageSquare, MapPin, ChevronLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Users, HandHeart, Crown, Calendar, MessageSquare, MapPin, ChevronLeft, TrendingUp, TrendingDown, Minus, FileDown } from 'lucide-react';
 
 const tendenciaConfig: Record<string, { label: string; color: string; icon: any }> = {
   arriba: { label: 'Vamos arriba', color: 'bg-green-100 text-green-700', icon: TrendingUp },
@@ -18,6 +18,7 @@ export default function FichaSeccionalDetallePage() {
   const router = useRouter();
   const [ficha, setFicha] = useState<FichaSeccional | null>(null);
   const [loading, setLoading] = useState(true);
+  const [descargando, setDescargando] = useState(false);
 
   useEffect(() => {
     if (!seccion) return;
@@ -33,6 +34,28 @@ export default function FichaSeccionalDetallePage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const descargarPdf = async () => {
+    if (!seccion || descargando) return;
+    try {
+      setDescargando(true);
+      const { data } = await fichasApi.descargarPdf(seccion as string);
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ficha-seccion-${seccion}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo generar el PDF. Intenta de nuevo.');
+    } finally {
+      setDescargando(false);
     }
   };
 
@@ -57,10 +80,18 @@ export default function FichaSeccionalDetallePage() {
         <button onClick={() => router.push('/dashboard/ficha-seccional')} className="rounded-md p-2 hover:bg-secondary-100">
           <ChevronLeft size={20} />
         </button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-2xl font-bold text-secondary-900">Ficha Seccional {ficha.seccion}</h2>
           <p className="text-secondary-600">Resumen territorial y proyección</p>
         </div>
+        <button
+          onClick={descargarPdf}
+          disabled={descargando}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <FileDown size={18} />
+          {descargando ? 'Generando PDF...' : 'Descargar PDF'}
+        </button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

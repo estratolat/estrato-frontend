@@ -93,17 +93,19 @@ interface Props {
   modoDibujo?: boolean;
   filtrosApoyos?: Record<string, boolean>;
   seleccion?: { geometry: any; properties?: any; tipo?: string; nombre?: string } | null;
-  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => void;
+  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>, geometry?: any, coords?: { lat: number; lng: number }) => void;
   resultadoDestacado?: ResultadoGlobal | null;
   onBoundsChange?: (bounds: { south: number; west: number; north: number; east: number }) => void;
+  onLimpiarSeleccion?: () => void;
 }
 
 // Refs compartidos entre MapaBridge y CapaPersonalizada para resaltar features
 const highlightRef: { layer: L.GeoJSON | null; timer: any } = { layer: null, timer: null };
 let pendingHighlight: { capaId: string; featureId: string; intentos: number } | null = null;
+let ultimoClickEnFeature = 0;
 
 export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
-  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, onDibujoListo, modoDibujo, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange, casillaUbicando },
+  { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, onDibujoListo, modoDibujo, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange, casillaUbicando, onLimpiarSeleccion },
   ref
 ) {
   const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
@@ -122,6 +124,7 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
       center={centroInicial.center}
       zoom={centroInicial.zoom}
       scrollWheelZoom={true}
+      doubleClickZoom={false}
       className="h-full w-full"
     >
       <TileLayer
@@ -133,7 +136,7 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
       <ControlRecargar onRecargar={onRecargar} />
       <GuardarCentro />
       {onBoundsChange && <ManejadorBounds onBoundsChange={onBoundsChange} />}
-      {onSeleccionarCoordenada && !casillaUbicando && <DetectorClicMapa onSeleccionar={onSeleccionarCoordenada} />}
+      {onSeleccionarCoordenada && !casillaUbicando && <DetectorClicMapa onSeleccionar={onSeleccionarCoordenada} onLimpiarSeleccion={onLimpiarSeleccion} />}
       {casillaUbicando && <UbicarCasillaEnMapa casilla={casillaUbicando} onConfirmar={onSeleccionarCoordenada} onCancelar={onCerrarPunto} />}
 
       <ManejadorResultadoDestacado resultado={resultadoDestacado} capasGeoJSONRef={capasGeoJSONRef} />
@@ -210,6 +213,13 @@ const MapaBridge = forwardRef<MapaLeafletRef, MapaBridgeProps>(function MapaBrid
     if (!map.getPane('sindical')) {
       map.createPane('sindical');
       map.getPane('sindical')!.style.zIndex = '640';
+    }
+    // Pane para puntos de campaña (líderes, eventos, casillas) por encima de los
+    // polígonos personalizados (z-index 500+) pero debajo de tooltips (650) y popups (700),
+    // para que los puntos dentro de un polígono sigan siendo clicables.
+    if (!map.getPane('puntos-campana')) {
+      map.createPane('puntos-campana');
+      map.getPane('puntos-campana')!.style.zIndex = '645';
     }
   }, [map]);
 
@@ -512,9 +522,28 @@ function GuardarCentro() {
   return null;
 }
 
-function DetectorClicMapa({ onSeleccionar }: { onSeleccionar: (lat: number, lng: number) => void }) {
+function DetectorClicMapa({
+  onSeleccionar,
+  onLimpiarSeleccion,
+}: {
+  onSeleccionar: (lat: number, lng: number) => void;
+  onLimpiarSeleccion?: () => void;
+}) {
   useMapEvents({
     click(e) {
+      // Clic simple en zona vacía: limpiar selección (no abrir popup).
+      // El popup de registro se abre con doble clic (dblclick).
+      // Defensivo: si el clic cayó sobre una capa interactiva (polígono/punto),
+      // NO limpiar — deja que el handler de esa capa maneje la selección.
+      const target = e.originalEvent?.target as HTMLElement | null;
+      if (target && target.closest && target.closest('.leaflet-interactive')) return;
+      // Extra defensivo: si un polígono de capa personalizada acaba de registrar el click,
+      // no limpiar la selección aunque el evento haya bubbujeado hasta el mapa.
+      if (Date.now() - ultimoClickEnFeature < 200) return;
+      onLimpiarSeleccion?.();
+    },
+    dblclick(e) {
+      // Doble clic en cualquier zona: abrir el popup "¿Qué registrar aquí?"
       onSeleccionar(e.latlng.lat, e.latlng.lng);
     },
   });
@@ -778,8 +807,10 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
           fillColor: colorCapa,
           fillOpacity: 0.3,
           weight: 2,
+          pane: 'puntos-campana',
         });
         circle.bindPopup(popupLider(l, onEditar));
+        circle.on('click', (e: any) => L.DomEvent.stopPropagation(e));
         asignarLiderId(circle, l);
         featureGroup.addLayer(circle);
       });
@@ -800,9 +831,11 @@ function CapaLideres({ lideres, modo, onEditar }: { lideres: Lider[]; modo?: str
             weight: 2,
             opacity: 1,
             fillOpacity: 0.9,
+            pane: 'puntos-campana',
           }
         );
         marker.bindPopup(popupLider(l, onEditar));
+        marker.on('click', (e: any) => L.DomEvent.stopPropagation(e));
         asignarLiderId(marker, l);
         featureGroup.addLayer(marker);
       });
@@ -857,6 +890,7 @@ function CapaEventos({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: 
     };
 
     const layer = L.geoJSON(data, {
+      pane: 'puntos-campana',
       pointToLayer: (feature, latlng) => {
         const status = feature?.properties?.status || 'programado';
         return L.circleMarker(latlng, {
@@ -866,6 +900,7 @@ function CapaEventos({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: 
           weight: status === 'programado' ? 2 : 3,
           opacity: 1,
           fillOpacity: 0.9,
+          pane: 'puntos-campana',
         });
       },
       onEachFeature: (feature, l) => {
@@ -885,6 +920,7 @@ function CapaEventos({ data, onEditar }: { data?: GeoJSONCollection; onEditar?: 
               Editar evento
             </button>`
           : '';
+        l.on('click', (e: any) => L.DomEvent.stopPropagation(e));
         l.bindPopup(`
           <div class="min-w-[200px] font-sans">
             <p class="text-sm font-bold text-secondary-900">${nombre}</p>
@@ -940,6 +976,7 @@ function CapaCasillas({ data, onEditar }: { data?: GeoJSONCollection; onEditar?:
     const colorCapa = COLORES_CAPA.casillas;
 
     const layer = L.geoJSON(data, {
+      pane: 'puntos-campana',
       pointToLayer: (feature, latlng) => {
         return L.circleMarker(latlng, {
           radius: 7,
@@ -948,10 +985,12 @@ function CapaCasillas({ data, onEditar }: { data?: GeoJSONCollection; onEditar?:
           weight: 2,
           opacity: 1,
           fillOpacity: 0.9,
+          pane: 'puntos-campana',
         });
       },
       onEachFeature: (feature, l) => {
         const props = feature?.properties || {};
+        l.on('click', (e: any) => L.DomEvent.stopPropagation(e));
         const seccion = escaparHtml(props.seccion || '');
         const tipo = escaparHtml(props.tipo || '');
         const numero = escaparHtml(props.numero || '');
@@ -1264,7 +1303,7 @@ interface CapaPersonalizadaProps {
   data: any;
   capa: { id: string; nombre: string; color: string; bloqueada?: boolean; orden?: number; estilos?: any };
   capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
-  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => void;
+  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>, geometry?: any, coords?: { lat: number; lng: number }) => void;
   onSeleccionarCoordenada?: (lat: number, lng: number) => void;
   onAccionPunto?: (tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante', lat: number, lng: number) => void;
   onRender?: () => void;
@@ -1386,6 +1425,7 @@ const CapaPersonalizada = memo(function CapaPersonalizada({ data, capa, capasGeo
   const onFeatureClickRef = useRef(onFeatureClick);
   const onSeleccionarRef = useRef(onSeleccionarCoordenada);
   const onAccionPuntoRef = useRef(onAccionPunto);
+  const lastHighlightedRef = useRef<any>(null);
   onFeatureClickRef.current = onFeatureClick;
   onSeleccionarRef.current = onSeleccionarCoordenada;
   onAccionPuntoRef.current = onAccionPunto;
@@ -1457,12 +1497,6 @@ const CapaPersonalizada = memo(function CapaPersonalizada({ data, capa, capasGeo
 
             const geometryType = feature?.geometry?.type;
 
-            l.bindPopup(crearPopupHtml(props, capa.id, capa.nombre, geometryType), {
-              maxWidth: 340,
-              className: 'capa-popup-sindical',
-              autoPan: false,
-            });
-
             // Etiqueta permanente para capas de puntos (colonias / localidades)
             if (geometryType === 'Point' || geometryType === 'MultiPoint') {
               const label = escaparHtml(String(props._feature_nombre || props.NOMBRE_VER || props.nombre || props.NOMBRE || props.name || props.NAME || 'Sin nombre'));
@@ -1481,65 +1515,27 @@ const CapaPersonalizada = memo(function CapaPersonalizada({ data, capa, capasGeo
 
             l.on('click', (e: any) => {
               console.log('[CapaPersonalizada] click en feature', { capaId: capa.id, featureId, geometryType: feature?.geometry?.type });
-              if (e?.originalEvent?.stopPropagation) e.originalEvent.stopPropagation();
+              // Detener la propagación del evento para evitar que el clic llegue al mapa
+              // y dispare el "limpiar selección" o el popup de registro.
+              if (e.originalEvent) {
+                L.DomEvent.stopPropagation(e.originalEvent);
+                e.originalEvent.stopImmediatePropagation();
+              }
+              L.DomEvent.stopPropagation(e);
+              ultimoClickEnFeature = Date.now();
+
+              // Resetear el layer resaltado anterior (antes se hacía en popupclose)
+              if (lastHighlightedRef.current && lastHighlightedRef.current !== l) {
+                try { lastHighlightedRef.current.setStyle(baseStyle(lastHighlightedRef.current.feature)); } catch {}
+              }
+
               l.bringToFront();
               l.setStyle({ weight: 4, opacity: 1, fillOpacity: Math.min(1, baseStyle(feature).fillOpacity + 0.2) });
-              l.openPopup();
-              if (onFeatureClickRef.current) onFeatureClickRef.current(capa.id, featureId, props, feature?.geometry);
-            });
+              lastHighlightedRef.current = l;
 
-            l.on('popupclose', () => {
-              l.setStyle(baseStyle(l.feature));
-            });
-
-            l.on('popupopen', () => {
-              const tieneFeatureClick = !!onFeatureClickRef.current;
-              const tieneSeleccionar = !!onSeleccionarRef.current;
-              const tieneAccionPunto = !!onAccionPuntoRef.current;
-              console.log('[CapaPersonalizada] popupopen', capa.id, featureId, { tieneFeatureClick, tieneSeleccionar, tieneAccionPunto });
-
-              const coords = obtenerCoordenadasFeature(feature, l);
-              console.log('[CapaPersonalizada] coords obtenidas', coords);
-
-              const btnEditar = document.getElementById(`btn-editar-feature-${featureId}`);
-              if (btnEditar && onFeatureClickRef.current) {
-                btnEditar.onclick = () => {
-                  console.log('[CapaPersonalizada] click Editar', capa.id, featureId);
-                  onFeatureClickRef.current?.(capa.id, featureId, props, feature?.geometry);
-                };
-              }
-
-              const btnRegistrar = document.getElementById(`btn-registrar-aqui-${featureId}`);
-              if (btnRegistrar && onSeleccionarRef.current) {
-                btnRegistrar.onclick = () => {
-                  console.log('[CapaPersonalizada] click Registrar aquí', coords);
-                  if (coords) {
-                    onSeleccionarRef.current?.(coords.lat, coords.lng);
-                    l.closePopup();
-                  }
-                };
-              }
-
-              const acciones: Array<{ id: string; tipo: 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante' }> = [
-                { id: `btn-accion-evento-${featureId}`, tipo: 'evento' },
-                { id: `btn-accion-lider-${featureId}`, tipo: 'lider' },
-                { id: `btn-accion-votante-${featureId}`, tipo: 'votante' },
-                { id: `btn-accion-apoyo-${featureId}`, tipo: 'apoyo' },
-                { id: `btn-accion-peticion-${featureId}`, tipo: 'peticion' },
-              ];
-
-              acciones.forEach(({ id, tipo }) => {
-                const btn = document.getElementById(id);
-                if (btn && onAccionPuntoRef.current && coords) {
-                  btn.onclick = () => {
-                    console.log('[CapaPersonalizada] click acción', tipo, coords);
-                    onAccionPuntoRef.current?.(tipo, coords.lat, coords.lng);
-                    l.closePopup();
-                  };
-                } else if (btn) {
-                  console.log('[CapaPersonalizada] botón acción deshabilitado', id, { tieneAccionPunto, coords });
-                }
-              });
+              // Coordenada exacta del click (más preciso que el centroide que usaba el popup)
+              const coords = e?.latlng ? { lat: e.latlng.lat, lng: e.latlng.lng } : obtenerCoordenadasFeature(feature, l);
+              if (onFeatureClickRef.current) onFeatureClickRef.current(capa.id, featureId, props, feature?.geometry, coords || undefined);
             });
           },
       pointToLayer: (feature: any, latlng: any) => {

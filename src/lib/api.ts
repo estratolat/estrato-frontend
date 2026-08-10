@@ -384,6 +384,8 @@ export const fichasApi = {
   getSecciones: () => api.get('/fichas-seccionales/secciones'),
   getFicha: (seccion: string) => api.get(`/fichas-seccionales/${seccion}`),
   getComparativa: (secciones: string[]) => api.post('/fichas-seccionales/comparativa', { secciones }),
+  descargarPdf: (seccion: string) =>
+    api.get(`/fichas-seccionales/${seccion}/pdf`, { responseType: 'blob' }),
 };
 
 // === API de Opositores ===

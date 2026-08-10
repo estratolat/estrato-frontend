@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { fichasApi } from '@/lib/api';
-import { FileText } from 'lucide-react';
+import { FileText, AlertCircle } from 'lucide-react';
 
 export default function FichaSeccionalPage() {
   const [secciones, setSecciones] = useState<string[]>([]);
@@ -32,6 +32,9 @@ export default function FichaSeccionalPage() {
     );
   }
 
+  const seccionesReales = secciones.filter((s) => s !== 'Sin sección');
+  const sinSeccion = secciones.includes('Sin sección');
+
   return (
     <div className="space-y-6">
       <div>
@@ -41,11 +44,14 @@ export default function FichaSeccionalPage() {
 
       {secciones.length === 0 ? (
         <div className="rounded-lg border border-dashed border-secondary-300 p-8 text-center text-secondary-500">
-          No hay secciones con votantes registrados.
+          <p className="font-medium">No hay secciones registradas.</p>
+          <p className="mt-1 text-sm">
+            Carga votantes, casillas, histórico electoral, secciones INE o zonas para que aparezcan aquí.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {secciones.map((s) => (
+          {seccionesReales.map((s) => (
             <Link
               key={s}
               href={`/dashboard/ficha-seccional/${s}`}
@@ -60,6 +66,21 @@ export default function FichaSeccionalPage() {
               </div>
             </Link>
           ))}
+          {sinSeccion && (
+            <Link
+              key="sin-seccion"
+              href="/dashboard/ficha-seccional/Sin%20sección"
+              className="card flex items-center gap-4 border-dashed border-secondary-300 bg-secondary-50/50 transition hover:border-secondary-400"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary-100 text-secondary-600">
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-secondary-700">Sin sección</p>
+                <p className="text-sm text-secondary-500">Votantes no asignados →</p>
+              </div>
+            </Link>
+          )}
         </div>
       )}
     </div>

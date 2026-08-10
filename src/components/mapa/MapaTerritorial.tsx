@@ -381,7 +381,7 @@ export default function MapaTerritorial() {
     setTimeout(() => intentarResaltar(0), 300);
   }, [activas, asegurarCapaCargada]);
 
-  const elementoCapaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any): ElementoCapa => {
+  const elementoCapaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any, coords?: { lat: number; lng: number }): ElementoCapa => {
     const capa = capasPersonalizadas.find(c => c.id === capaId);
     const nombre = props._feature_nombre || props.NOMBRE_VER || props.NOMBRE || props.nombre || props.name || props.NAME || featureId;
     return {
@@ -392,11 +392,12 @@ export default function MapaTerritorial() {
       capaId,
       capaNombre: capa?.nombre || 'Capa',
       color: props._feature_color || capa?.color || '#3B82F6',
+      coords,
     };
   }, [capasPersonalizadas]);
 
-  const abrirFichaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => {
-    setElementoFicha(elementoCapaDesdeFeature(capaId, featureId, props, geometry));
+  const abrirFichaDesdeFeature = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any, coords?: { lat: number; lng: number }) => {
+    setElementoFicha(elementoCapaDesdeFeature(capaId, featureId, props, geometry, coords));
   }, [elementoCapaDesdeFeature]);
 
   const abrirEditorFeature = useCallback((el: ElementoCapa) => {
@@ -415,9 +416,9 @@ export default function MapaTerritorial() {
     });
   }, []);
 
-  const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any) => {
-    console.log('[MapaTerritorial] handleFeatureClick', { capaId, featureId, hasGeometry: !!geometry, geometryType: geometry?.type, mapRef: !!mapRef.current });
-    abrirFichaDesdeFeature(capaId, featureId, props, geometry);
+  const handleFeatureClick = useCallback((capaId: string, featureId: string, props: Record<string, any>, geometry?: any, coords?: { lat: number; lng: number }) => {
+    console.log('[MapaTerritorial] handleFeatureClick', { capaId, featureId, hasGeometry: !!geometry, geometryType: geometry?.type, mapRef: !!mapRef.current, hasCoords: !!coords });
+    abrirFichaDesdeFeature(capaId, featureId, props, geometry, coords);
 
     // Centrar y resaltar el polígono/elemento seleccionado.
     // Primero un fitBounds directo como fallback inmediato, luego resaltarFeature intenta
@@ -1706,6 +1707,10 @@ export default function MapaTerritorial() {
           onFeatureClick={handleFeatureClick}
           resultadoDestacado={resultadoDestacado}
           onBoundsChange={handleBoundsChange}
+          onLimpiarSeleccion={() => {
+            setElementoFicha(null);
+            cerrarFicha();
+          }}
         />
       </div>
 
@@ -1891,6 +1896,15 @@ export default function MapaTerritorial() {
           elemento={elementoFicha}
           onCerrar={() => setElementoFicha(null)}
           onEditar={abrirEditorFeature}
+          onRegistrarAqui={(coords) => {
+            if (casillaUbicando) { return; }
+            setPuntoInicial(coords);
+          }}
+          onRegistrarAccion={(tipo, coords) => {
+            if (casillaUbicando) { return; }
+            setPuntoInicial(coords);
+            abrirModal(tipo, coords);
+          }}
           onVerDetalle={(el) => {
             setDetalle(null);
             setCargandoDetalle(true);

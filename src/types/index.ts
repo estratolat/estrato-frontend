@@ -362,4 +362,25 @@ export interface FichaSeccional {
   metas?: MetaVotacion[];
   resultados?: { anio: number; partido_ganador: string; votos_ganador?: number; votos_totales?: number; participacion_pct?: number }[];
   proyeccion?: ProyeccionSeccion;
+  territorio?: {
+    municipio?: string;
+    estado?: string;
+    nombre?: string;
+    distrito_local?: number;
+    distrito_federal?: number;
+    tiene_geometria?: boolean;
+  };
+  zona?: { id: string; nombre: string; color?: string; tipo?: string };
+  comunidades?: { comunidad?: string; colonia?: string; vereda?: string; votantes: number }[];
+  peticiones?: {
+    total: number;
+    por_estatus: Record<string, number>;
+    recientes: { id: string; folio?: string; titulo?: string; estatus: string; categoria: string; prioridad: string; created_at: string }[];
+  };
+  apoyos_por_tipo?: { tipo: string; entregas: number; unidades: number }[];
+  votantes_por_nivel?: { nivel: number; total: number }[];
+  lideres_detalle?: { id: string; nombre: string; score: number; alcance?: number; ubicacion?: string; telefono?: string }[];
+  mensajes_recientes?: { id: string; canal: string; direccion: string; contenido: string; created_at: string; votante?: { nombre?: string } }[];
+  eventos_recientes?: { id: string; nombre: string; direccion?: string; fecha_inicio: string; status: string; asistentes_estimados?: number }[];
+  respuestas_encuesta?: number;
 }

@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { X, MapPin, ExternalLink, Edit3, Users, Crown, Gift, Calendar, FileText, GripVertical } from 'lucide-react';
+import { X, MapPin, ExternalLink, Edit3, Users, Crown, Gift, Calendar, FileText, GripVertical, Plus } from 'lucide-react';
 import { ElementoCapa } from './ExploradorCapa';
 import { mapaApi, resultadosHistoricosApi } from '@/lib/api';
 import { errorToString } from '@/lib/error-utils';
+
+type TipoRegistro = 'apoyo' | 'evento' | 'lider' | 'peticion' | 'votante';
 
 interface Props {
   elemento: ElementoCapa | null;
   onCerrar: () => void;
   onVerDetalle?: (elemento: ElementoCapa) => void;
   onEditar?: (elemento: ElementoCapa) => void;
+  onRegistrarAqui?: (coords: { lat: number; lng: number }) => void;
+  onRegistrarAccion?: (tipo: TipoRegistro, coords: { lat: number; lng: number }) => void;
 }
 
 function formatearPropiedad(key: string): string {
@@ -62,7 +66,7 @@ function esUuid(valor: string): boolean {
   return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(valor);
 }
 
-export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEditar }: Props) {
+export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEditar, onRegistrarAqui, onRegistrarAccion }: Props) {
   const [cruce, setCruce] = useState<CruceResumen | null>(null);
   const [datosOficiales, setDatosOficiales] = useState<DatosOficiales | null>(null);
   const [numeralia, setNumeralia] = useState<NumeraliaData | null>(null);
@@ -441,6 +445,29 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
             <p className="text-xs text-secondary-500">No disponible para este tipo de elemento.</p>
           ) : null}
         </div>
+
+        {onRegistrarAqui && elemento.coords && (
+          <div className="mt-3 border-t border-secondary-100 pt-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase text-secondary-500">Registrar en este punto</p>
+            {onRegistrarAqui && (
+              <button
+                onClick={() => onRegistrarAqui(elemento.coords!)}
+                className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-secondary-100 py-2 text-xs font-semibold text-secondary-700 transition hover:bg-secondary-200"
+              >
+                <Plus size={13} /> Registrar aquí
+              </button>
+            )}
+            {onRegistrarAccion && (
+              <div className="grid grid-cols-3 gap-1.5">
+                <button onClick={() => onRegistrarAccion('evento', elemento.coords!)} className="rounded bg-red-50 px-1.5 py-1.5 text-[10px] font-semibold text-red-700 transition hover:bg-red-100">Evento</button>
+                <button onClick={() => onRegistrarAccion('lider', elemento.coords!)} className="rounded bg-purple-50 px-1.5 py-1.5 text-[10px] font-semibold text-purple-700 transition hover:bg-purple-100">Líder</button>
+                <button onClick={() => onRegistrarAccion('votante', elemento.coords!)} className="rounded bg-blue-50 px-1.5 py-1.5 text-[10px] font-semibold text-blue-700 transition hover:bg-blue-100">Votante</button>
+                <button onClick={() => onRegistrarAccion('apoyo', elemento.coords!)} className="rounded bg-amber-50 px-1.5 py-1.5 text-[10px] font-semibold text-amber-700 transition hover:bg-amber-100">Apoyo</button>
+                <button onClick={() => onRegistrarAccion('peticion', elemento.coords!)} className="rounded bg-sky-50 px-1.5 py-1.5 text-[10px] font-semibold text-sky-700 transition hover:bg-sky-100">Petición</button>
+              </div>
+            )}
+          </div>
+        )}
 
         {onVerDetalle && (
           <button

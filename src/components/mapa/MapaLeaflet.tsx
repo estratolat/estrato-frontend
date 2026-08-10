@@ -197,6 +197,7 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
       )}
 
       {seleccion?.geometry && <CapaSeleccionada seleccion={seleccion} />}
+      <ManejadorClicCapas capasGeoJSONRef={capasGeoJSONRef} onFeatureClick={onFeatureClick} />
     </MapContainer>
   );
 });
@@ -1814,6 +1815,75 @@ function CapaSeleccionada({ seleccion }: { seleccion: any }) {
       }
     };
   }, [seleccion, map]);
+
+  return null;
+}
+
+interface ManejadorClicCapasProps {
+  capasGeoJSONRef: React.RefObject<Map<string, L.GeoJSON>>;
+  onFeatureClick?: (capaId: string, featureId: string, props: Record<string, any>, geometry?: any, coords?: { lat: number; lng: number }) => void;
+}
+
+function ManejadorClicCapas({ capasGeoJSONRef, onFeatureClick }: ManejadorClicCapasProps) {
+  const map = useMap();
+  const onFeatureClickRef = useRef(onFeatureClick);
+  onFeatureClickRef.current = onFeatureClick;
+
+  useEffect(() => {
+    const container = map.getContainer();
+    if (!container) return;
+
+    const handler = (e: MouseEvent) => {
+      // No actuar si ya se procesó como clic de feature recientemente
+      if (Date.now() - ultimoClickEnFeature < 50) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Solo atender clics sobre elementos SVG path/circle de capas personalizadas
+      const tag = target.tagName?.toLowerCase();
+      if (tag !== 'path' && tag !== 'circle') return;
+
+      const pane = target.closest('[class*="leaflet-pane"][class*="capa-"]') as HTMLElement | null;
+      if (!pane) return;
+
+      const match = pane.className.match(/capa-([a-zA-Z0-9\-_]+)/);
+      if (!match) return;
+      const capaId = match[1];
+
+      const geoLayer = capasGeoJSONRef.current?.get(capaId);
+      if (!geoLayer) return;
+
+      // Buscar el layer Leaflet cuyo elemento DOM coincida con target
+      let matchedLayer: any = null;
+      (geoLayer as any).eachLayer?.((layer: any) => {
+        if (matchedLayer) return;
+        try {
+          const el = layer.getElement?.() || (layer as any)._path || (layer as any)._icon;
+          if (el === target) matchedLayer = layer;
+        } catch {}
+      });
+      if (!matchedLayer) return;
+
+      const feature = matchedLayer.feature;
+      if (!feature) return;
+      const props = feature.properties || {};
+      const featureId = String(
+        props._feature_id || props.id || props.ID || props.OBJECTID || props.objectid || props.FID || props.fid || props.gid || props.GID
+      );
+      const latlng = map.mouseEventToLatLng(e);
+      const coords = { lat: latlng.lat, lng: latlng.lng };
+
+      console.log('[ManejadorClicCapas] clic detectado en feature', { capaId, featureId });
+      ultimoClickEnFeature = Date.now();
+      onFeatureClickRef.current?.(capaId, featureId, props, feature.geometry, coords);
+    };
+
+    container.addEventListener('click', handler, { capture: true });
+    return () => {
+      container.removeEventListener('click', handler, { capture: true });
+    };
+  }, [map, capasGeoJSONRef]);
 
   return null;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, memo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle, memo } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -45,18 +45,36 @@ const RESALTAR_INTERVALO = 300;
 
 import { shouldIgnoreMoveEnd, registerProgrammaticMove } from './mapa-move-utils';
 
-function getCentroStorageKey(tenantId?: string) {
-  if (!tenantId) return CENTRO_STORAGE_KEY_LEGACY;
-  return `mapa-centro-${tenantId}`;
+function getTenantId(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const fromStorage = localStorage.getItem('tenantId');
+  if (fromStorage) return fromStorage;
+  try {
+    const userRaw = localStorage.getItem('user');
+    if (userRaw) {
+      const parsed = JSON.parse(userRaw);
+      if (parsed?.tenant_id) return parsed.tenant_id;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
 }
 
-function getCentroInicial(tenantId?: string): { center: [number, number]; zoom: number; fromStorage: boolean } {
+function getCentroStorageKey(tenantId?: string) {
+  const id = tenantId || getTenantId();
+  if (!id) return CENTRO_STORAGE_KEY_LEGACY;
+  return `mapa-centro-${id}`;
+}
+
+function getCentroInicial(tenantId?: string): { center: [number, number]; zoom: number; fromStorage: boolean; tenantId?: string } {
+  const id = tenantId || getTenantId();
   if (typeof window === 'undefined') {
-    return { center: CENTRO_LEON, zoom: ZOOM_INICIAL, fromStorage: false };
+    return { center: CENTRO_LEON, zoom: ZOOM_INICIAL, fromStorage: false, tenantId: id };
   }
+  const key = getCentroStorageKey(id);
   try {
     // Preferir posición guardada para este proyecto/tenant
-    const key = getCentroStorageKey(tenantId);
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -67,7 +85,7 @@ function getCentroInicial(tenantId?: string): { center: [number, number]; zoom: 
         typeof parsed.center[1] === 'number' &&
         typeof parsed.zoom === 'number'
       ) {
-        return { center: parsed.center, zoom: parsed.zoom, fromStorage: true };
+        return { center: parsed.center, zoom: parsed.zoom, fromStorage: true, tenantId: id };
       }
     }
 
@@ -82,16 +100,16 @@ function getCentroInicial(tenantId?: string): { center: [number, number]; zoom: 
         typeof parsed.center[1] === 'number' &&
         typeof parsed.zoom === 'number'
       ) {
-        if (tenantId) {
+        if (id && key !== CENTRO_STORAGE_KEY_LEGACY) {
           localStorage.setItem(key, legacy);
         }
-        return { center: parsed.center, zoom: parsed.zoom, fromStorage: true };
+        return { center: parsed.center, zoom: parsed.zoom, fromStorage: true, tenantId: id };
       }
     }
   } catch {
     // ignore
   }
-  return { center: CENTRO_LEON, zoom: ZOOM_INICIAL, fromStorage: false };
+  return { center: CENTRO_LEON, zoom: ZOOM_INICIAL, fromStorage: false, tenantId: id };
 }
 
 export interface MapaLeafletRef {
@@ -135,9 +153,9 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
   ref
 ) {
   const { user } = useAuth();
-  const tenantId = user?.tenant_id;
+  const tenantId = user?.tenant_id || getTenantId();
   const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
-  const centroInicial = useRef(getCentroInicial(tenantId)).current;
+  const centroInicial = useMemo(() => getCentroInicial(tenantId), [tenantId]);
 
   const handleCapaRender = useCallback((capaId: string) => {
     if (pendingHighlight && pendingHighlight.capaId === capaId) {

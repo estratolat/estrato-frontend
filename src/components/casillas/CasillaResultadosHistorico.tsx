@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { casillasApi } from '@/lib/api';
+import {
+  normalizarDesglose,
+  type DesglosePartidosInput,
+} from '@/lib/historico-electoral';
 import { Trophy, Vote, Users, ScrollText, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Props {
@@ -21,7 +25,7 @@ interface ResultadoItem {
   participacion_pct: number | null;
   partido_ganador: string | null;
   votos_ganador: number | null;
-  desglose_partidos: { partido: string; votos: number; tipo: string }[];
+  desglose_partidos: DesglosePartidosInput;
 }
 
 interface Eleccion {
@@ -210,16 +214,23 @@ export default function CasillaResultadosHistorico({ casillaId }: Props) {
                           </td>
                           <td className="px-4 py-2">
                             <div className="flex flex-wrap gap-1">
-                              {c.desglose_partidos.slice(0, 4).map((d, i) => (
-                                <span key={i} className="inline-block rounded-md bg-secondary-100 px-1.5 py-0.5 text-xs text-secondary-700">
-                                  {d.partido}: {fmt(d.votos)}
-                                </span>
-                              ))}
-                              {c.desglose_partidos.length > 4 && (
-                                <span className="inline-block rounded-md bg-secondary-100 px-1.5 py-0.5 text-xs text-secondary-500">
-                                  +{c.desglose_partidos.length - 4}
-                                </span>
-                              )}
+                              {(() => {
+                                const desglose = normalizarDesglose(c.desglose_partidos);
+                                return (
+                                  <>
+                                    {desglose.slice(0, 4).map((d, i) => (
+                                      <span key={i} className="inline-block rounded-md bg-secondary-100 px-1.5 py-0.5 text-xs text-secondary-700">
+                                        {d.partido}: {fmt(d.votos)}
+                                      </span>
+                                    ))}
+                                    {desglose.length > 4 && (
+                                      <span className="inline-block rounded-md bg-secondary-100 px-1.5 py-0.5 text-xs text-secondary-500">
+                                        +{desglose.length - 4}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </td>
                         </tr>

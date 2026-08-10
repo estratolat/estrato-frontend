@@ -5,6 +5,10 @@ import dynamic from "next/dynamic";
 import { resultadosHistoricosApi, mapaApi } from "@/lib/api";
 import { Icon } from "@/components/ui/Icon";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  normalizarDesglose,
+  type DesglosePartidosInput,
+} from "@/lib/historico-electoral";
 
 const MapaCruceHistorico = dynamic(() => import("./MapaCruceHistorico"), {
   ssr: false,
@@ -83,12 +87,7 @@ interface Resultado {
   votos_nulos?: number;
   lista_nominal?: number;
   participacion_pct?: number;
-  desglose_partidos?: {
-    partido: string;
-    votos: number;
-    tipo: "individual" | "coalicion";
-    candidato?: string;
-  }[];
+  desglose_partidos?: DesglosePartidosInput;
   sabana_completa?: any;
   partido_principal?: string;
 }
@@ -2291,7 +2290,7 @@ function HistoricoElectoralPageInner() {
     const actoresUnicos = new Set<string>();
 
     resultadosSafe.forEach((r) => {
-      const desglose = r.desglose_partidos || [];
+      const desglose = normalizarDesglose(r.desglose_partidos);
       desglose.forEach((d) => {
         actoresUnicos.add(d.partido);
         if (!secciones.has(r.seccion)) {
@@ -5233,7 +5232,7 @@ function CasillasTable({
               </td>
               <td className="px-3 py-2">
                 <DesglosePreview
-                  desglose={r.desglose_partidos}
+                  desglose={normalizarDesglose(r.desglose_partidos)}
                   principal={principal || r.partido_principal}
                 />
               </td>
@@ -5545,17 +5544,13 @@ function DesglosePreview({
   desglose,
   principal,
 }: {
-  desglose?: {
-    partido: string;
-    votos: number;
-    tipo?: "individual" | "coalicion";
-    candidato?: string;
-  }[];
+  desglose?: Resultado["desglose_partidos"];
   principal?: string;
 }) {
-  if (!desglose || desglose.length === 0)
+  const desgloseArray = normalizarDesglose(desglose);
+  if (!desgloseArray || desgloseArray.length === 0)
     return <span className="text-secondary-400">-</span>;
-  const sorted = [...desglose]
+  const sorted = [...desgloseArray]
     .filter((a) => a && typeof a.votos === "number" && a.partido)
     .sort((a, b) => b.votos - a.votos);
   const top = sorted.slice(0, 3);

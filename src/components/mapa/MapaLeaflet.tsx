@@ -35,21 +35,29 @@ import { Icon } from '@/components/ui/Icon';
 import { errorToString } from '@/lib/error-utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAuth } from '@/hooks/useAuth';
 
 const CENTRO_LEON: [number, number] = [21.125, -101.6858];
 const ZOOM_INICIAL = 13;
-const CENTRO_STORAGE_KEY = 'mapa-centro';
+const CENTRO_STORAGE_KEY_LEGACY = 'mapa-centro';
 const RESALTAR_REINTENTOS = 40;
 const RESALTAR_INTERVALO = 300;
 
 import { shouldIgnoreMoveEnd, registerProgrammaticMove } from './mapa-move-utils';
 
-function getCentroInicial(): { center: [number, number]; zoom: number } {
+function getCentroStorageKey(tenantId?: string) {
+  if (!tenantId) return CENTRO_STORAGE_KEY_LEGACY;
+  return `mapa-centro-${tenantId}`;
+}
+
+function getCentroInicial(tenantId?: string): { center: [number, number]; zoom: number; fromStorage: boolean } {
   if (typeof window === 'undefined') {
-    return { center: CENTRO_LEON, zoom: ZOOM_INICIAL };
+    return { center: CENTRO_LEON, zoom: ZOOM_INICIAL, fromStorage: false };
   }
   try {
-    const raw = localStorage.getItem(CENTRO_STORAGE_KEY);
+    // Preferir posición guardada para este proyecto/tenant
+    const key = getCentroStorageKey(tenantId);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (
@@ -59,13 +67,31 @@ function getCentroInicial(): { center: [number, number]; zoom: number } {
         typeof parsed.center[1] === 'number' &&
         typeof parsed.zoom === 'number'
       ) {
-        return { center: parsed.center, zoom: parsed.zoom };
+        return { center: parsed.center, zoom: parsed.zoom, fromStorage: true };
+      }
+    }
+
+    // Fallback a clave legacy global (migración silenciosa)
+    const legacy = localStorage.getItem(CENTRO_STORAGE_KEY_LEGACY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      if (
+        Array.isArray(parsed.center) &&
+        parsed.center.length === 2 &&
+        typeof parsed.center[0] === 'number' &&
+        typeof parsed.center[1] === 'number' &&
+        typeof parsed.zoom === 'number'
+      ) {
+        if (tenantId) {
+          localStorage.setItem(key, legacy);
+        }
+        return { center: parsed.center, zoom: parsed.zoom, fromStorage: true };
       }
     }
   } catch {
     // ignore
   }
-  return { center: CENTRO_LEON, zoom: ZOOM_INICIAL };
+  return { center: CENTRO_LEON, zoom: ZOOM_INICIAL, fromStorage: false };
 }
 
 export interface MapaLeafletRef {
@@ -108,8 +134,10 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
   { data, activas, onRecargar, personalizadas, lideres = [], modoLideres = 'pines', puntoSeleccionado, onSeleccionarCoordenada, onAccionPunto, onCerrarPunto, onEditarLider, onEditarEvento, onDibujoListo, modoDibujo, filtrosApoyos, seleccion, onFeatureClick, resultadoDestacado, onBoundsChange, casillaUbicando, onLimpiarSeleccion },
   ref
 ) {
+  const { user } = useAuth();
+  const tenantId = user?.tenant_id;
   const capasGeoJSONRef = useRef<Map<string, L.GeoJSON>>(new Map());
-  const centroInicial = useRef(getCentroInicial()).current;
+  const centroInicial = useRef(getCentroInicial(tenantId)).current;
 
   const handleCapaRender = useCallback((capaId: string) => {
     if (pendingHighlight && pendingHighlight.capaId === capaId) {
@@ -134,14 +162,19 @@ export default forwardRef<MapaLeafletRef, Props>(function MapaLeaflet(
 
       <MapaBridge ref={ref} capasGeoJSONRef={capasGeoJSONRef} />
       <ControlRecargar onRecargar={onRecargar} />
-      <GuardarCentro />
+      <GuardarCentro tenantId={tenantId} />
       {onBoundsChange && <ManejadorBounds onBoundsChange={onBoundsChange} />}
       {onSeleccionarCoordenada && !casillaUbicando && <DetectorClicMapa onSeleccionar={onSeleccionarCoordenada} onLimpiarSeleccion={onLimpiarSeleccion} />}
       {casillaUbicando && <UbicarCasillaEnMapa casilla={casillaUbicando} onConfirmar={onSeleccionarCoordenada} onCancelar={onCerrarPunto} />}
 
       <ManejadorResultadoDestacado resultado={resultadoDestacado} capasGeoJSONRef={capasGeoJSONRef} />
 
-      <CentradorCapas data={data} activas={activas} personalizadas={personalizadas} />
+      <CentradorCapas
+        data={data}
+        activas={activas}
+        personalizadas={personalizadas}
+        autoCentrar={!centroInicial.fromStorage}
+      />
 
       {activas.votantes && data.votantes && (
         <CapaVotantes data={data.votantes} />
@@ -503,7 +536,7 @@ function ManejadorResultadoDestacado({
   return null;
 }
 
-function GuardarCentro() {
+function GuardarCentro({ tenantId }: { tenantId?: string }) {
   const map = useMap();
   useMapEvents({
     moveend: () => {
@@ -512,7 +545,7 @@ function GuardarCentro() {
       const zoom = map.getZoom();
       try {
         localStorage.setItem(
-          CENTRO_STORAGE_KEY,
+          getCentroStorageKey(tenantId),
           JSON.stringify({ center: [center.lat, center.lng], zoom })
         );
       } catch {
@@ -1600,10 +1633,12 @@ function CentradorCapas({
   data,
   activas,
   personalizadas,
+  autoCentrar,
 }: {
   data: MapaData;
   activas: Record<string, boolean>;
   personalizadas: { id: string; nombre: string; tipo: string; color: string; bloqueada?: boolean; orden?: number }[];
+  autoCentrar?: boolean;
 }) {
   const map = useMap();
   const yaCentradoRef = useRef(false);
@@ -1633,6 +1668,17 @@ function CentradorCapas({
 
     const boundsTyped = globalBounds as L.LatLngBounds;
     if (!boundsTyped.isValid()) return;
+
+    if (autoCentrar) {
+      // Primera visita a este proyecto: ajustar a las capas activas sin importar ubicación
+      yaCentradoRef.current = true;
+      registerProgrammaticMove(1200);
+      map.fitBounds(boundsTyped, { padding: [80, 80], maxZoom: 14, animate: true });
+      return;
+    }
+
+    // Para proyectos con posición guardada, solo corregir si las capas están fuera
+    // de México y el mapa sigue en México (caso Colombia/León por defecto)
     const center = boundsTyped.getCenter();
     const isOutsideMexico = center.lat < 14 || center.lat > 33 || center.lng < -118 || center.lng > -86;
     const currentCenter = map.getCenter();
@@ -1640,14 +1686,12 @@ function CentradorCapas({
       currentCenter.lat >= 14 && currentCenter.lat <= 33 &&
       currentCenter.lng >= -118 && currentCenter.lng <= -86;
 
-    // Solo auto-centrar si las capas están fuera de México y el mapa sigue en México
-    // (para no sobreescribir el comportamiento de proyectos mexicanos existentes)
     if (isOutsideMexico && isCurrentlyInMexico) {
       yaCentradoRef.current = true;
       registerProgrammaticMove(1200);
       map.fitBounds(boundsTyped, { padding: [80, 80], maxZoom: 14, animate: true });
     }
-  }, [map, data, activas, personalizadas]);
+  }, [map, data, activas, personalizadas, autoCentrar]);
 
   return null;
 }

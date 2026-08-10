@@ -187,17 +187,32 @@ export default function InteligenciaElectoralPage() {
     string | null
   >(null);
   const [estadoInteligencia, setEstadoInteligencia] = useState<{
-    datos?: Record<string, number | boolean>;
+    datos?: Record<string, number | boolean | string | null>;
+    pasos?: {
+      catalogos: { listo: boolean; mensaje: string };
+      datos: { listo: boolean; mensaje: string; fuente?: string | null };
+      analisis: { listo: boolean; mensaje: string };
+      mapa: { listo: boolean; mensaje: string };
+    };
     fuentes_con_datos?: Record<string, boolean>;
     historicos_disponibles?: any[];
     sugerencias?: {
       actorPrincipalId?: string;
       rival?: { nombre?: string; partido?: string; votos_historicos?: number };
       historicoSeleccion?: any;
+      historicoAutoSeleccion?: any;
+      requiereVincularHistorico?: boolean;
       filtroTerritorial?: { tipo: string; valor: string };
     };
   } | null>(null);
   const [cargandoEstado, setCargandoEstado] = useState(false);
+
+  // Simulador de alianzas
+  const [bloqueA, setBloqueA] = useState<string[]>([]);
+  const [bloqueB, setBloqueB] = useState<string[]>([]);
+  const [nombreBloqueA, setNombreBloqueA] = useState("Alianza A");
+  const [nombreBloqueB, setNombreBloqueB] = useState("Alianza B");
+  const [simulandoAlianza, setSimulandoAlianza] = useState(false);
 
   // Formularios
   const [partidoForm, setPartidoForm] = useState<Partial<Partido>>({});
@@ -429,8 +444,10 @@ export default function InteligenciaElectoralPage() {
       const { data } = await inteligenciaElectoralApi.getEstadoInteligencia(id);
       setEstadoInteligencia(data);
 
-      // Solo aplicar sugerencias automáticas si no hay contexto guardado en localStorage
+      // Aplicar sugerencias automáticas: actor, rival y filtro solo si no hay contexto previo guardado.
+      // El histórico se vincula automáticamente si el usuario aún no ha seleccionado uno manualmente.
       const tieneContextoGuardado = !!localStorage.getItem(claveContextoIA(id));
+      const historicoVacio = !historicoSeleccion?.anio;
 
       if (!tieneContextoGuardado) {
         if (data.sugerencias?.actorPrincipalId) {
@@ -439,12 +456,15 @@ export default function InteligenciaElectoralPage() {
         if (data.sugerencias?.rival?.partido) {
           setRival(data.sugerencias.rival);
         }
-        if (data.sugerencias?.historicoSeleccion?.anio) {
-          setHistoricoSeleccion(data.sugerencias.historicoSeleccion);
-        }
         if (data.sugerencias?.filtroTerritorial) {
           setFiltroTerritorialIA(data.sugerencias.filtroTerritorial);
         }
+      }
+
+      if (historicoVacio && (data.sugerencias?.historicoAutoSeleccion?.anio || data.sugerencias?.historicoSeleccion?.anio)) {
+        setHistoricoSeleccion(
+          data.sugerencias.historicoAutoSeleccion || data.sugerencias.historicoSeleccion,
+        );
       }
 
       // Actualizar fuentes: activar las que tienen datos, desactivar las que no
@@ -829,7 +849,7 @@ export default function InteligenciaElectoralPage() {
                     { key: 'casillas', label: 'Casillas / Sedes', icon: MapPin },
                   ].map((item) => {
                     const raw = estadoInteligencia?.datos?.[item.key];
-                    const tiene = typeof raw === 'boolean' ? raw : (raw || 0) > 0;
+                    const tiene = typeof raw === 'boolean' ? raw : Number(raw || 0) > 0;
                     return (
                       <div
                         key={item.key}
@@ -857,6 +877,11 @@ export default function InteligenciaElectoralPage() {
               )}
               {!cargandoEstado && estadoInteligencia && (
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {estadoInteligencia.datos?.fuente && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2 py-1 text-xs font-medium text-primary-700">
+                      <Database size={14} /> Fuente de datos: {estadoInteligencia.datos.fuente}
+                    </span>
+                  )}
                   {estadoInteligencia.sugerencias?.actorPrincipalId && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
                       <Check size={14} /> Actor principal sugerido:{' '}
@@ -1471,19 +1496,32 @@ export default function InteligenciaElectoralPage() {
 
                 {/* Wizard steps */}
                 <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { key: 'catalogos', label: 'Catálogos', desc: 'Partidos, elección y actores', icon: Users },
-                    { key: 'carga', label: 'Cargar sábanas', desc: 'Resultados por casilla', icon: Upload },
-                    { key: 'analisis', label: 'Análisis', desc: 'Revisar secciones', icon: BarChart3 },
-                    { key: 'mapa', label: 'Mapa', desc: 'Visualización territorial', icon: MapPin },
-                  ].map((s) => {
-                    const completo = s.key === 'catalogos'
-                      ? partidos.length > 0 && elecciones.length > 0 && actores.length > 0
-                      : s.key === 'carga'
-                        ? Number(estadoInteligencia?.datos?.sábanas || 0) > 0
-                        : s.key === 'analisis'
-                          ? Number(estadoInteligencia?.datos?.secciones || 0) > 0 || seccionesDesdeHistorico.length > 0
-                          : !!geojsonMapa;
+                  {(
+                    [
+                      { key: 'catalogos', label: 'Define tu elección', desc: 'Partidos, cargo/año y actores/coaliciones', icon: Users },
+                      { key: 'carga', label: 'Cargar resultados', desc: 'Sábanas de casilla o histórico electoral', icon: Upload },
+                      { key: 'analisis', label: 'Analizar secciones', desc: 'Revisa secciones y simula alianzas', icon: BarChart3 },
+                      { key: 'mapa', label: 'Ver mapa', desc: 'Visualización territorial por ganador', icon: MapPin },
+                    ] as {
+                      key: 'catalogos' | 'carga' | 'analisis' | 'mapa';
+                      label: string;
+                      desc: string;
+                      icon: any;
+                    }[]
+                  ).map((s) => {
+                    const clavePaso = s.key === 'carga' ? 'datos' : s.key;
+                    const pasoBackend = estadoInteligencia?.pasos?.[clavePaso as keyof NonNullable<typeof estadoInteligencia.pasos>];
+                    // Fallback local si el backend aún no devuelve pasos
+                    const completo = pasoBackend?.listo ?? (
+                      s.key === 'catalogos'
+                        ? partidos.length > 0 && elecciones.length > 0 && actores.length > 0
+                        : s.key === 'carga'
+                          ? Number(estadoInteligencia?.datos?.sábanas || 0) > 0 || Number(estadoInteligencia?.datos?.históricos || 0) > 0
+                          : s.key === 'analisis'
+                            ? Number(estadoInteligencia?.datos?.secciones || 0) > 0 || seccionesDesdeHistorico.length > 0
+                            : !!geojsonMapa
+                    );
+                    const mensaje = pasoBackend?.mensaje || s.desc;
                     return (
                       <button
                         key={s.key}
@@ -1499,12 +1537,12 @@ export default function InteligenciaElectoralPage() {
                             <s.icon size={16} className="text-primary-600" /> {s.label}
                           </span>
                           {completo ? (
-                            <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">LISTO</span>
+                            <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">✓ LISTO</span>
                           ) : (
                             <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">PEND</span>
                           )}
                         </div>
-                        <span className="text-xs text-secondary-500">{s.desc}</span>
+                        <span className="text-xs text-secondary-500">{mensaje}</span>
                       </button>
                     );
                   })}
@@ -1516,9 +1554,16 @@ export default function InteligenciaElectoralPage() {
                 {pasoDrawer === 'catalogos' && (
                   <div className="space-y-4">
                     <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
-                      <p className="font-bold">¿Qué haces aquí?</p>
+                      <p className="font-bold">¿Para qué sirve este paso?</p>
                       <p>
-                        Define quiénes compiten: los <strong>partidos</strong> (siglas y color), la <strong>elección</strong> (cargo y año, ej. Alcalde 2027) y los <strong>actores/coaliciones</strong> (candidato o alianza que busca votos). La IA usa esto para saber de quién hablas.
+                        Antes de que la IA te asesore, necesita saber <strong>quiénes compiten</strong> y por qué cargo. Aquí defines los partidos (con siglas y color), la elección (año y puesto, ej. Alcalde 2027) y los actores o coaliciones que buscan votos.
+                      </p>
+                      <p className="mt-2 flex items-center gap-2 font-medium">
+                        {estadoInteligencia?.pasos?.catalogos?.listo ? (
+                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.catalogos.mensaje}</>
+                        ) : (
+                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.catalogos?.mensaje || 'Completa partidos, elección y actores'}</>
+                        )}
                       </p>
                     </div>
                         <div className="grid gap-6 lg:grid-cols-2">
@@ -1893,9 +1938,16 @@ export default function InteligenciaElectoralPage() {
                 {pasoDrawer === 'carga' && (
                   <div className="space-y-4">
                     <div className="rounded-lg bg-green-50 p-4 text-sm text-green-800">
-                      <p className="font-bold">¿Qué es una sábana?</p>
+                      <p className="font-bold">¿Para qué sirve este paso?</p>
                       <p>
-                        Es el archivo Excel con los resultados oficiales por casilla. Con ella la IA calcula ganador por sección, votos nulos, participación y estrategia territorial. Si aún no la tienes, descarga la plantilla.
+                        Aquí le dices a la IA <strong>de dónde sacar los votos</strong>. Puedes subir una <strong>sábana oficial</strong> (resultados por casilla) o importar un <strong>histórico electoral</strong> que ya tengas cargado en ESTRATO. Con eso la IA calcula el ganador por sección, votos nulos, participación y puede proyectar escenarios.
+                      </p>
+                      <p className="mt-2 flex items-center gap-2 font-medium">
+                        {estadoInteligencia?.pasos?.datos?.listo ? (
+                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.datos.mensaje}</>
+                        ) : (
+                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.datos?.mensaje || 'Sube una sábana o importa un histórico'}</>
+                        )}
                       </p>
                     </div>
                         <div className="card p-6">
@@ -2019,11 +2071,180 @@ export default function InteligenciaElectoralPage() {
                 {pasoDrawer === 'analisis' && (
                   <div className="space-y-4">
                     <div className="rounded-lg bg-purple-50 p-4 text-sm text-purple-800">
-                      <p className="font-bold">¿Qué verás aquí?</p>
+                      <p className="font-bold">¿Para qué sirve este paso?</p>
                       <p>
-                        Revisa el resumen por sección: ganador, votos, participación, votos nulos y clasificación estratégica. También puedes analizar una sección específica con IA.
+                        Aquí revisas el <strong>ganador por sección</strong>, los votos, la participación, los votos nulos y la clasificación estratégica. También puedes usar el <strong>simulador de alianzas</strong> para preguntarle a la IA: "¿qué pasaría si estos partidos se unen contra estos otros?"
+                      </p>
+                      <p className="mt-2 flex items-center gap-2 font-medium">
+                        {estadoInteligencia?.pasos?.analisis?.listo ? (
+                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.analisis.mensaje}</>
+                        ) : (
+                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.analisis?.mensaje || 'Primero carga resultados'}</>
+                        )}
                       </p>
                     </div>
+
+                    {/* Simulador de alianzas */}
+                    {estadoInteligencia?.pasos?.datos?.listo && actores.length > 0 && (
+                      <div className="card p-5">
+                        <h4 className="mb-3 flex items-center gap-2 text-lg font-bold text-secondary-900">
+                          <Layers size={18} className="text-primary-600" /> Simulador de alianzas
+                        </h4>
+                        <p className="mb-4 text-sm text-secondary-600">
+                          Arma dos bloques con los actores de esta elección y pregúntale a la IA cómo quedaría el escenario. La IA cruzará los votos por sección según el histórico o las sábanas cargadas.
+                        </p>
+
+                        <div className="mb-4 grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <label className="label">Nombre del bloque A</label>
+                            <input
+                              value={nombreBloqueA}
+                              onChange={(e) => setNombreBloqueA(e.target.value)}
+                              className="input"
+                              placeholder="Ej. Alianza Va por México"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="label">Nombre del bloque B</label>
+                            <input
+                              value={nombreBloqueB}
+                              onChange={(e) => setNombreBloqueB(e.target.value)}
+                              className="input"
+                              placeholder="Ej. Juntos Hacemos Historia"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {actores.map((a) => {
+                            const enA = bloqueA.includes(a.id);
+                            const enB = bloqueB.includes(a.id);
+                            return (
+                              <div key={a.id} className="rounded-lg border border-gray-200 bg-white p-3">
+                                <div className="mb-2 flex items-center gap-2">
+                                  <span
+                                    className="h-3 w-3 rounded-full"
+                                    style={{ backgroundColor: a.color_hex || a.partido?.color_hex || '#ccc' }}
+                                  />
+                                  <span className="text-sm font-medium text-secondary-900">{a.nombre_visual}</span>
+                                  <span className="text-xs text-secondary-500">{a.partido?.siglas || a.tipo_actor}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setBloqueA((prev) => prev.filter((id) => id !== a.id).concat(enA ? [] : [a.id]));
+                                      setBloqueB((prev) => prev.filter((id) => id !== a.id));
+                                    }}
+                                    className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition ${
+                                      enA ? 'bg-primary-600 text-white' : 'bg-gray-100 text-secondary-600 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    Bloque A
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setBloqueB((prev) => prev.filter((id) => id !== a.id).concat(enB ? [] : [a.id]));
+                                      setBloqueA((prev) => prev.filter((id) => id !== a.id));
+                                    }}
+                                    className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition ${
+                                      enB ? 'bg-secondary-700 text-white' : 'bg-gray-100 text-secondary-600 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    Bloque B
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setBloqueA((prev) => prev.filter((id) => id !== a.id));
+                                      setBloqueB((prev) => prev.filter((id) => id !== a.id));
+                                    }}
+                                    className="flex-1 rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-secondary-600 hover:bg-gray-200"
+                                  >
+                                    Neutral
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {bloqueA.length === 0 || bloqueB.length === 0 ? (
+                          <p className="text-sm text-amber-600">Selecciona al menos un actor para cada bloque.</p>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              const nombresA = actores
+                                .filter((a) => bloqueA.includes(a.id))
+                                .map((a) => a.nombre_visual)
+                                .join(', ');
+                              const nombresB = actores
+                                .filter((a) => bloqueB.includes(a.id))
+                                .map((a) => a.nombre_visual)
+                                .join(', ');
+                              const preguntaAlianza = `Simula un escenario electoral donde "${nombreBloqueA}" (${nombresA}) compite como un solo bloque contra "${nombreBloqueB}" (${nombresB}). Basándote en los datos cargados (histórico/sábanas), dime: ¿quién ganaría el territorio total?, ¿en qué secciones cambiaría el ganador?, ¿cuál sería el margen aproximado de votos? y ¿qué secciones debería priorizar cada bloque?`;
+                              setPregunta(preguntaAlianza);
+                              setSimulandoAlianza(true);
+                              setMostrarConfigAvanzada(false);
+                              setActiveTab('consultor');
+                              setRespuestaIA(null);
+                              setConsultando(true);
+                              setError(null);
+                              try {
+                                const { data } = await inteligenciaElectoralApi.consultarIA({
+                                  pregunta: preguntaAlianza,
+                                  contextoCampana: {
+                                    ...contextoCampana,
+                                    escenario: `${contextoCampana.escenario || ''}\n\nEscenario simulado: ${nombreBloqueA} vs ${nombreBloqueB}`.trim(),
+                                  },
+                                  eleccionId: eleccionId || undefined,
+                                  actorPrincipalId: actorPrincipalId || undefined,
+                                  fuentes: fuentesIA,
+                                  filtroTerritorial: filtroTerritorialIA,
+                                  historicoSeleccion: Object.keys(historicoSeleccion).length ? historicoSeleccion : undefined,
+                                  rival: Object.keys(rival).length ? rival : undefined,
+                                });
+                                setRespuestaIA(data.respuesta);
+                                setResumenContextoIA(data.contexto_resumen || null);
+                                if (eleccionId) {
+                                  const nuevoItem = {
+                                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                                    fecha: new Date().toISOString(),
+                                    pregunta: preguntaAlianza,
+                                    respuesta: data.respuesta,
+                                    contexto_resumen: data.contexto_resumen,
+                                  };
+                                  const actualizado = [nuevoItem, ...historialIA];
+                                  setHistorialIA(actualizado);
+                                  setHistorialExpandidoId(nuevoItem.id);
+                                  localStorage.setItem(claveHistorialIA(eleccionId), JSON.stringify(actualizado.slice(0, 50)));
+                                }
+                              } catch (err: any) {
+                                setError(err.response?.data?.message || 'Error al simular la alianza');
+                              } finally {
+                                setConsultando(false);
+                                setSimulandoAlianza(false);
+                              }
+                            }}
+                            disabled={simulandoAlianza}
+                            className="btn-primary flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            {simulandoAlianza ? (
+                              <>
+                                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+                                Simulando...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles size={16} /> Preguntar a la IA cómo quedaría
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                         <div className="space-y-6">
                           <div className="card overflow-hidden">
                             <div className="p-4">
@@ -2304,9 +2525,16 @@ export default function InteligenciaElectoralPage() {
                 {pasoDrawer === 'mapa' && (
                   <div className="space-y-4">
                     <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-                      <p className="font-bold">¿Para qué sirve el mapa?</p>
+                      <p className="font-bold">¿Para qué sirve este paso?</p>
                       <p>
-                        Visualiza geográficamente las secciones coloreadas por ganador. Requiere que hayas cargado sábanas o un histórico electoral.
+                        El mapa te permite <strong>ver el territorio coloreado por ganador</strong>, detectar bastiones, zonas en riesgo y dónde concentrar esfuerzos. Requiere que ya hayas cargado resultados y, idealmente, que exista una capa geográfica en el Mapa Territorial.
+                      </p>
+                      <p className="mt-2 flex items-center gap-2 font-medium">
+                        {estadoInteligencia?.pasos?.mapa?.listo ? (
+                          <><CheckCircle2 size={16} /> {estadoInteligencia.pasos.mapa.mensaje}</>
+                        ) : (
+                          <><AlertCircle size={16} /> {estadoInteligencia?.pasos?.mapa?.mensaje || 'Primero carga resultados y análisis'}</>
+                        )}
                       </p>
                     </div>
                         <div className="space-y-4">

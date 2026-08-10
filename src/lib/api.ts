@@ -349,6 +349,10 @@ export const inteligenciaElectoralApi = {
   analizarSeccion: (eleccionId: string, seccion: string) =>
     api.post(`/inteligencia-electoral/elecciones/${eleccionId}/analizar-seccion/${seccion}`),
 
+  // Estado / detección automática
+  getEstadoInteligencia: (eleccionId: string) =>
+    api.get(`/inteligencia-electoral/elecciones/${eleccionId}/estado`),
+
   // Consultor IA
   consultarIA: (data: {
     pregunta: string;

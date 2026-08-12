@@ -26,6 +26,7 @@ import {
   DevicePhoneMobileIcon,
   ClipboardDocumentCheckIcon,
   UserGroupIcon,
+  PhoneIcon,
 } from '@heroicons/react/24/solid';
 
 type IconComponent = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -40,6 +41,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard', icon: Squares2X2Icon, label: 'Dashboard', color: '#B91C1C', permiso: 'dashboard', grupo: 'operacion' },
   { href: '/dashboard/votantes', icon: UsersIcon, label: 'Votantes', color: '#2563EB', permiso: 'votantes', grupo: 'operacion' },
   { href: '/dashboard/crm', icon: ChatBubbleLeftRightIcon, label: 'CRM', color: '#16A34A', permiso: 'crm', grupo: 'operacion' },
+  { href: '/dashboard/llamadas', icon: PhoneIcon, label: 'Llamadas', color: '#9F1239', permiso: 'llamadas', grupo: 'operacion' },
   { href: '/dashboard/peticiones', icon: ClipboardDocumentCheckIcon, label: 'Operaciones', color: '#06B6D4', permiso: 'peticiones', grupo: 'operacion' },
   { href: '/dashboard/eventos', icon: CalendarDaysIcon, label: 'Eventos', color: '#7C3AED', permiso: 'eventos', grupo: 'operacion' },
   { href: '/dashboard/encuestas', icon: ClipboardDocumentListIcon, label: 'Encuestas', color: '#D97706', permiso: 'encuestas', grupo: 'operacion' },
@@ -65,7 +67,7 @@ const MENU_ITEMS: MenuItem[] = [
   // Módulos avanzados desactivados por defecto
   ...(HABILITAR_MODULOS_AVANZADOS
     ? [
-        { href: '/dashboard/llamadas', icon: ChatBubbleLeftRightIcon, label: 'Llamadas', color: '#9F1239', permiso: 'llamadas', grupo: 'avanzados' } as MenuItem,
+        // Aquí se pueden agregar módulos experimentales sin mostrarlos aún en producción
       ]
     : []),
 

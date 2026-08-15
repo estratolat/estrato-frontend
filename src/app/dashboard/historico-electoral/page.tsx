@@ -46,6 +46,9 @@ import {
   TrendingDown,
   TrendingUpIcon,
   Info,
+  ChevronUp,
+  ChevronDown,
+  X,
 } from "lucide-react";
 
 // Tipos
@@ -299,76 +302,119 @@ const CAMPOS_MAPEO: {
 ];
 
 function NotaRedistritacionEmilio() {
+  const [abierto, setAbierto] = useState(true);
+  const [cerrado, setCerrado] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("estrato.nota-redistritacion-cerrada") === "1";
+  });
+
+  if (cerrado) return null;
+
   return (
     <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-      <div className="mb-3 flex items-start gap-3">
-        <div className="rounded-full bg-blue-100 p-2">
-          <Info size={20} className="text-blue-600" />
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="rounded-full bg-blue-100 p-2">
+            <Info size={20} className="text-blue-600" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-blue-900">
+              Redistritación del Distrito Local XVII, Guanajuato
+            </h3>
+            {!abierto && (
+              <p className="mt-1 text-sm text-blue-700">
+                2018/2021: 107 secciones · 2024: 125 secciones
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          <h3 className="text-base font-bold text-blue-900">
-            Redistritación del Distrito Local XVII, Guanajuato
-          </h3>
-          <p className="mt-1 text-sm leading-relaxed text-blue-800">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setAbierto((v) => !v)}
+            className="rounded-md p-1.5 text-blue-600 hover:bg-blue-100"
+            aria-label={abierto ? "Colapsar nota" : "Expandir nota"}
+          >
+            {abierto ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCerrado(true);
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("estrato.nota-redistritacion-cerrada", "1");
+              }
+            }}
+            className="rounded-md p-1.5 text-blue-600 hover:bg-blue-100"
+            aria-label="Cerrar nota"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      </div>
+
+      {abierto && (
+        <>
+          <p className="mb-3 text-sm leading-relaxed text-blue-800">
             Los históricos cargados corresponden al Distrito Local XVII, pero su
             composición territorial cambió entre procesos electorales. Por eso el
             número de secciones y la lista nominal varían entre años: no es un error
             de captura, es el nuevo corte geográfico aprobado por el Instituto
             Electoral del Estado de Guanajuato.
           </p>
-        </div>
-      </div>
 
-      <div className="overflow-hidden rounded-lg border border-blue-100 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-blue-100 text-left text-xs font-bold uppercase tracking-wide text-blue-900">
-            <tr>
-              <th className="px-3 py-2">Año</th>
-              <th className="px-3 py-2">Secciones</th>
-              <th className="px-3 py-2">Municipios incluidos</th>
-              <th className="px-3 py-2">Observación</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-blue-100 text-blue-900">
-            <tr>
-              <td className="px-3 py-2 font-semibold">2018</td>
-              <td className="px-3 py-2">107</td>
-              <td className="px-3 py-2">
-                Comonfort, Juventino Rosas, Villagrán (secciones 2906-2933)
-              </td>
-              <td className="px-3 py-2">Corte 2017</td>
-            </tr>
-            <tr>
-              <td className="px-3 py-2 font-semibold">2021</td>
-              <td className="px-3 py-2">107</td>
-              <td className="px-3 py-2">
-                Comonfort, Juventino Rosas, Villagrán (secciones 2906-2933)
-              </td>
-              <td className="px-3 py-2">Mismo corte que 2018</td>
-            </tr>
-            <tr>
-              <td className="px-3 py-2 font-semibold">2024</td>
-              <td className="px-3 py-2">125</td>
-              <td className="px-3 py-2">
-                Comonfort, Juventino Rosas, Apaseo el Grande, casilla especial 9016
-              </td>
-              <td className="px-3 py-2">Nuevo corte post-2021</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+          <div className="overflow-hidden rounded-lg border border-blue-100 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-blue-100 text-left text-xs font-bold uppercase tracking-wide text-blue-900">
+                <tr>
+                  <th className="px-3 py-2">Año</th>
+                  <th className="px-3 py-2">Secciones</th>
+                  <th className="px-3 py-2">Municipios incluidos</th>
+                  <th className="px-3 py-2">Observación</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-blue-100 text-blue-900">
+                <tr>
+                  <td className="px-3 py-2 font-semibold">2018</td>
+                  <td className="px-3 py-2">107</td>
+                  <td className="px-3 py-2">
+                    Comonfort, Juventino Rosas, Villagrán (secciones 2906-2933)
+                  </td>
+                  <td className="px-3 py-2">Corte 2017</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 font-semibold">2021</td>
+                  <td className="px-3 py-2">107</td>
+                  <td className="px-3 py-2">
+                    Comonfort, Juventino Rosas, Villagrán (secciones 2906-2933)
+                  </td>
+                  <td className="px-3 py-2">Mismo corte que 2018</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 font-semibold">2024</td>
+                  <td className="px-3 py-2">125</td>
+                  <td className="px-3 py-2">
+                    Comonfort, Juventino Rosas, Apaseo el Grande, casilla especial 9016
+                  </td>
+                  <td className="px-3 py-2">Nuevo corte post-2021</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-blue-800">
-        <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
-          Actor principal: MC
-        </span>
-        <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
-          Comparación 2018 ↔ 2021 válida
-        </span>
-        <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
-          2024 incluye territorio nuevo
-        </span>
-      </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-blue-800">
+            <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
+              Actor principal: MC
+            </span>
+            <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
+              Comparación 2018 ↔ 2021 válida
+            </span>
+            <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
+              2024 incluye territorio nuevo
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

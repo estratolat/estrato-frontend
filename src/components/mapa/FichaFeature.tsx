@@ -387,27 +387,27 @@ export default function FichaFeature({ elemento, onCerrar, onVerDetalle, onEdita
                 Cargando histórico...
               </div>
             ) : historicoCompleto.length > 0 ? (
-              <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-secondary-100">
-                <table className="w-full text-[10px]">
+              <div className="mt-2 max-h-40 overflow-x-auto overflow-y-auto rounded-lg border border-secondary-100">
+                <table className="min-w-full text-[10px]">
                   <thead className="bg-secondary-50">
                     <tr>
-                      <th className="px-2 py-1 text-left font-semibold text-secondary-600">Año</th>
-                      <th className="px-2 py-1 text-left font-semibold text-secondary-600">Elección</th>
-                      <th className="px-2 py-1 text-left font-semibold text-secondary-600">Ganador</th>
-                      <th className="px-2 py-1 text-right font-semibold text-secondary-600">Votos</th>
-                      <th className="px-2 py-1 text-right font-semibold text-secondary-600">Lista nominal</th>
-                      <th className="px-2 py-1 text-right font-semibold text-secondary-600">Particip.</th>
+                      <th className="whitespace-nowrap px-2 py-1 text-left font-semibold text-secondary-600">Año</th>
+                      <th className="whitespace-nowrap px-2 py-1 text-left font-semibold text-secondary-600">Elección</th>
+                      <th className="whitespace-nowrap px-2 py-1 text-left font-semibold text-secondary-600">Ganador</th>
+                      <th className="whitespace-nowrap px-2 py-1 text-right font-semibold text-secondary-600">Votos</th>
+                      <th className="whitespace-nowrap px-2 py-1 text-right font-semibold text-secondary-600">Lista nominal</th>
+                      <th className="whitespace-nowrap px-2 py-1 text-right font-semibold text-secondary-600">Particip.</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historicoCompleto.map((h, idx) => (
                       <tr key={idx} className="border-t border-secondary-100">
-                        <td className="px-2 py-1 text-secondary-900">{h.anio}</td>
-                        <td className="px-2 py-1 capitalize text-secondary-700">{String(h.tipo_eleccion).replace(/_/g, ' ')}</td>
-                        <td className="px-2 py-1 font-medium text-secondary-900">{h.partido_ganador || '-'}</td>
-                        <td className="px-2 py-1 text-right text-secondary-800">{h.total_votos != null ? Number(h.total_votos).toLocaleString() : '-'}</td>
-                        <td className="px-2 py-1 text-right text-secondary-800">{h.lista_nominal != null ? Number(h.lista_nominal).toLocaleString() : '-'}</td>
-                        <td className="px-2 py-1 text-right text-secondary-800">{h.participacion_pct != null ? `${Number(h.participacion_pct).toFixed(2)}%` : (h.total_votos != null && h.lista_nominal != null && h.lista_nominal > 0 ? `${((Number(h.total_votos) / Number(h.lista_nominal)) * 100).toFixed(2)}%` : '-')}</td>
+                        <td className="whitespace-nowrap px-2 py-1 text-secondary-900">{h.anio}</td>
+                        <td className="whitespace-nowrap px-2 py-1 capitalize text-secondary-700">{String(h.tipo_eleccion).replace(/_/g, ' ')}</td>
+                        <td className="whitespace-nowrap px-2 py-1 font-medium text-secondary-900">{h.partido_ganador || '-'}</td>
+                        <td className="whitespace-nowrap px-2 py-1 text-right text-secondary-800">{h.total_votos != null ? Number(h.total_votos).toLocaleString() : '-'}</td>
+                        <td className="whitespace-nowrap px-2 py-1 text-right text-secondary-800">{h.lista_nominal != null ? Number(h.lista_nominal).toLocaleString() : '-'}</td>
+                        <td className="whitespace-nowrap px-2 py-1 text-right text-secondary-800">{h.participacion_pct != null ? `${Number(h.participacion_pct).toFixed(2)}%` : (h.total_votos != null && h.lista_nominal != null && h.lista_nominal > 0 ? `${((Number(h.total_votos) / Number(h.lista_nominal)) * 100).toFixed(2)}%` : '-')}</td>
                       </tr>
                     ))}
                   </tbody>

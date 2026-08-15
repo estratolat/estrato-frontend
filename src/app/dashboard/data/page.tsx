@@ -75,10 +75,10 @@ interface ConfigPais {
 const CONFIG_POR_PAIS: Record<string, ConfigPais> = {
   mx: {
     titulo: 'Data México',
-    subtitulo: 'Indicadores oficiales de Dolores Hidalgo, Guanajuato',
-    tituloTab: 'Data México — Dolores Hidalgo Cuna de la Independencia Nacional',
+    subtitulo: 'Indicadores oficiales de México',
+    tituloTab: 'Data México',
     fuenteNombre: 'Data México',
-    fuenteUrl: 'https://www.economia.gob.mx/datamexico/es/profile/geo/dolores-hidalgo-cuna-de-la-independencia-nacional?redirect=true',
+    fuenteUrl: 'https://www.economia.gob.mx/datamexico/',
     fuenteCreditos: 'Datos curados de INEGI, CONEVAL y Secretaría de Bienestar.',
     errorCarga: 'Error al cargar los indicadores de Data México',
   },
@@ -90,6 +90,19 @@ const CONFIG_POR_PAIS: Record<string, ConfigPais> = {
     fuenteUrl: 'https://www.dane.gov.co/',
     fuenteCreditos: 'Datos oficiales del Departamento Administrativo Nacional de Estadística (DANE).',
     errorCarga: 'Error al cargar los indicadores de Data Colombia',
+  },
+};
+
+// Configuración específica por tenant para mostrar el territorio correcto en Data México.
+const CONFIG_POR_TENANT: Record<string, ConfigPais> = {
+  emilio: {
+    titulo: 'Data México',
+    subtitulo: 'Indicadores del Distrito Local XVII, Guanajuato',
+    tituloTab: 'Data México — Distrito Local XVII, Guanajuato',
+    fuenteNombre: 'Data México / INEGI',
+    fuenteUrl: 'https://www.economia.gob.mx/datamexico/',
+    fuenteCreditos: 'Datos curados de INEGI, CONEVAL y Secretaría de Bienestar. Agregado de Comonfort, Juventino Rosas, Apaseo el Grande y Villagrán.',
+    errorCarga: 'Error al cargar los indicadores de Data México',
   },
 };
 
@@ -157,8 +170,10 @@ function maximoGrupo(indicadores: Indicador[], nombreIndicador: string): number 
 export default function DataPage() {
   const { user } = useAuth();
   const pais = user?.tenant?.pais || 'mx';
+  const slug = user?.tenant?.slug || '';
   const esColombia = pais === 'co';
-  const configPais = CONFIG_POR_PAIS[pais] || CONFIG_POR_PAIS['mx'];
+  const configBase = CONFIG_POR_PAIS[pais] || CONFIG_POR_PAIS['mx'];
+  const configPais = CONFIG_POR_TENANT[slug] || configBase;
 
   const [indicadores, setIndicadores] = useState<Indicador[]>([]);
   const [resumen, setResumen] = useState<ResumenData | null>(null);

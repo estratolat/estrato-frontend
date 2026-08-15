@@ -20,7 +20,9 @@ Ha fusionado la potencia visual con la estrategia discursiva como Director de Co
 
 Asesor en campañas electorales en México, enfocado en imagen, posicionamiento de candidatos, mensajes clave y contención de daños. Es conferencista, capacitador y autor del libro Guerra de Mensajes, guía práctica que aplica principios de estrategia militar a la comunicación política moderna.
 
-Autor del libro Guerra de Mensajes y estratega detrás del enfoque comunicacional de ESTRATO.`,
+Autor del libro Guerra de Mensajes y estratega detrás del enfoque comunicacional de ESTRATO.
+
+Consulta mi tarjeta digital: https://toke.mx/gabo`,
     flags: [{ code: 'MX', label: 'México', emoji: '🇲🇽' }],
   },
   {

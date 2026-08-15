@@ -7,6 +7,8 @@ interface TeamMember {
   image: string;
   bio: string;
   flags: { code: string; label: string; emoji: string }[];
+  tarjetaDigital?: string;
+  tarjetaDigitalLabel?: string;
 }
 
 const TEAM: TeamMember[] = [
@@ -20,10 +22,10 @@ Ha fusionado la potencia visual con la estrategia discursiva como Director de Co
 
 Asesor en campañas electorales en México, enfocado en imagen, posicionamiento de candidatos, mensajes clave y contención de daños. Es conferencista, capacitador y autor del libro Guerra de Mensajes, guía práctica que aplica principios de estrategia militar a la comunicación política moderna.
 
-Autor del libro Guerra de Mensajes y estratega detrás del enfoque comunicacional de ESTRATO.
-
-Consulta mi tarjeta digital: https://toke.mx/gabo`,
+Autor del libro Guerra de Mensajes y estratega detrás del enfoque comunicacional de ESTRATO.`,
     flags: [{ code: 'MX', label: 'México', emoji: '🇲🇽' }],
+    tarjetaDigital: 'https://toke.mx/gabo',
+    tarjetaDigitalLabel: 'Ver tarjeta digital',
   },
   {
     name: 'Alejandra Sierra López',
@@ -172,6 +174,18 @@ export default function NosotrosPage() {
                 <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/55">
                   {member.bio}
                 </p>
+
+                {member.tarjetaDigital && (
+                  <a
+                    href={member.tarjetaDigital}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-[#d73216] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#b82412]"
+                  >
+                    {member.tarjetaDigitalLabel || 'Ver tarjeta digital'}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  </a>
+                )}
               </div>
             </div>
           ))}

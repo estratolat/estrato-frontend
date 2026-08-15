@@ -49,6 +49,7 @@ import {
   ChevronUp,
   ChevronDown,
   X,
+  RotateCcw,
 } from "lucide-react";
 
 // Tipos
@@ -301,14 +302,8 @@ const CAMPOS_MAPEO: {
   { key: "filtro_municipio_columna", label: "Columna filtro municipio" },
 ];
 
-function NotaRedistritacionEmilio() {
+function NotaRedistritacionEmilio({ onCerrar }: { onCerrar: () => void }) {
   const [abierto, setAbierto] = useState(true);
-  const [cerrado, setCerrado] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return sessionStorage.getItem("estrato.nota-redistritacion-cerrada") === "1";
-  });
-
-  if (cerrado) return null;
 
   return (
     <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
@@ -340,10 +335,10 @@ function NotaRedistritacionEmilio() {
           <button
             type="button"
             onClick={() => {
-              setCerrado(true);
               if (typeof window !== "undefined") {
                 sessionStorage.setItem("estrato.nota-redistritacion-cerrada", "1");
               }
+              onCerrar();
             }}
             className="rounded-md p-1.5 text-blue-600 hover:bg-blue-100"
             aria-label="Cerrar nota"
@@ -483,6 +478,21 @@ function HistoricoElectoralPageInner() {
   }, []);
   const modoBallesteros = tenantSlug === "mario-bellesteros";
   const modoEmilio = tenantSlug === "emilio";
+
+  // Visibilidad de la nota metodológica de redistritación (solo Emilio)
+  const [notaRedistritacionVisible, setNotaRedistritacionVisible] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return sessionStorage.getItem("estrato.nota-redistritacion-cerrada") !== "1";
+  });
+  const cerrarNotaRedistritacion = () => {
+    setNotaRedistritacionVisible(false);
+  };
+  const mostrarNotaRedistritacion = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("estrato.nota-redistritacion-cerrada");
+    }
+    setNotaRedistritacionVisible(true);
+  };
 
   // Análisis territorial / cruce histórico
   const [cruceData, setCruceData] = useState<any | null>(null);
@@ -2889,7 +2899,9 @@ function HistoricoElectoralPageInner() {
     return (
       <div className="space-y-6">
         {/* Nota metodológica exclusiva del proyecto Emilio */}
-        {modoEmilio && <NotaRedistritacionEmilio />}
+        {modoEmilio && notaRedistritacionVisible && (
+          <NotaRedistritacionEmilio onCerrar={cerrarNotaRedistritacion} />
+        )}
 
         {/* KPIs globales — una sola fila compacta */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -2933,8 +2945,20 @@ function HistoricoElectoralPageInner() {
               </h3>
             </div>
 
-            <div className="flex rounded-lg border border-secondary-200 bg-white p-1">
-              {[
+            <div className="flex flex-wrap items-center gap-2">
+              {modoEmilio && !notaRedistritacionVisible && (
+                <button
+                  type="button"
+                  onClick={mostrarNotaRedistritacion}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                >
+                  <RotateCcw size={14} />
+                  Mostrar nota de redistritación
+                </button>
+              )}
+
+              <div className="flex rounded-lg border border-secondary-200 bg-white p-1">
+                {[
                 { key: '', label: 'Ambos' },
                 { key: 'principal', label: 'Principales' },
                 { key: 'complementario', label: 'Complementarios' },
@@ -2955,6 +2979,7 @@ function HistoricoElectoralPageInner() {
                   </button>
                 );
               })}
+              </div>
             </div>
           </div>
 

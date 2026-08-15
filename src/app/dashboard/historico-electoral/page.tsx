@@ -67,7 +67,7 @@ interface Agrupado {
   total_votos: number;
   lista_nominal?: number;
   participacion_promedio?: number | null;
-  partidos: { partido: string; votos: number; candidato?: string }[];
+  partidos: { partido: string; votos: number; candidato?: string; tipo?: "individual" | "coalicion" }[];
   partido_principal?: string;
   sabana?: any;
 }
@@ -236,7 +236,10 @@ function consolidarCoalicionesActores(
   for (const actor of actores) {
     if (!actor || !actor.partido || typeof actor.votos !== "number") continue;
     const partes = actor.partido.split("_");
-    const esCoalicion = partes.length > 1;
+    // Respetar el tipo declarado por el backend: solo las coaliciones reales
+    // deben repartir sus votos entre sus partes. Los partidos cuyo nombre
+    // contiene guión bajo (p. ej. NA_Gto) se mantienen como actores individuales.
+    const esCoalicion = actor.tipo === "coalicion";
 
     if (esCoalicion) {
       for (const parte of partes) {

@@ -45,6 +45,7 @@ import {
   BrainCircuit,
   TrendingDown,
   TrendingUpIcon,
+  Info,
 } from "lucide-react";
 
 // Tipos
@@ -297,6 +298,81 @@ const CAMPOS_MAPEO: {
   { key: "filtro_municipio_columna", label: "Columna filtro municipio" },
 ];
 
+function NotaRedistritacionEmilio() {
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+      <div className="mb-3 flex items-start gap-3">
+        <div className="rounded-full bg-blue-100 p-2">
+          <Info size={20} className="text-blue-600" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-blue-900">
+            Redistritación del Distrito Local XVII, Guanajuato
+          </h3>
+          <p className="mt-1 text-sm leading-relaxed text-blue-800">
+            Los históricos cargados corresponden al Distrito Local XVII, pero su
+            composición territorial cambió entre procesos electorales. Por eso el
+            número de secciones y la lista nominal varían entre años: no es un error
+            de captura, es el nuevo corte geográfico aprobado por el Instituto
+            Electoral del Estado de Guanajuato.
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-blue-100 bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-blue-100 text-left text-xs font-bold uppercase tracking-wide text-blue-900">
+            <tr>
+              <th className="px-3 py-2">Año</th>
+              <th className="px-3 py-2">Secciones</th>
+              <th className="px-3 py-2">Municipios incluidos</th>
+              <th className="px-3 py-2">Observación</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-blue-100 text-blue-900">
+            <tr>
+              <td className="px-3 py-2 font-semibold">2018</td>
+              <td className="px-3 py-2">107</td>
+              <td className="px-3 py-2">
+                Comonfort, Juventino Rosas, Villagrán (secciones 2906-2933)
+              </td>
+              <td className="px-3 py-2">Corte 2017</td>
+            </tr>
+            <tr>
+              <td className="px-3 py-2 font-semibold">2021</td>
+              <td className="px-3 py-2">107</td>
+              <td className="px-3 py-2">
+                Comonfort, Juventino Rosas, Villagrán (secciones 2906-2933)
+              </td>
+              <td className="px-3 py-2">Mismo corte que 2018</td>
+            </tr>
+            <tr>
+              <td className="px-3 py-2 font-semibold">2024</td>
+              <td className="px-3 py-2">125</td>
+              <td className="px-3 py-2">
+                Comonfort, Juventino Rosas, Apaseo el Grande, casilla especial 9016
+              </td>
+              <td className="px-3 py-2">Nuevo corte post-2021</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-blue-800">
+        <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
+          Actor principal: MC
+        </span>
+        <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
+          Comparación 2018 ↔ 2021 válida
+        </span>
+        <span className="rounded-full bg-blue-100 px-2 py-1 font-medium">
+          2024 incluye territorio nuevo
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function HistoricoElectoralPageInner() {
   const { user, loading: authLoading } = useAuth();
 
@@ -360,6 +436,7 @@ function HistoricoElectoralPageInner() {
     }
   }, []);
   const modoBallesteros = tenantSlug === "mario-bellesteros";
+  const modoEmilio = tenantSlug === "emilio";
 
   // Análisis territorial / cruce histórico
   const [cruceData, setCruceData] = useState<any | null>(null);
@@ -2765,6 +2842,9 @@ function HistoricoElectoralPageInner() {
 
     return (
       <div className="space-y-6">
+        {/* Nota metodológica exclusiva del proyecto Emilio */}
+        {modoEmilio && <NotaRedistritacionEmilio />}
+
         {/* KPIs globales — una sola fila compacta */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KpiCard
